@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   version="1.1"
+   id="svg1"
+   width="108"
+   height="108"
+   viewBox="0 0 1079.9892 1079.9892"
+   sodipodi:docname="ic_bugbane_background.svg"
+   inkscape:version="1.4.2 (ebf0e940, 2025-05-08)"
+   inkscape:export-filename="bugbane.png"
+   inkscape:export-xdpi="24"
+   inkscape:export-ydpi="24"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="true"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="true"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="6.6169687"
+     inkscape:cx="53.952197"
+     inkscape:cy="53.952197"
+     inkscape:window-width="1920"
+     inkscape:window-height="1027"
+     inkscape:window-x="0"
+     inkscape:window-y="25"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g1"
+     borderlayer="true"
+     labelstyle="default"
+     showgrid="true">
+    <inkscape:grid
+       id="grid1"
+       units="px"
+       originx="0"
+       originy="0"
+       spacingx="9.9999"
+       spacingy="9.9999"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="5"
+       enabled="true"
+       visible="true" />
+  </sodipodi:namedview>
+  <g
+     inkscape:groupmode="layer"
+     inkscape:label="Image"
+     id="g1"
+     transform="matrix(0.4799952,0,0,0.4799952,298.26327,297.45368)">
+    <rect
+       style="display:inline;fill:#d85c59;fill-opacity:1;stroke-width:52.5714;stroke-linecap:round;stroke-linejoin:round"
+       id="rect10"
+       width="2281.4277"
+       height="2284.5762"
+       x="-635.52765"
+       y="-636.98944"
+       ry="0"
+       rx="0" />
+  </g>
+</svg>

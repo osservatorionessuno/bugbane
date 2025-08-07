@@ -1,0 +1,10 @@
+.gradle
+.idea
+.vscode
+build
+gradle
+gradlew
+gradlew.bat
+local.properties
+*.class
+.DS_Store
