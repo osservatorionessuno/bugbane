@@ -9,9 +9,7 @@
 Bugbane is an open-source Android application designed to help potential spyware and stalkerware victims self-triage their own device and, when appropriate, export evidence for later analysis by trusted organizations.
 
 
-<img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/assets/screenshots/home.png" />
-<img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/assets/screenshots/pairing.png" />
-<img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/assets/screenshots/dump.png" />
+<img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/assets/screenshots/intro.png" /><img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/assets/screenshots/pairing.png" /><img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/assets/screenshots/dump.png" />
 
 
 Unlike existing tools such as [MVT](https://mvt.re), Bugbane does not require a separate computer, command-line usage, or debugging skills. It uses ADB Wireless Debugging to issue commands directly to the same device on which it is installed, through a guided, user-friendly interface.
