@@ -1,5 +1,5 @@
 # Bugbane
-<img width="100" alt="image" src="https://github.com/user-attachments/assets/ebac862f-35e7-4e77-a7c2-540cbf38ac88" />
+<img width="100" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/icons/ic_bugbane_zoom.svg" />
 
 
 > [!CAUTION]
@@ -9,9 +9,9 @@
 Bugbane is an open-source Android application designed to help potential spyware and stalkerware victims self-triage their own device and, when appropriate, export evidence for later analysis by trusted organizations.
 
 
-<img width="260" alt="image" src="https://github.com/user-attachments/assets/ce9dc882-ed87-4146-8155-52ea3770dccb" />
-<img width="260" alt="image" src="https://github.com/user-attachments/assets/8588f9d7-902e-406a-be4c-ff03ffcf8a5a" />
-<img width="260" alt="image" src="https://github.com/user-attachments/assets/15d2c55e-ad32-4d5d-acf5-69ac8cfa8c6b" />
+<img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/assets/screenshots/home.png" />
+<img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/assets/screenshots/pairing.png" />
+<img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/assets/screenshots/dump.png" />
 
 
 Unlike existing tools such as [MVT](https://mvt.re), Bugbane does not require a separate computer, command-line usage, or debugging skills. It uses ADB Wireless Debugging to issue commands directly to the same device on which it is installed, through a guided, user-friendly interface.
