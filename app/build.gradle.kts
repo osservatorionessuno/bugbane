@@ -10,8 +10,8 @@ android {
 
     defaultConfig {
         applicationId = "org.osservatorionessuno.bugbane"
-        minSdk = 26
-        targetSdk = 35
+        minSdk = 29
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
