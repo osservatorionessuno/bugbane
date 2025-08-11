@@ -74,12 +74,8 @@ public class AdbViewModel extends AndroidViewModel {
             try {
                 if (adbShellStream != null) {
                     adbShellStream.close();
+                    adbShellStream = null;
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            try {
-                AdbConnectionManager.getInstance(getApplication()).close();
             } catch (Exception e) {
                 e.printStackTrace();
             }
