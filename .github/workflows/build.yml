@@ -5,22 +5,28 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch: {}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: 35
-          build-tools: 35.0.0
+          packages: |
+            platforms;android-35
+            build-tools;35.0.0
+
       - name: Build with Gradle
-        run: gradle build
+        run: ./gradlew --no-daemon build
+
