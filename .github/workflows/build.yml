@@ -24,9 +24,23 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: |
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+            platforms;android-35 build-tools;35.0.0
+      - name: Install Gradle (official distribution)
+        env:
+          GRADLE_VERSION: "8.13"
+        run: |
+          curl -L -o gradle-${GRADLE_VERSION}-bin.zip https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
+          unzip -q gradle-${GRADLE_VERSION}-bin.zip -d "$HOME/gradle"
+          echo "$HOME/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+          gradle --version
 
       - name: Build with Gradle
-        run: ./gradlew --no-daemon build
+        run: gradle --no-daemon build
 
+      - name: Upload APKs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ github.run_number }}
+          path: "**/build/outputs/apk/**/*.apk"
+          retention-days: 7
