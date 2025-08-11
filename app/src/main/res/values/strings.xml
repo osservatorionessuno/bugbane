@@ -15,6 +15,10 @@
     Beware that the results could in some cases contain sensitive information, so be careful with the sharing.</string>
     <string name="slideshow_welcome_button">I understand</string>
 
+    <string name="slideshow_wifi_title">Connect to a Trusted Wi‑Fi Network</string>
+    <string name="slideshow_wifi_description">To continue, connect your device to a protected Wi‑Fi network, such as your home network or a personal hotspot.</string>
+    <string name="slideshow_wifi_button">Open Wi‑Fi Settings</string>
+
     <string name="slideshow_notification_title">Enable Notification Permissions</string>
     <string name="slideshow_notification_description">To use this app, you need to enable Notification Permissions in your device settings.
     \n\n

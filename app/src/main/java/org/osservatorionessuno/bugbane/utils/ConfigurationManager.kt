@@ -8,6 +8,8 @@ import android.util.Log
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 
 object ConfigurationManager {
 
@@ -23,6 +25,15 @@ object ConfigurationManager {
     fun openDeveloperOptions(context: Context) {
         // Open the developer options settings
         val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+        }
+    }
+
+    fun openWifiSettings(context: Context) {
+        // Open Wi-Fi settings
+        val intent = Intent(Settings.ACTION_WIFI_SETTINGS)
         try {
             context.startActivity(intent)
         } catch (e: Exception) {
@@ -53,6 +64,14 @@ object ConfigurationManager {
             return true
         }
         return false
+    }
+
+    fun isConnectedToWifi(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
     fun isWirelessDebuggingEnabled(context: Context): Boolean {

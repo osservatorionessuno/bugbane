@@ -51,6 +51,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.foundation)
+    implementation("androidx.compose.material:material-icons-extended")
 
     implementation("com.github.MuntashirAkon:libadb-android:3.0.0")
     implementation("com.github.MuntashirAkon:sun-security-android:1.1")

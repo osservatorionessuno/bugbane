@@ -31,7 +31,7 @@ import org.osservatorionessuno.bugbane.utils.AdbViewModel
 
 class SlideshowActivity : ComponentActivity() {
     private val viewModel: AdbViewModel by viewModels()
-    private val totalPages = 5
+    private val totalPages = 6
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,6 +99,7 @@ fun SlideshowScreen(
 
     val slideshowPages = listOf(
         WelcomePage.create { goToNextPage() },
+        WifiConnectionPage.create { goToNextPage() },
         NotificationPermissionPage.create { goToNextPage() },
         DeveloperOptionsPage.create { goToNextPage() },
         WirelessDebuggingPage.create { goToNextPage() },
