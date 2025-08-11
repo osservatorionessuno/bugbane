@@ -21,6 +21,9 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.osservatorionessuno.bugbane.components.SlideshowPage
 import org.osservatorionessuno.bugbane.pages.*
 import org.osservatorionessuno.bugbane.ui.theme.Theme
@@ -107,6 +110,22 @@ fun SlideshowScreen(
         val currentPageData = slideshowPages.getOrNull(currentPage)
         if (currentPageData?.shouldSkip?.invoke() == true) {
             goToNextPage()
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, currentPage) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val currentPageData = slideshowPages.getOrNull(currentPage)
+                if (currentPageData?.shouldSkip?.invoke() == true) {
+                    goToNextPage()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
