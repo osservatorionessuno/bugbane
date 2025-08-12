@@ -15,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -231,17 +232,13 @@ public class AdbViewModel extends AndroidViewModel {
         });
     }
 
-    public void runQuickForensics() {
+    public void runQuickForensics(@NonNull File baseDir) {
         executor.submit(() -> {
             try {
                 AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(getApplication());
-                // TODO: Implement QuickForensics functionality
-                // new org.osservatorionessuno.bugbane.qf.QuickForensics()
-                //         .run(getApplication(), manager);
-                System.out.println("QuickForensics functionality not yet implemented");
-                // Post message to main thread via LiveData instead of Toast
-                commandOutput.postValue("QuickForensics functionality not yet implemented");
-            } catch (Exception e) {
+                File out = new org.osservatorionessuno.bugbane.qf.QuickForensics()
+                        .run(getApplication(), manager, baseDir);
+                commandOutput.postValue("QuickForensics completed: " + out.getAbsolutePath());            } catch (Exception e) {
                 e.printStackTrace();
                 commandOutput.postValue("Error running QuickForensics: " + e.getMessage());
             }
