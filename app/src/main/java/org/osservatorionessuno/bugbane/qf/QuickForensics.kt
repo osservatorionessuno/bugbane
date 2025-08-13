@@ -9,6 +9,10 @@ import java.util.UUID
 import org.osservatorionessuno.bugbane.qf.modules.Dumpsys
 import org.osservatorionessuno.bugbane.qf.modules.Logcat
 import org.osservatorionessuno.bugbane.qf.modules.Env
+import org.osservatorionessuno.bugbane.qf.modules.GetProp
+import org.osservatorionessuno.bugbane.qf.modules.Processes
+import org.osservatorionessuno.bugbane.qf.modules.Services
+import org.osservatorionessuno.bugbane.qf.modules.Settings
 
 private const val TAG = "QuickForensics"
 
@@ -27,6 +31,10 @@ private const val TAG = "QuickForensics"
          Env(),
          Dumpsys(),
          Logcat(),
+         GetProp(),
+         Processes(),
+         Services(),
+         Settings()
      )
  ) {
 
