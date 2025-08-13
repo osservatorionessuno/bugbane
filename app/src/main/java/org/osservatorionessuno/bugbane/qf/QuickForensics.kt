@@ -11,6 +11,7 @@ import org.osservatorionessuno.bugbane.qf.modules.Logcat
 import org.osservatorionessuno.bugbane.qf.modules.Env
 import org.osservatorionessuno.bugbane.qf.modules.GetProp
 import org.osservatorionessuno.bugbane.qf.modules.Processes
+import org.osservatorionessuno.bugbane.qf.modules.SELinux
 import org.osservatorionessuno.bugbane.qf.modules.Services
 import org.osservatorionessuno.bugbane.qf.modules.Settings
 
@@ -34,7 +35,8 @@ private const val TAG = "QuickForensics"
          GetProp(),
          Processes(),
          Services(),
-         Settings()
+         Settings(),
+         SELinux()
      )
  ) {
 
