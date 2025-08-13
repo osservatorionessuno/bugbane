@@ -1,14 +1,17 @@
 package org.osservatorionessuno.bugbane.qf
 
-import android.util.Log
 import android.content.Context
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
+import android.util.Log
 import java.io.File
 import java.io.IOException
+import java.time.Instant
 import java.util.UUID
+import org.json.JSONObject
+import io.github.muntashirakon.adb.AbsAdbConnectionManager
+import org.osservatorionessuno.bugbane.BuildConfig
+import org.osservatorionessuno.bugbane.qf.modules.Env
 import org.osservatorionessuno.bugbane.qf.modules.Dumpsys
 import org.osservatorionessuno.bugbane.qf.modules.Logcat
-import org.osservatorionessuno.bugbane.qf.modules.Env
 import org.osservatorionessuno.bugbane.qf.modules.GetProp
 import org.osservatorionessuno.bugbane.qf.modules.Processes
 import org.osservatorionessuno.bugbane.qf.modules.SELinux
@@ -59,11 +62,27 @@ private const val TAG = "QuickForensics"
             throw IOException("Unable to create base output directory: $baseOutputDir")
         }
 
+        val started = Instant.now()
+
         val acquisitionDir = File(baseOutputDir, UUID.randomUUID().toString())
         if (!acquisitionDir.mkdirs()) {
             throw IOException("Unable to create acquisition directory: $acquisitionDir")
         }
         Log.i(TAG, "Starting acquisition in ${acquisitionDir.absolutePath}")
+
+        val shell = Shell(manager)
+        val cpu = shell.exec("getprop ro.product.cpu.abi").trim()
+        var tmpDir = "/data/local/tmp/"
+        var sdCard = "/sdcard/"
+        shell.exec("env").split('\n').forEach { line ->
+            val trimmed = line.trim()
+            when {
+                trimmed.startsWith("TMPDIR=") -> tmpDir = trimmed.removePrefix("TMPDIR=")
+                trimmed.startsWith("EXTERNAL_STORAGE=") -> sdCard = trimmed.removePrefix("EXTERNAL_STORAGE=")
+            }
+        }
+        if (!tmpDir.endsWith('/')) tmpDir += '/'
+        if (!sdCard.endsWith('/')) sdCard += '/'
 
         modules.forEach { module ->
             Log.i(TAG, "Running module ${module.name}")
@@ -74,6 +93,25 @@ private const val TAG = "QuickForensics"
                 Log.e(TAG, "Module ${module.name} failed", t)
             }
         }
+
+        val completed = Instant.now()
+        val metadata = JSONObject().apply {
+            put("uuid", acquisitionDir.name)
+            put("androidqf_version", BuildConfig.VERSION_NAME)
+            put("storage_path", acquisitionDir.absolutePath)
+            put("started", started.toString())
+            put("completed", completed.toString())
+            put("collector", JSONObject().apply {
+                put("ExePath", tmpDir + "collector")
+                put("Installed", false)
+                put("Adb", JSONObject().apply { put("ExePath", "") })
+                put("Architecture", cpu)
+            })
+            put("tmp_dir", tmpDir)
+            put("sdcard", sdCard)
+            put("cpu", cpu)
+        }
+        File(acquisitionDir, "acquisition.json").writeText(metadata.toString(1))
 
         Log.i(TAG, "Acquisition complete in ${acquisitionDir.absolutePath}")
         return acquisitionDir
