@@ -20,7 +20,7 @@ import io.github.muntashirakon.adb.PRNGFixes
 import org.osservatorionessuno.bugbane.components.AppTopBar
 import org.osservatorionessuno.bugbane.components.NavigationTabs
 import org.osservatorionessuno.bugbane.screens.ScanScreen
-import org.osservatorionessuno.bugbane.screens.BackupsScreen
+import org.osservatorionessuno.bugbane.screens.AcquisitionsScreen
 import org.osservatorionessuno.bugbane.ui.theme.Theme
 import org.osservatorionessuno.bugbane.utils.SlideshowManager
 import org.osservatorionessuno.bugbane.utils.AdbViewModel
@@ -135,7 +135,7 @@ fun MainContent(onSetLacksPermissionsCallback: ((Boolean) -> Unit) -> Unit) {
                         lacksPermissions = lacksPermissions,
                         onLacksPermissionsChange = { setLacksPermissions(it) }
                     )
-                    1 -> BackupsScreen()
+                    1 -> AcquisitionsScreen()
                 }
             }
         }

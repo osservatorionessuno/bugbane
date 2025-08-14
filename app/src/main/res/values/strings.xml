@@ -3,7 +3,7 @@
     
     <!-- Navigation strings -->
     <string name="main_nav_scan">Scan</string>
-    <string name="main_nav_backups">Backups</string>
+    <string name="main_nav_acquisitions">Acquisitions</string>
     <string name="main_nav_settings">Settings</string>
 
     <!-- Slideshow strings -->
@@ -59,11 +59,10 @@
     <string name="settings_developer_options">Disable Developer Options</string>
     <string name="settings_developer_options_desc">It is recommended to disable the Development Options after every scan and re-enable it when needed to prevent unnecessary use.</string>
     
-    <!-- Backup screen strings -->
-    <string name="backups_title">Backups</string>
-    <string name="backups_share">Share</string>
-    <string name="backups_show_password">Show Password</string>
-    <string name="backups_delete">Delete</string>
+    <!-- Acquisitions screen strings -->
+    <string name="acquisitions_title">Acquisitions</string>
+    <string name="acquisitions_rename">Rename</string>
+    <string name="acquisitions_delete">Delete</string>
     
     <!-- ADB Pairing Service strings -->
     <string name="notification_channel_adb_pairing">ADB Pairing</string>

@@ -6,7 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,7 +33,7 @@ fun NavigationTabs(
 ) {
     val tabs = listOf(
         TabItem(stringResource(R.string.main_nav_scan), Icons.Default.Search),
-        TabItem(stringResource(R.string.main_nav_backups), Icons.Default.LocationOn)
+        TabItem(stringResource(R.string.main_nav_acquisitions), Icons.Default.Folder)
     )
     
     TabRow(
