@@ -45,24 +45,14 @@
     
     <!-- Home screen checklist strings -->
     <string name="home_checklist_title">Forensic Checklist</string>
-    <string name="home_scan_button">Start Dump</string>
-    <string name="home_scanning_button">Dumping...</string>
+    <string name="home_scan_button">Start Analysis</string>
+    <string name="home_scanning_button">Analizying...</string>
     <string name="home_permissions_button">Enable Permissions</string>
     <string name="scan_disable_dialog_title">After every scan, it is recommended to disable the Development Option until the next scan.</string>
     <string name="scan_disable_dialog_button">Disable</string>
     <string name="scan_disable_dialog_close_button">Close</string>
-    
-    <!-- Checklist items -->    
-    <string name="checkbox_getprop">Dump device properties</string>
-    <string name="checkbox_settings">Dump device settings</string>
-    <string name="checkbox_processes">Dump processes in execution</string>
-    <string name="checkbox_services">Dump services in execution</string>
-    <string name="checkbox_smsbackup">Dump received SMS</string>
-    <string name="checkbox_logcat">Dump Logcat logs</string>
-    <string name="checkbox_logs">Dump device/kernel/crash logs</string>
-    <string name="checkbox_dumpsys">Dump DumpSys information</string>
-    <string name="checkbox_packages">Dump installed packages and applications</string>
-    
+    <string name="scan_cancel_button">Stop Analysis</string>
+        
     <!-- Settings screen strings -->
     <string name="settings_description">Configure your app preferences and settings here.</string>
     <string name="settings_general">General Settings</string>

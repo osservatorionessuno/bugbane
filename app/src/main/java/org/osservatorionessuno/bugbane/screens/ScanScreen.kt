@@ -10,10 +10,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,12 +28,6 @@ import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
 import java.io.File
 
-data class ChecklistItem(
-    val id: Int,
-    val title: String,
-    val isChecked: Boolean = false
-)
-
 @Composable
 fun ScanScreen(
     lacksPermissions: Boolean = false,
@@ -44,37 +38,15 @@ fun ScanScreen(
     val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<org.osservatorionessuno.bugbane.utils.AdbViewModel>()
     var isScanning by remember { mutableStateOf(false) }
     var showDisableDialog by remember { mutableStateOf(false) }
-    
+    var completedModules by remember { mutableStateOf(0) }
+    var totalModules by remember { mutableStateOf(0) }
+    val progressLogs = remember { mutableStateListOf<String>() }
+
     // Update lacksPermissions based on current permissions
     LaunchedEffect(Unit) {
-        val hasPermissions = ConfigurationManager.isNotificationPermissionGranted(context) && 
+        val hasPermissions = ConfigurationManager.isNotificationPermissionGranted(context) &&
                            ConfigurationManager.isWirelessDebuggingEnabled(context)
         onLacksPermissionsChange(!hasPermissions)
-    }
-    
-    // Get string resources at composable level
-    val backupTitle = stringResource(R.string.checkbox_smsbackup)
-    val getpropTitle = stringResource(R.string.checkbox_getprop)
-    val settingsTitle = stringResource(R.string.checkbox_settings)
-    val processesTitle = stringResource(R.string.checkbox_processes)
-    val servicesTitle = stringResource(R.string.checkbox_services)
-    val logcatTitle = stringResource(R.string.checkbox_logcat)
-    val logsTitle = stringResource(R.string.checkbox_logs)
-    val dumpsysTitle = stringResource(R.string.checkbox_dumpsys)
-    
-    var checklistItems by remember {
-        mutableStateOf(
-            listOf(
-                ChecklistItem(1, backupTitle),
-                ChecklistItem(2, getpropTitle),
-                ChecklistItem(3, settingsTitle),
-                ChecklistItem(4, processesTitle),
-                ChecklistItem(5, servicesTitle),
-                ChecklistItem(6, logcatTitle),
-                ChecklistItem(7, logsTitle),
-                ChecklistItem(8, dumpsysTitle)
-            )
-        )
     }
 
     Column(
@@ -82,197 +54,199 @@ fun ScanScreen(
             .fillMaxSize()
             .padding(8.dp)
     ) {
-        Card(
-            modifier = Modifier.weight(1f),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) { 
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+        if (isScanning) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    itemsIndexed(checklistItems) { index, item ->
-                        ChecklistItemRow(
-                            item = item
-                        )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (totalModules > 0) {
+                            CircularProgressIndicator(progress = completedModules / totalModules.toFloat())
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("$completedModules / $totalModules")
+                        } else {
+                            CircularProgressIndicator()
+                        }
                     }
                 }
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    items(progressLogs) { log ->
+                        Text(log)
+                    }
+                }
+                Button(
+                    onClick = { viewModel.cancelQuickForensics() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.scan_cancel_button),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                    )
+                }
             }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Disable Development Tools Dialog
-        AnimatedVisibility(
-            visible = showDisableDialog,
-            enter = slideInVertically(
-                animationSpec = tween(400),
-                initialOffsetY = { it }
-            ) + fadeIn(
-                animationSpec = tween(400)
-            ) + scaleIn(
-                animationSpec = tween(400),
-                initialScale = 0.95f
-            ),
-            exit = slideOutVertically(
-                animationSpec = tween(300),
-                targetOffsetY = { it }
-            ) + fadeOut(
-                animationSpec = tween(300)
-            ) + scaleOut(
-                animationSpec = tween(300),
-                targetScale = 0.95f
-            )
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+        } else {
+            // Disable Development Tools Dialog
+            AnimatedVisibility(
+                visible = showDisableDialog,
+                enter = slideInVertically(
+                    animationSpec = tween(400),
+                    initialOffsetY = { it }
+                ) + fadeIn(
+                    animationSpec = tween(400)
+                ) + scaleIn(
+                    animationSpec = tween(400),
+                    initialScale = 0.95f
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                exit = slideOutVertically(
+                    animationSpec = tween(300),
+                    targetOffsetY = { it }
+                ) + fadeOut(
+                    animationSpec = tween(300)
+                ) + scaleOut(
+                    animationSpec = tween(300),
+                    targetScale = 0.95f
+                )
             ) {
-                Row(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(bottom = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.scan_disable_dialog_title),
-                        //style = MaterialTheme.typography.bodyLarge.copy(
-                        //    fontWeight = FontWeight.Medium
-                        //),
-                        modifier = Modifier.weight(1f)
-                    )
-                    
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Button(
-                            onClick = {
-                                ConfigurationManager.openDeveloperOptions(context)
-                                showDisableDialog = false
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error
-                            )
+                        Text(
+                            text = stringResource(R.string.scan_disable_dialog_title),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text(stringResource(R.string.scan_disable_dialog_button))
-                        }
-                        
-                        IconButton(
-                            onClick = { showDisableDialog = false }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = stringResource(R.string.scan_disable_dialog_close_button),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Button(
+                                onClick = {
+                                    ConfigurationManager.openDeveloperOptions(context)
+                                    showDisableDialog = false
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text(stringResource(R.string.scan_disable_dialog_button))
+                            }
+
+                            IconButton(
+                                onClick = { showDisableDialog = false }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.scan_disable_dialog_close_button),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(2.dp))
-        
-        // Scan Button
-        Button(
-            onClick = {
-                if (lacksPermissions) {
-                    SlideshowActivity.start(context)
-                    return@Button
-                }
+            Spacer(modifier = Modifier.height(2.dp))
 
-                if (!isScanning) {
-                    coroutineScope.launch {
-                        val baseDir = File(context.filesDir, "acquisitions")
-                        viewModel.runQuickForensics(baseDir)
-
-                        isScanning = true
-                        // Reset all items to unchecked
-                        checklistItems = checklistItems.map { it.copy(isChecked = false) }
-                        
-                        // Check items one by one with delay
-                        checklistItems.forEachIndexed { index, item ->
-                            //delay(800) // 800ms delay between each check
-                            checklistItems = checklistItems.map { 
-                                if (it.id == item.id) it.copy(isChecked = true) else it 
-                            }
-                        }
-                        isScanning = false
-                        
-                        // Show the disable dialog after scanning is complete
-                        showDisableDialog = true
+            // Scan Button
+            Button(
+                onClick = {
+                    if (lacksPermissions) {
+                        SlideshowActivity.start(context)
+                        return@Button
                     }
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isScanning,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isScanning) 
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f) 
-                else if (lacksPermissions)
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
-                else 
-                    MaterialTheme.colorScheme.secondary
-            )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = if (isScanning)
-                    stringResource(R.string.home_scanning_button)
-                else if (lacksPermissions)
-                    stringResource(R.string.home_permissions_button)
-                else
-                    stringResource(R.string.home_scan_button),
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Medium
+
+                    if (!isScanning) {
+                        val baseDir = File(context.filesDir, "acquisitions")
+                        isScanning = true
+                        progressLogs.clear()
+                        completedModules = 0
+                        totalModules = 0
+                        viewModel.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
+                            override fun onModuleStart(name: String, completed: Int, total: Int) {
+                                coroutineScope.launch {
+                                    totalModules = total
+                                    progressLogs.add("Starting $name")
+                                }
+                            }
+
+                            override fun onModuleComplete(name: String, completed: Int, total: Int) {
+                                coroutineScope.launch {
+                                    completedModules = completed
+                                    progressLogs.add("Completed $name")
+                                }
+                            }
+
+                            override fun isCancelled(): Boolean = viewModel.isQuickForensicsCancelled()
+
+                            override fun onFinished(cancelled: Boolean) {
+                                coroutineScope.launch {
+                                    isScanning = false
+                                    if (!cancelled) {
+                                        showDisableDialog = true
+                                    }
+                                }
+                            }
+                        })
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isScanning,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isScanning)
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    else if (lacksPermissions)
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
+                    else
+                        MaterialTheme.colorScheme.secondary
                 )
-            )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isScanning)
+                        stringResource(R.string.home_scanning_button)
+                    else if (lacksPermissions)
+                        stringResource(R.string.home_permissions_button)
+                    else
+                        stringResource(R.string.home_scan_button),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
         }
     }
 }
-
-@Composable
-fun ChecklistItemRow(
-    item: ChecklistItem
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 1.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Checkbox(
-            checked = item.isChecked,
-            onCheckedChange = null,
-            modifier = Modifier.padding(end = 4.dp)
-        )
-        
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Medium
-                ),
-                color = if (item.isChecked) 
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f) 
-                else 
-                    MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-} 
