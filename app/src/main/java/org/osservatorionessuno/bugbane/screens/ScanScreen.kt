@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
+import java.io.File
 
 data class ChecklistItem(
     val id: Int,
@@ -190,8 +191,9 @@ fun ScanScreen(
 
                 if (!isScanning) {
                     coroutineScope.launch {
-                        viewModel.execute("id")
-                        
+                        val baseDir = File(context.filesDir, "acquisitions")
+                        viewModel.runQuickForensics(baseDir)
+
                         isScanning = true
                         // Reset all items to unchecked
                         checklistItems = checklistItems.map { it.copy(isChecked = false) }
