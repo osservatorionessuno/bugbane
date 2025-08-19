@@ -5,14 +5,20 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.osservatorionessuno.bugbane.qf.Module
 import org.osservatorionessuno.bugbane.qf.Shell
+import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import java.io.File
 
 class Files : Module {
     override val name = "files"
 
-    override fun run(context: Context, shell: Shell, outDir: File) {
+    override fun run(
+        context: Context,
+        manager: AbsAdbConnectionManager,
+        outDir: File,
+        progress: ((Long) -> Unit)?
+    ) {
         outDir.mkdirs()
-        val sh = shell
+        val sh = Shell(manager, progress = progress)
 
         // Detect find -printf capability
         val supportsPrintf = runCatching {

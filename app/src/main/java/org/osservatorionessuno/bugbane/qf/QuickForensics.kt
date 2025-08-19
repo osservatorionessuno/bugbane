@@ -18,6 +18,7 @@ import org.osservatorionessuno.bugbane.qf.modules.Processes
 import org.osservatorionessuno.bugbane.qf.modules.SELinux
 import org.osservatorionessuno.bugbane.qf.modules.Services
 import org.osservatorionessuno.bugbane.qf.modules.Settings
+import org.osservatorionessuno.bugbane.qf.modules.Bugreport
 
 private const val TAG = "QuickForensics"
 
@@ -36,6 +37,7 @@ class QuickForensics(
         Env(),
         Dumpsys(),
         Files(),
+        Bugreport(),
         Logcat(),
         GetProp(),
         Processes(),
@@ -109,14 +111,15 @@ class QuickForensics(
             }
 
             var moduleBytes = 0L
-            val modShell = Shell(manager = manager, progress = { delta: Long ->
+            val progressCb: (Long) -> Unit = { delta ->
                 moduleBytes += delta
                 listener?.onModuleProgress(module.name, moduleBytes)
-            })
+                Unit
+            }
             Log.i(TAG, "Running module ${module.name}")
             listener?.onModuleStart(module.name, completedCount, total)
             try {
-                module.run(context, modShell, acquisitionDir)
+                module.run(context, manager, acquisitionDir, progressCb)
                 Log.i(TAG, "Module ${module.name} finished")
             } catch (t: Throwable) {
                 Log.e(TAG, "Module ${module.name} failed", t)

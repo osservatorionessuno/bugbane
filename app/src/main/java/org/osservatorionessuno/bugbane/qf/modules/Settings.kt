@@ -3,6 +3,7 @@ package org.osservatorionessuno.bugbane.qf.modules
 import android.content.Context
 import org.osservatorionessuno.bugbane.qf.Module
 import org.osservatorionessuno.bugbane.qf.Shell
+import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import java.io.File
 
 /**
@@ -12,9 +13,15 @@ import java.io.File
 class Settings : Module {
     override val name: String = "settings"
 
-    override fun run(context: Context, shell: Shell, outDir: File) {
+    override fun run(
+        context: Context,
+        manager: AbsAdbConnectionManager,
+        outDir: File,
+        progress: ((Long) -> Unit)?
+    ) {
         if (!outDir.exists()) outDir.mkdirs()
         val namespaces = listOf("system", "secure", "global")
+        val shell = Shell(manager, progress = progress)
         for (ns in namespaces) {
             val outFile = File(outDir, "settings_${ns}.txt")
             shell.execToFile("cmd settings list $ns", outFile)
