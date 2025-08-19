@@ -48,6 +48,7 @@ private const val TAG = "QuickForensics"
      */
     interface ProgressListener {
         fun onModuleStart(name: String, completed: Int, total: Int)
+        fun onModuleProgress(name: String, bytes: Long)
         fun onModuleComplete(name: String, completed: Int, total: Int)
         fun isCancelled(): Boolean
         fun onFinished(cancelled: Boolean)
@@ -105,10 +106,15 @@ private const val TAG = "QuickForensics"
                 return acquisitionDir
             }
 
+            var moduleBytes = 0L
+            val modShell = Shell(manager) { delta ->
+                moduleBytes += delta
+                listener?.onModuleProgress(module.name, moduleBytes)
+            }
             Log.i(TAG, "Running module ${module.name}")
             listener?.onModuleStart(module.name, completedCount, total)
             try {
-                module.run(context, manager, acquisitionDir)
+                module.run(context, modShell, acquisitionDir)
                 Log.i(TAG, "Module ${module.name} finished")
             } catch (t: Throwable) {
                 Log.e(TAG, "Module ${module.name} failed", t)

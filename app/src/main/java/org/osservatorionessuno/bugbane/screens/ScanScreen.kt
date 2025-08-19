@@ -41,6 +41,8 @@ fun ScanScreen(
     var completedModules by remember { mutableStateOf(0) }
     var totalModules by remember { mutableStateOf(0) }
     val progressLogs = remember { mutableStateListOf<String>() }
+    val moduleLogIndex = remember { mutableStateMapOf<String, Int>() }
+    val moduleBytes = remember { mutableStateMapOf<String, Long>() }
 
     // Update lacksPermissions based on current permissions
     LaunchedEffect(Unit) {
@@ -188,20 +190,38 @@ fun ScanScreen(
                         val baseDir = File(context.filesDir, "acquisitions")
                         isScanning = true
                         progressLogs.clear()
+                        moduleLogIndex.clear()
+                        moduleBytes.clear()
                         completedModules = 0
                         totalModules = 0
                         viewModel.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
                             override fun onModuleStart(name: String, completed: Int, total: Int) {
                                 coroutineScope.launch {
                                     totalModules = total
-                                    progressLogs.add("Starting $name")
+                                    moduleLogIndex[name] = progressLogs.size
+                                    moduleBytes[name] = 0L
+                                    progressLogs.add("Running $name: 0 B")
+                                }
+                            }
+
+                            override fun onModuleProgress(name: String, bytes: Long) {
+                                coroutineScope.launch {
+                                    val idx = moduleLogIndex[name] ?: return@launch
+                                    moduleBytes[name] = bytes
+                                    progressLogs[idx] = "Running $name: ${formatBytes(bytes)}"
                                 }
                             }
 
                             override fun onModuleComplete(name: String, completed: Int, total: Int) {
                                 coroutineScope.launch {
                                     completedModules = completed
-                                    progressLogs.add("Completed $name")
+                                    val idx = moduleLogIndex[name]
+                                    val finalBytes = moduleBytes[name] ?: 0L
+                                    if (idx != null) {
+                                        progressLogs[idx] = "Completed $name: ${formatBytes(finalBytes)}"
+                                    } else {
+                                        progressLogs.add("Completed $name: ${formatBytes(finalBytes)}")
+                                    }
                                 }
                             }
 
@@ -249,4 +269,15 @@ fun ScanScreen(
             }
         }
     }
+}
+
+private fun formatBytes(bytes: Long): String {
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    var value = bytes.toDouble()
+    var idx = 0
+    while (value >= 1024 && idx < units.lastIndex) {
+        value /= 1024
+        idx++
+    }
+    return String.format("%.1f %s", value, units[idx])
 }

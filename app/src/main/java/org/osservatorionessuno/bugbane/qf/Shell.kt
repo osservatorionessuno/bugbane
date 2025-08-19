@@ -8,7 +8,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
-class Shell(private val manager: AbsAdbConnectionManager) {
+class Shell(
+    private val manager: AbsAdbConnectionManager,
+    private val progress: ((Long) -> Unit)? = null
+) {
 
     companion object {
         private const val NO_PROGRESS_MS = 5_000L   // rule: no bytes for 5s => EOF
@@ -124,6 +127,7 @@ class Shell(private val manager: AbsAdbConnectionManager) {
                         if (bytes > 0) {
                             sink.write(buf, 0, bytes)
                             total += bytes
+                            progress?.invoke(bytes.toLong())
                         }
                         // If bytes == 0, continue; (shouldn't happen with blocking read)
                     }
