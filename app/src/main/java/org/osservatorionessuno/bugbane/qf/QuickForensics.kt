@@ -19,6 +19,7 @@ import org.osservatorionessuno.bugbane.qf.modules.SELinux
 import org.osservatorionessuno.bugbane.qf.modules.Services
 import org.osservatorionessuno.bugbane.qf.modules.Settings
 import org.osservatorionessuno.bugbane.qf.modules.Bugreport
+import org.osservatorionessuno.bugbane.qf.modules.RootBinaries
 
 private const val TAG = "QuickForensics"
 
@@ -41,6 +42,7 @@ class QuickForensics(
         Logcat(),
         GetProp(),
         Processes(),
+        RootBinaries(),
         Services(),
         Settings(),
         SELinux()
