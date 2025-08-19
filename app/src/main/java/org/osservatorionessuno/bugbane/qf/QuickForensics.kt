@@ -11,6 +11,7 @@ import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import org.osservatorionessuno.bugbane.BuildConfig
 import org.osservatorionessuno.bugbane.qf.modules.Env
 import org.osservatorionessuno.bugbane.qf.modules.Dumpsys
+import org.osservatorionessuno.bugbane.qf.modules.Files
 import org.osservatorionessuno.bugbane.qf.modules.Logcat
 import org.osservatorionessuno.bugbane.qf.modules.GetProp
 import org.osservatorionessuno.bugbane.qf.modules.Processes
@@ -34,6 +35,7 @@ class QuickForensics(
     private val modules: List<Module> = listOf(
         Env(),
         Dumpsys(),
+        Files(),
         Logcat(),
         GetProp(),
         Processes(),

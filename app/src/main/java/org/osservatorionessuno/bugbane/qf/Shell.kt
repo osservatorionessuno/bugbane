@@ -29,11 +29,7 @@ class Shell(
             parentFile?.mkdirs()
             delete()
         }
-
-        FileOutputStream(temp).use { out ->
-            execInternal(command, out)
-        }
-
+        FileOutputStream(temp).use { out -> execInternal(command, out) }
         if (file.exists()) file.delete()
         if (!temp.renameTo(file)) temp.copyTo(file, overwrite = true)
         temp.delete()
@@ -43,10 +39,16 @@ class Shell(
         var lastErr: Throwable? = null
         repeat(RETRIES + 1) { attempt ->
             try {
-                val marker = "__QF_MARKER_${UUID.randomUUID()}__"
-                val fullCmd = "$command; echo $marker"
-                Log.d(tag, "[exec] Running: $fullCmd")
-                runWithStream("shell:$fullCmd", sink, marker)
+                val marker = "__QF__${UUID.randomUUID()}__EOX__"
+                // Always run inside a shell and print marker via printf (more reliable than echo).
+                val script = "LC_ALL=C; exec 2>&1; { $command ; }; /system/bin/printf \"%s\\n\" \"$marker\""
+                val wrapped = "/system/bin/sh -c " + shSingleQuote(script)
+                Log.d(tag, "[exec] Running: $wrapped")
+
+                val found = runWithStream("shell:$wrapped", sink, marker)
+                if (!found) {
+                    Log.w(tag, "[exec] Marker not seen; stream ended/idle before marker (accepting output)")
+                }
                 return
             } catch (t: Throwable) {
                 Log.w(tag, "[exec] Attempt $attempt failed: ${t.message}")
@@ -56,7 +58,11 @@ class Shell(
         throw IOException("All attempts failed", lastErr)
     }
 
-    private fun runWithStream(command: String, sink: OutputStream, marker: String) {
+    /**
+     * Reads the stream, writes to [sink], returns true if marker matched, false if stream ended/idle first.
+     * Throws only on hard timeout or unexpected IO.
+     */
+    private fun runWithStream(command: String, sink: OutputStream, marker: String): Boolean {
         val stream = manager.openStream(command)
         val input = stream.openInputStream().buffered()
         val executor = Executors.newSingleThreadExecutor { Thread(it, "ShellReader").apply { isDaemon = true } }
@@ -69,6 +75,7 @@ class Shell(
 
         try {
             loop@ while (true) {
+                // Hard timeout always enforced
                 if (System.nanoTime() - startTime > TimeUnit.MILLISECONDS.toNanos(timeoutMs)) {
                     throw IOException("Shell command timed out: $command")
                 }
@@ -76,24 +83,32 @@ class Shell(
                 val bytesRead = try {
                     readOnceWithTimeout(executor, input, buf, inactivityMs)
                 } catch (e: TimeoutException) {
-                    Log.d(tag, "[exec] Inactivity fallback triggered for: $command")
+                    Log.d(tag, "[exec] Inactivity: no bytes for ${inactivityMs}ms (fallback exit)")
                     break
                 } catch (e: IOException) {
-                    if (e.message?.contains("stream closed", ignoreCase = true) == true) break
+                    // Some devices close the stream abruptly when the process exits.
+                    if (e.message?.contains("stream closed", ignoreCase = true) == true) {
+                        Log.d(tag, "[exec] Stream closed by remote")
+                        break
+                    }
                     throw e
                 }
 
-                if (bytesRead == -1) break
+                if (bytesRead == -1) {
+                    Log.d(tag, "[exec] EOF")
+                    break
+                }
 
                 var writeUntil = bytesRead
 
+                // Fast byte scanner for marker (no decoding).
                 for (i in 0 until bytesRead) {
                     sliding.addLast(buf[i])
                     if (sliding.size > markerBytes.size) sliding.removeFirst()
 
-                    if (sliding.size == markerBytes.size && sliding.toByteArray().contentEquals(markerBytes)) {
+                    if (sliding.size == markerBytes.size && slidingMatches(sliding, markerBytes)) {
                         markerMatched = true
-                        writeUntil = i - markerBytes.size + 1
+                        writeUntil = i - markerBytes.size + 1 // exclude the marker itself
                         break
                     }
                 }
@@ -110,14 +125,20 @@ class Shell(
             }
 
             sink.flush()
-
-            if (!markerMatched) {
-                Log.w(tag, "[exec] Marker not found; using fallback")
-            }
+            return markerMatched
         } finally {
             executor.shutdownNow()
             stream.close()
         }
+    }
+
+    private fun slidingMatches(q: ArrayDeque<Byte>, bytes: ByteArray): Boolean {
+        if (q.size != bytes.size) return false
+        var i = 0
+        for (b in q) {
+            if (b != bytes[i++]) return false
+        }
+        return true
     }
 
     private fun readOnceWithTimeout(
@@ -138,5 +159,12 @@ class Shell(
             if (cause is IOException) throw cause
             throw e
         }
+    }
+
+    /** Safely single-quote a script for sh -c. */
+    private fun shSingleQuote(s: String): String {
+        // ' -> '"'"'  (classic POSIX-safe quoting)
+        val escaped = s.replace("'", "'\"'\"'")
+        return "'$escaped'"
     }
 }
