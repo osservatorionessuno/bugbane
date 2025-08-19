@@ -20,7 +20,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.github.muntashirakon.adb.AbsAdbConnectionManager;
@@ -37,6 +39,9 @@ public class AdbViewModel extends AndroidViewModel {
     private final MutableLiveData<Boolean> askPairAdb = new MutableLiveData<>();
     private final MutableLiveData<CharSequence> commandOutput = new MutableLiveData<>();
     private final MutableLiveData<Integer> pairingPort = new MutableLiveData<>();
+
+    private Future<?> qfFuture;
+    private final AtomicBoolean qfCancelled = new AtomicBoolean(false);
 
     private String mPairingHost;
     private int mPairingPort = -1;
@@ -232,13 +237,35 @@ public class AdbViewModel extends AndroidViewModel {
         });
     }
 
-    public void runQuickForensics(@NonNull File baseDir) {
-        executor.submit(() -> {
+    public synchronized boolean isQuickForensicsRunning() {
+        return qfFuture != null && !qfFuture.isDone();
+    }
+
+    public synchronized boolean isQuickForensicsCancelled() {
+        return qfCancelled.get();
+    }
+
+    public synchronized void cancelQuickForensics() {
+        qfCancelled.set(true);
+    }
+
+    public void runQuickForensics(@NonNull File baseDir,
+                                  @NonNull org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener listener) {
+        if (isQuickForensicsRunning()) {
+            return;
+        }
+        qfCancelled.set(false);
+        qfFuture = executor.submit(() -> {
             try {
                 AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(getApplication());
                 File out = new org.osservatorionessuno.bugbane.qf.QuickForensics()
-                        .run(getApplication(), manager, baseDir);
-                commandOutput.postValue("QuickForensics completed: " + out.getAbsolutePath());            } catch (Exception e) {
+                        .run(getApplication(), manager, baseDir, listener);
+                if (qfCancelled.get()) {
+                    commandOutput.postValue("QuickForensics cancelled");
+                } else {
+                    commandOutput.postValue("QuickForensics completed: " + out.getAbsolutePath());
+                }
+            } catch (Exception e) {
                 e.printStackTrace();
                 commandOutput.postValue("Error running QuickForensics: " + e.getMessage());
             }

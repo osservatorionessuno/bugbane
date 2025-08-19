@@ -32,16 +32,26 @@ private const val TAG = "QuickForensics"
  */
  class QuickForensics(
      private val modules: List<Module> = listOf(
-         Env(),
-         Dumpsys(),
-         Logcat(),
-         GetProp(),
-         Processes(),
-         Services(),
-         Settings(),
-         SELinux()
-     )
- ) {
+        Env(),
+        Dumpsys(),
+        Logcat(),
+        GetProp(),
+        Processes(),
+        Services(),
+        Settings(),
+        SELinux()
+    )
+) {
+
+    /**
+     * Listener used to report progress and check for cancellation.
+     */
+    interface ProgressListener {
+        fun onModuleStart(name: String, completed: Int, total: Int)
+        fun onModuleComplete(name: String, completed: Int, total: Int)
+        fun isCancelled(): Boolean
+        fun onFinished(cancelled: Boolean)
+    }
 
     /**
      * Run all registered modules and store their output inside a newly created
@@ -56,7 +66,8 @@ private const val TAG = "QuickForensics"
     fun run(
         context: Context,
         manager: AbsAdbConnectionManager,
-        baseOutputDir: File
+        baseOutputDir: File,
+        listener: ProgressListener? = null
     ): File {
         if (!baseOutputDir.exists() && !baseOutputDir.mkdirs()) {
             throw IOException("Unable to create base output directory: $baseOutputDir")
@@ -84,14 +95,26 @@ private const val TAG = "QuickForensics"
         if (!tmpDir.endsWith('/')) tmpDir += '/'
         if (!sdCard.endsWith('/')) sdCard += '/'
 
-        modules.forEach { module ->
+        val total = modules.size
+        var completedCount = 0
+
+        for (module in modules) {
+            if (listener?.isCancelled() == true) {
+                Log.i(TAG, "Acquisition cancelled before module ${module.name}")
+                listener.onFinished(true)
+                return acquisitionDir
+            }
+
             Log.i(TAG, "Running module ${module.name}")
+            listener?.onModuleStart(module.name, completedCount, total)
             try {
                 module.run(context, manager, acquisitionDir)
                 Log.i(TAG, "Module ${module.name} finished")
             } catch (t: Throwable) {
                 Log.e(TAG, "Module ${module.name} failed", t)
             }
+            completedCount++
+            listener?.onModuleComplete(module.name, completedCount, total)
         }
 
         val completed = Instant.now()
@@ -114,6 +137,7 @@ private const val TAG = "QuickForensics"
         File(acquisitionDir, "acquisition.json").writeText(metadata.toString(1))
 
         Log.i(TAG, "Acquisition complete in ${acquisitionDir.absolutePath}")
+        listener?.onFinished(false)
         return acquisitionDir
     }
 }
