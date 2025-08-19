@@ -30,8 +30,8 @@ private const val TAG = "QuickForensics"
  * At this stage only the scaffolding is provided – concrete modules still need
  * to be implemented.
  */
- class QuickForensics(
-     private val modules: List<Module> = listOf(
+class QuickForensics(
+    private val modules: List<Module> = listOf(
         Env(),
         Dumpsys(),
         Logcat(),
@@ -107,10 +107,10 @@ private const val TAG = "QuickForensics"
             }
 
             var moduleBytes = 0L
-            val modShell = Shell(manager) { delta ->
+            val modShell = Shell(manager = manager, progress = { delta: Long ->
                 moduleBytes += delta
                 listener?.onModuleProgress(module.name, moduleBytes)
-            }
+            })
             Log.i(TAG, "Running module ${module.name}")
             listener?.onModuleStart(module.name, completedCount, total)
             try {

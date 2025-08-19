@@ -1,163 +1,139 @@
 package org.osservatorionessuno.bugbane.qf
 
+import android.util.Log
 import io.github.muntashirakon.adb.AbsAdbConnectionManager
-import io.github.muntashirakon.adb.AdbStream
 import java.io.*
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
+import java.util.*
+import java.util.concurrent.*
 
 class Shell(
     private val manager: AbsAdbConnectionManager,
-    private val progress: ((Long) -> Unit)? = null
+    private val tag: String = "ShellQF",
+    private val progress: ((Long) -> Unit)? = null,
+    private val timeoutMs: Long = 30_000L,
+    private val inactivityMs: Long = 5_000L
 ) {
-
     companion object {
-        private const val NO_PROGRESS_MS = 5_000L   // rule: no bytes for 5s => EOF
-        private const val RETRIES = 1               // rule: if 0 bytes total => retry once
+        private const val RETRIES = 1
     }
 
-    /** Try exec first, fall back to shell. */
-    @Throws(IOException::class)
-    private fun openCommandStream(command: String): AdbStream {
-        return try {
-            manager.openStream("exec:$command")
-        } catch (_: IOException) {
-            manager.openStream("shell:$command")
-        }
-    }
-
-    /** Run a command and return its stdout as UTF-8 text. */
-    @Throws(IOException::class)
     fun exec(command: String): String {
-        var lastErr: Throwable? = null
-        repeat(RETRIES + 1) { attempt ->
-            val baos = ByteArrayOutputStream()
-            try {
-                readWithInactivityEOF(command, sink = baos)
-                if (baos.size() == 0) {
-                    // rule: no bytes read => fail & retry
-                    if (attempt < RETRIES) return@repeat
-                    throw IOException("No bytes read from command: $command")
-                }
-                return baos.toString(StandardCharsets.UTF_8.name())
-            } catch (t: Throwable) {
-                lastErr = t
-                if (attempt >= RETRIES) throw t
-            }
-        }
-        throw (lastErr ?: IOException("exec failed: $command"))
+        val output = ByteArrayOutputStream()
+        execInternal(command, output)
+        return output.toString(StandardCharsets.UTF_8.name())
     }
 
-    /** Run a command and stream stdout to a file. */
-    @Throws(IOException::class)
     fun execToFile(command: String, file: File) {
+        val temp = File(file.parentFile, file.name + ".part").apply {
+            parentFile?.mkdirs()
+            delete()
+        }
+
+        FileOutputStream(temp).use { out ->
+            execInternal(command, out)
+        }
+
+        if (file.exists()) file.delete()
+        if (!temp.renameTo(file)) temp.copyTo(file, overwrite = true)
+        temp.delete()
+    }
+
+    private fun execInternal(command: String, sink: OutputStream) {
         var lastErr: Throwable? = null
         repeat(RETRIES + 1) { attempt ->
-            file.parentFile?.mkdirs()
-            // write to temp first; only move on success
-            val tmp = File(file.parentFile, file.name + ".part")
-            if (tmp.exists()) tmp.delete()
-
             try {
-                FileOutputStream(tmp).use { out ->
-                    readWithInactivityEOF(command, sink = out)
-                }
-                if (tmp.length() == 0L) {
-                    // rule: no bytes read => fail & retry
-                    tmp.delete()
-                    if (attempt < RETRIES) return@repeat
-                    throw IOException("No bytes read from command: $command")
-                }
-                if (file.exists()) file.delete()
-                if (!tmp.renameTo(file)) {
-                    // best-effort copy/replace
-                    tmp.copyTo(file, overwrite = true)
-                    tmp.delete()
-                }
+                val marker = "__QF_MARKER_${UUID.randomUUID()}__"
+                val fullCmd = "$command; echo $marker"
+                Log.d(tag, "[exec] Running: $fullCmd")
+                runWithStream("shell:$fullCmd", sink, marker)
                 return
             } catch (t: Throwable) {
+                Log.w(tag, "[exec] Attempt $attempt failed: ${t.message}")
                 lastErr = t
-                tmp.delete()
-                if (attempt >= RETRIES) throw t
             }
         }
-        throw (lastErr ?: IOException("execToFile failed: $command"))
+        throw IOException("All attempts failed", lastErr)
     }
 
-    /* -------------------- core: read with inactivity=>EOF -------------------- */
+    private fun runWithStream(command: String, sink: OutputStream, marker: String) {
+        val stream = manager.openStream(command)
+        val input = stream.openInputStream().buffered()
+        val executor = Executors.newSingleThreadExecutor { Thread(it, "ShellReader").apply { isDaemon = true } }
 
-    /**
-     * Reads stdout of [command] and writes to [sink].
-     *
-     * Rules implemented:
-     *  - IOException containing "closed"/"Stream closed" => treat as EOF (success).
-     *  - If a read produces no bytes for NO_PROGRESS_MS => treat as EOF (success).
-     *  - Caller handles "total bytes == 0" as failure/ retry.
-     */
-    @Throws(IOException::class)
-    private fun readWithInactivityEOF(command: String, sink: OutputStream) {
-        openCommandStream(command).use { stream ->
-            stream.openInputStream().use { input ->
-                val buf = ByteArray(DEFAULT_BUFFER_SIZE)
-                var total: Long = 0
+        val buf = ByteArray(DEFAULT_BUFFER_SIZE)
+        val markerBytes = marker.toByteArray(StandardCharsets.UTF_8)
+        val sliding = ArrayDeque<Byte>(markerBytes.size)
+        var markerMatched = false
+        val startTime = System.nanoTime()
 
-                // single-threaded read with per-read inactivity timeout
-                val exec = Executors.newSingleThreadExecutor { r ->
-                    Thread(r, "QF.read").apply { isDaemon = true }
+        try {
+            loop@ while (true) {
+                if (System.nanoTime() - startTime > TimeUnit.MILLISECONDS.toNanos(timeoutMs)) {
+                    throw IOException("Shell command timed out: $command")
                 }
-                try {
-                    while (true) {
-                        val bytes = try {
-                            readOnceWithTimeout(exec, input, buf, NO_PROGRESS_MS)
-                        } catch (te: TimeoutException) {
-                            // rule: no bytes for 5s => EOF
-                            break
-                        } catch (io: IOException) {
-                            // rule: stream closed => EOF
-                            val m = io.message?.lowercase() ?: ""
-                            if ("closed" in m) break
-                            throw io
-                        }
-                        if (bytes == -1) {
-                            // normal EOF
-                            break
-                        }
-                        if (bytes > 0) {
-                            sink.write(buf, 0, bytes)
-                            total += bytes
-                            progress?.invoke(bytes.toLong())
-                        }
-                        // If bytes == 0, continue; (shouldn't happen with blocking read)
+
+                val bytesRead = try {
+                    readOnceWithTimeout(executor, input, buf, inactivityMs)
+                } catch (e: TimeoutException) {
+                    Log.d(tag, "[exec] Inactivity fallback triggered for: $command")
+                    break
+                } catch (e: IOException) {
+                    if (e.message?.contains("stream closed", ignoreCase = true) == true) break
+                    throw e
+                }
+
+                if (bytesRead == -1) break
+
+                var writeUntil = bytesRead
+
+                for (i in 0 until bytesRead) {
+                    sliding.addLast(buf[i])
+                    if (sliding.size > markerBytes.size) sliding.removeFirst()
+
+                    if (sliding.size == markerBytes.size && sliding.toByteArray().contentEquals(markerBytes)) {
+                        markerMatched = true
+                        writeUntil = i - markerBytes.size + 1
+                        break
                     }
-                    sink.flush()
-                } finally {
-                    exec.shutdownNow()
+                }
+
+                if (writeUntil > 0) {
+                    sink.write(buf, 0, writeUntil)
+                    progress?.invoke(writeUntil.toLong())
+                }
+
+                if (markerMatched) {
+                    Log.d(tag, "[exec] Marker matched; command complete")
+                    break@loop
                 }
             }
+
+            sink.flush()
+
+            if (!markerMatched) {
+                Log.w(tag, "[exec] Marker not found; using fallback")
+            }
+        } finally {
+            executor.shutdownNow()
+            stream.close()
         }
     }
 
-    /**
-     * Performs a single blocking read() with an inactivity timeout.
-     * If the read produces no result within [timeoutMs], throws TimeoutException.
-     */
     private fun readOnceWithTimeout(
-        executor: java.util.concurrent.ExecutorService,
+        executor: ExecutorService,
         input: InputStream,
         buf: ByteArray,
         timeoutMs: Long
     ): Int {
-        val future = executor.submit<Int> { input.read(buf) }
+        val f = executor.submit<Int> { input.read(buf) }
         return try {
-            future.get(timeoutMs, TimeUnit.MILLISECONDS)
+            f.get(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (e: TimeoutException) {
-            future.cancel(true)
+            f.cancel(true)
             throw e
         } catch (e: Exception) {
-            future.cancel(true)
-            // Unwrap IOExceptions thrown from the callable
+            f.cancel(true)
             val cause = e.cause
             if (cause is IOException) throw cause
             throw e
