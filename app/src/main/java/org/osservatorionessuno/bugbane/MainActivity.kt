@@ -15,9 +15,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import kotlinx.coroutines.launch
 import io.github.muntashirakon.adb.PRNGFixes
 import org.osservatorionessuno.bugbane.components.AppTopBar
+import org.osservatorionessuno.bugbane.components.MergedTopBar
 import org.osservatorionessuno.bugbane.components.NavigationTabs
 import org.osservatorionessuno.bugbane.screens.ScanScreen
 import org.osservatorionessuno.bugbane.screens.AcquisitionsScreen
@@ -81,9 +83,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainContent(onSetLacksPermissionsCallback: ((Boolean) -> Unit) -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val configuration = LocalConfiguration.current
     val pagerState = rememberPagerState(pageCount = { 2 })
     val coroutineScope = rememberCoroutineScope()
     var lacksPermissions by remember { mutableStateOf(false) }
+    
+    // Detect if we're in landscape mode
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
     // Sync tab selection with pager
     val selectedTabIndex by remember { derivedStateOf { pagerState.currentPage } }
@@ -102,21 +108,38 @@ fun MainContent(onSetLacksPermissionsCallback: ((Boolean) -> Unit) -> Unit) {
     
     Scaffold(
         topBar = {
-            Column {
-                AppTopBar(
-                    onSettingsClick = {
-                        val intent = Intent(context, SettingsActivity::class.java)
-                        context.startActivity(intent)
-                    }
-                )
-                NavigationTabs(
+            if (isLandscape) {
+                // Landscape mode: merged top bar
+                MergedTopBar(
                     selectedTabIndex = selectedTabIndex,
                     onTabSelected = { tabIndex ->
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(tabIndex)
                         }
+                    },
+                    onSettingsClick = {
+                        val intent = Intent(context, SettingsActivity::class.java)
+                        context.startActivity(intent)
                     }
                 )
+            } else {
+                // Portrait mode: separate top bar and navigation tabs
+                Column {
+                    AppTopBar(
+                        onSettingsClick = {
+                            val intent = Intent(context, SettingsActivity::class.java)
+                            context.startActivity(intent)
+                        }
+                    )
+                    NavigationTabs(
+                        selectedTabIndex = selectedTabIndex,
+                        onTabSelected = { tabIndex ->
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(tabIndex)
+                            }
+                        }
+                    )
+                }
             }
         },
         modifier = Modifier.fillMaxSize()

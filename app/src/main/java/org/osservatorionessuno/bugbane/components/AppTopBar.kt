@@ -57,4 +57,57 @@ fun AppTopBar(
             actionIconContentColor = MaterialTheme.colorScheme.onPrimary
         )
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MergedTopBar(
+    selectedTabIndex: Int,
+    onTabSelected: (Int) -> Unit,
+    onSettingsClick: () -> Unit = {}
+) {
+    TopAppBar(
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_bugbane_zoom),
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
+        },
+        actions = {
+            // Navigation tabs in landscape mode
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavigationTabs(
+                    selectedTabIndex = selectedTabIndex,
+                    onTabSelected = onTabSelected,
+                    isLandscape = true
+                )
+                IconButton(onClick = onSettingsClick) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = stringResource(R.string.main_nav_settings)
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            titleContentColor = MaterialTheme.colorScheme.onPrimary,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+            actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    )
 } 
