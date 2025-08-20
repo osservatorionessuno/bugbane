@@ -8,6 +8,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
+import org.osservatorionessuno.bugbane.AcquisitionActivity
 import java.io.File
 
 @Composable
@@ -246,6 +248,13 @@ fun ScanScreen(
                                     coroutineScope.launch {
                                         isScanning = false
                                         if (!cancelled) {
+                                            val latest = baseDir.listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.lastModified() }
+                                            if (latest != null) {
+                                                val intent = Intent(context, AcquisitionActivity::class.java).apply {
+                                                    putExtra(AcquisitionActivity.EXTRA_PATH, latest.absolutePath)
+                                                }
+                                                context.startActivity(intent)
+                                            }
                                             showDisableDialog = true
                                         }
                                     }

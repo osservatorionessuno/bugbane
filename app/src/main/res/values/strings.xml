@@ -79,4 +79,14 @@
     <string name="notification_adb_pairing_service_found_title">ADB Pairing Service Found on Port %d</string>
     <string name="notification_adb_pairing_working_title">Pairing with ADB Service</string>
     
+    <!-- Acquisition details strings -->
+    <string name="acquisition_details_title">Acquisition Details</string>
+    <string name="acquisition_details_size">Size: %1$s</string>
+    <string name="acquisition_details_uuid">UUID: %1$s</string>
+    <string name="acquisition_details_started">Started: %1$s</string>
+    <string name="acquisition_details_completed">Completed: %1$s</string>
+    <string name="acquisition_details_files">Files</string>
+    <string name="acquisition_details_export">Export</string>
+    <string name="acquisition_details_share">Share</string>
+    <string name="acquisition_details_rescan">Scan Again</string>
 </resources>

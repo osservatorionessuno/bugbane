@@ -38,6 +38,10 @@
             android:name=".SettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.Theme" />
+        <activity
+            android:name=".AcquisitionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Theme" />
         <service
             android:name=".utils.AdbPairingService"
             android:exported="false"

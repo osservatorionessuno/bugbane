@@ -1,6 +1,8 @@
 package org.osservatorionessuno.bugbane.screens
 
+import android.content.Intent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +26,7 @@ import java.time.Instant
 import java.util.Date
 import org.json.JSONObject
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.AcquisitionActivity
 
 data class AcquisitionItem(
     val dir: File,
@@ -94,6 +97,12 @@ fun AcquisitionsScreen() {
                 items(acquisitionItems) { item ->
                     AcquisitionItemRow(
                         item = item,
+                        onClick = {
+                            val intent = Intent(context, AcquisitionActivity::class.java).apply {
+                                putExtra(AcquisitionActivity.EXTRA_PATH, item.dir.absolutePath)
+                            }
+                            context.startActivity(intent)
+                        },
                         onRename = { newName ->
                             val newDir = File(item.dir.parentFile, newName)
                             if (!newDir.exists() && item.dir.renameTo(newDir)) {
@@ -120,6 +129,7 @@ fun AcquisitionsScreen() {
 @Composable
 fun AcquisitionItemRow(
     item: AcquisitionItem,
+    onClick: () -> Unit,
     onRename: (String) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -160,6 +170,7 @@ fun AcquisitionItemRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(vertical = 12.dp, horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
