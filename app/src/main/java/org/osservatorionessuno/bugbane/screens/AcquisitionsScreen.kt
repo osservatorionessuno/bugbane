@@ -1,5 +1,6 @@
 package org.osservatorionessuno.bugbane.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,8 +13,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.io.File
 import java.text.DateFormat
@@ -57,30 +60,58 @@ fun AcquisitionsScreen() {
             .fillMaxSize()
             .padding(8.dp)
     ) {
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(1.dp),
-            modifier = Modifier.weight(1f)
-        ) {
-            items(acquisitionItems) { item ->
-                AcquisitionItemRow(
-                    item = item,
-                    onRename = { newName ->
-                        val newDir = File(item.dir.parentFile, newName)
-                        if (!newDir.exists() && item.dir.renameTo(newDir)) {
-                            val meta = File(newDir, "acquisition.json")
-                            try {
-                                val json = JSONObject(meta.readText())
-                                json.put("uuid", newName)
-                                meta.writeText(json.toString(1))
-                            } catch (_: Throwable) { }
+        if (acquisitionItems.isEmpty()) {
+            // No acquisitions, place a logo and a message as placeholder
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_bugbane_zoom),
+                        contentDescription = "Bugbane Logo",
+                        modifier = Modifier.size(200.dp),
+                        alpha = 0.4f
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = stringResource(R.string.acquisitions_empty_message),
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(1.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                items(acquisitionItems) { item ->
+                    AcquisitionItemRow(
+                        item = item,
+                        onRename = { newName ->
+                            val newDir = File(item.dir.parentFile, newName)
+                            if (!newDir.exists() && item.dir.renameTo(newDir)) {
+                                val meta = File(newDir, "acquisition.json")
+                                try {
+                                    val json = JSONObject(meta.readText())
+                                    json.put("uuid", newName)
+                                    meta.writeText(json.toString(1))
+                                } catch (_: Throwable) { }
+                                loadAcquisitions()
+                            }
+                        },
+                        onDelete = {
+                            item.dir.deleteRecursively()
                             loadAcquisitions()
                         }
-                    },
-                    onDelete = {
-                        item.dir.deleteRecursively()
-                        loadAcquisitions()
-                    }
-                )
+                    )
+                }
             }
         }
     }

@@ -63,6 +63,11 @@
     <string name="acquisitions_title">Acquisitions</string>
     <string name="acquisitions_rename">Rename</string>
     <string name="acquisitions_delete">Delete</string>
+    <string name="acquisitions_empty_message">You have no acquisition, perform one to see it here</string>
+    
+    <!-- Scan screen strings -->
+    <string name="scan_welcome_title">Welcome to Bugbane</string>
+    <string name="scan_welcome_description">Press the \'Start Acquisition\' button to start</string>
     
     <!-- ADB Pairing Service strings -->
     <string name="notification_channel_adb_pairing">ADB Pairing</string>

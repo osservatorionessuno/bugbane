@@ -8,6 +8,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,8 +20,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.R
@@ -104,168 +107,183 @@ fun ScanScreen(
                 }
             }
         } else {
-            // Disable Development Tools Dialog
-            AnimatedVisibility(
-                visible = showDisableDialog,
-                enter = slideInVertically(
-                    animationSpec = tween(400),
-                    initialOffsetY = { it }
-                ) + fadeIn(
-                    animationSpec = tween(400)
-                ) + scaleIn(
-                    animationSpec = tween(400),
-                    initialScale = 0.95f
-                ),
-                exit = slideOutVertically(
-                    animationSpec = tween(300),
-                    targetOffsetY = { it }
-                ) + fadeOut(
-                    animationSpec = tween(300)
-                ) + scaleOut(
-                    animationSpec = tween(300),
-                    targetScale = 0.95f
-                )
+            Box(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Card(
+                // Welcome content in the center
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        .align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_bugbane_zoom),
+                        contentDescription = "Bugbane Logo",
+                        modifier = Modifier.size(200.dp),
+                        alpha = 0.4f
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = stringResource(R.string.scan_welcome_title),
+                        style = MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.scan_welcome_description),
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                // Disable Development Tools Dialog
+                if (showDisableDialog) {
+                    Card(
                         modifier = Modifier
+                            .align(Alignment.TopCenter)
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        Text(
-                            text = stringResource(R.string.scan_disable_dialog_title),
-                            modifier = Modifier.weight(1f)
-                        )
-
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Button(
-                                onClick = {
-                                    ConfigurationManager.openDeveloperOptions(context)
-                                    showDisableDialog = false
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.error
-                                )
-                            ) {
-                                Text(stringResource(R.string.scan_disable_dialog_button))
-                            }
+                            Text(
+                                text = stringResource(R.string.scan_disable_dialog_title),
+                                modifier = Modifier.weight(1f)
+                            )
 
-                            IconButton(
-                                onClick = { showDisableDialog = false }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = stringResource(R.string.scan_disable_dialog_close_button),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Button(
+                                    onClick = {
+                                        ConfigurationManager.openDeveloperOptions(context)
+                                        showDisableDialog = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Text(stringResource(R.string.scan_disable_dialog_button))
+                                }
+
+                                IconButton(
+                                    onClick = { showDisableDialog = false }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.scan_disable_dialog_close_button),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(2.dp))
+                // Scan Button fixed at the bottom
+                Button(
+                    onClick = {
+                        if (lacksPermissions) {
+                            SlideshowActivity.start(context)
+                            return@Button
+                        }
 
-            // Scan Button
-            Button(
-                onClick = {
-                    if (lacksPermissions) {
-                        SlideshowActivity.start(context)
-                        return@Button
-                    }
-
-                    if (!isScanning) {
-                        val baseDir = File(context.filesDir, "acquisitions")
-                        isScanning = true
-                        progressLogs.clear()
-                        moduleLogIndex.clear()
-                        moduleBytes.clear()
-                        completedModules = 0
-                        totalModules = 0
-                        viewModel.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
-                            override fun onModuleStart(name: String, completed: Int, total: Int) {
-                                coroutineScope.launch {
-                                    totalModules = total
-                                    moduleLogIndex[name] = progressLogs.size
-                                    moduleBytes[name] = 0L
-                                    progressLogs.add("Running $name: 0 B")
-                                }
-                            }
-
-                            override fun onModuleProgress(name: String, bytes: Long) {
-                                coroutineScope.launch {
-                                    val idx = moduleLogIndex[name] ?: return@launch
-                                    moduleBytes[name] = bytes
-                                    progressLogs[idx] = "Running $name: ${formatBytes(bytes)}"
-                                }
-                            }
-
-                            override fun onModuleComplete(name: String, completed: Int, total: Int) {
-                                coroutineScope.launch {
-                                    completedModules = completed
-                                    val idx = moduleLogIndex[name]
-                                    val finalBytes = moduleBytes[name] ?: 0L
-                                    if (idx != null) {
-                                        progressLogs[idx] = "Completed $name: ${formatBytes(finalBytes)}"
-                                    } else {
-                                        progressLogs.add("Completed $name: ${formatBytes(finalBytes)}")
+                        if (!isScanning) {
+                            val baseDir = File(context.filesDir, "acquisitions")
+                            isScanning = true
+                            progressLogs.clear()
+                            moduleLogIndex.clear()
+                            moduleBytes.clear()
+                            completedModules = 0
+                            totalModules = 0
+                            viewModel.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
+                                override fun onModuleStart(name: String, completed: Int, total: Int) {
+                                    coroutineScope.launch {
+                                        totalModules = total
+                                        moduleLogIndex[name] = progressLogs.size
+                                        moduleBytes[name] = 0L
+                                        progressLogs.add("Running $name: 0 B")
                                     }
                                 }
-                            }
 
-                            override fun isCancelled(): Boolean = viewModel.isQuickForensicsCancelled()
-
-                            override fun onFinished(cancelled: Boolean) {
-                                coroutineScope.launch {
-                                    isScanning = false
-                                    if (!cancelled) {
-                                        showDisableDialog = true
+                                override fun onModuleProgress(name: String, bytes: Long) {
+                                    coroutineScope.launch {
+                                        val idx = moduleLogIndex[name] ?: return@launch
+                                        moduleBytes[name] = bytes
+                                        progressLogs[idx] = "Running $name: ${formatBytes(bytes)}"
                                     }
                                 }
-                            }
-                        })
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isScanning,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isScanning)
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    else if (lacksPermissions)
-                        MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
-                    else
-                        MaterialTheme.colorScheme.secondary
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isScanning)
-                        stringResource(R.string.home_scanning_button)
-                    else if (lacksPermissions)
-                        stringResource(R.string.home_permissions_button)
-                    else
-                        stringResource(R.string.home_scan_button),
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium
+
+                                override fun onModuleComplete(name: String, completed: Int, total: Int) {
+                                    coroutineScope.launch {
+                                        completedModules = completed
+                                        val idx = moduleLogIndex[name]
+                                        val finalBytes = moduleBytes[name] ?: 0L
+                                        if (idx != null) {
+                                            progressLogs[idx] = "Completed $name: ${formatBytes(finalBytes)}"
+                                        } else {
+                                            progressLogs.add("Completed $name: ${formatBytes(finalBytes)}")
+                                        }
+                                    }
+                                }
+
+                                override fun isCancelled(): Boolean = viewModel.isQuickForensicsCancelled()
+
+                                override fun onFinished(cancelled: Boolean) {
+                                    coroutineScope.launch {
+                                        isScanning = false
+                                        if (!cancelled) {
+                                            showDisableDialog = true
+                                        }
+                                    }
+                                }
+                            })
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth(),
+                    enabled = !isScanning,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isScanning)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        else if (lacksPermissions)
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
+                        else
+                            MaterialTheme.colorScheme.secondary
                     )
-                )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isScanning)
+                            stringResource(R.string.home_scanning_button)
+                        else if (lacksPermissions)
+                            stringResource(R.string.home_permissions_button)
+                        else
+                            stringResource(R.string.home_scan_button),
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
             }
         }
     }
