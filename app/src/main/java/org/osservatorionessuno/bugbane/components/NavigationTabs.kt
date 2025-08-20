@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.osservatorionessuno.bugbane.R
+import androidx.compose.foundation.clickable
 
 data class TabItem(val title: String, val icon: ImageVector)
 
@@ -29,53 +30,93 @@ data class TabItem(val title: String, val icon: ImageVector)
 @Composable
 fun NavigationTabs(
     selectedTabIndex: Int,
-    onTabSelected: (Int) -> Unit
+    onTabSelected: (Int) -> Unit,
+    isLandscape: Boolean = false
 ) {
     val tabs = listOf(
         TabItem(stringResource(R.string.main_nav_scan), Icons.Default.Search),
         TabItem(stringResource(R.string.main_nav_acquisitions), Icons.Default.Folder)
     )
     
-    TabRow(
-        selectedTabIndex = selectedTabIndex,
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
-        divider = { },
-        indicator = { tabPositions ->
-            TabRowDefaults.PrimaryIndicator(
-                modifier = Modifier
-                    .tabIndicatorOffset(tabPositions[selectedTabIndex])
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(2.5.dp))
-                    .background(
-                        MaterialTheme.colorScheme.primary,
-                        RoundedCornerShape(2.5.dp)
-                    ),
-                color = MaterialTheme.colorScheme.onPrimary,
-                height = 3.dp
-            )
-        }
-    ) {
-        tabs.forEachIndexed { index, tab ->
-            Tab(
-                selected = selectedTabIndex == index,
-                onClick = { onTabSelected(index) },
-                text = { 
+    if (isLandscape) {
+        // Landscape mode: horizontal tabs without background
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(horizontal = 8.dp)
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                val isSelected = selectedTabIndex == index
+                Column(
+                    horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                            else androidx.compose.ui.graphics.Color.Transparent
+                        )
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .clickable { onTabSelected(index) }
+                ) {
+                    Icon(
+                        imageVector = tab.icon,
+                        contentDescription = tab.title,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = tab.title,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal
-                        )
-                    ) 
-                },
-                icon = { 
-                    Icon(
-                        imageVector = tab.icon, 
-                        contentDescription = tab.title,
-                        modifier = Modifier.size(24.dp)
-                    ) 
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                        ),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
                 }
-            )
+            }
+        }
+    } else {
+        // Portrait mode: full-width tab row
+        TabRow(
+            selectedTabIndex = selectedTabIndex,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            divider = { },
+            indicator = { tabPositions ->
+                TabRowDefaults.PrimaryIndicator(
+                    modifier = Modifier
+                        .tabIndicatorOffset(tabPositions[selectedTabIndex])
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(2.5.dp))
+                        .background(
+                            MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(2.5.dp)
+                        ),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    height = 3.dp
+                )
+            }
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                Tab(
+                    selected = selectedTabIndex == index,
+                    onClick = { onTabSelected(index) },
+                    text = { 
+                        Text(
+                            text = tab.title,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal
+                            )
+                        ) 
+                    },
+                    icon = { 
+                        Icon(
+                            imageVector = tab.icon, 
+                            contentDescription = tab.title,
+                            modifier = Modifier.size(24.dp)
+                        ) 
+                    }
+                )
+            }
         }
     }
 } 
