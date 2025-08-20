@@ -1,11 +1,13 @@
 package org.osservatorionessuno.bugbane.components
 
+import android.app.Activity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -19,11 +21,14 @@ data class SlideshowPageData(
     val icon: ImageVector? = null,
     val buttonText: String? = null,
     val onClick: (() -> Unit)? = null,
-    val shouldSkip: (() -> Boolean)? = null
+    val shouldSkip: (() -> Boolean)? = null,
+    val shouldContinue: Boolean = true
 )
 
 @Composable
 fun SlideshowPage(page: SlideshowPageData) {
+    val context = LocalContext.current
+    
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -55,23 +60,48 @@ fun SlideshowPage(page: SlideshowPageData) {
             text = page.description,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            color = if (page.shouldContinue) {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            } else {
+                MaterialTheme.colorScheme.error
+            }
         )
 
         page.onClick?.let { onClick ->
             Spacer(modifier = Modifier.height(16.dp))
             Button(
-                onClick = onClick,
+                onClick = {
+                    if (page.shouldContinue) {
+                        onClick()
+                    } else {
+                        (context as? Activity)?.let { activity ->
+                            //activity.moveTaskToBack(true)
+                            activity.finishAffinity()
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp, vertical = 8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = androidx.compose.ui.graphics.Color.White
+                    containerColor = if (page.shouldContinue) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    },
+                    contentColor = if (page.shouldContinue) {
+                        androidx.compose.ui.graphics.Color.White
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    }
                 )
             ) {
                 Text(
-                    text = page.buttonText ?: stringResource(R.string.slideshow_welcome_button),
+                    text = if (page.shouldContinue) {
+                        page.buttonText ?: stringResource(R.string.slideshow_welcome_button)
+                    } else {
+                        "Exit"
+                    },
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = FontWeight.Medium
                     )
