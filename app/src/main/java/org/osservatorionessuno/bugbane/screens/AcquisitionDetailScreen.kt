@@ -33,7 +33,9 @@ import java.util.zip.ZipOutputStream
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.CipherOutputStream
+import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 @Composable
@@ -240,12 +242,16 @@ private suspend fun createEncryptedArchive(context: Context, sourceDir: File): P
     return withContext(Dispatchers.IO) {
         val pass = generatePassphrase()
         val dest = File.createTempFile("acquisition", ".zip.enc", context.cacheDir)
-        val key = SecretKeySpec(pass.toByteArray(Charsets.UTF_8), "AES")
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val spec = PBEKeySpec(pass.toCharArray(), salt, 100_000, 256)
+        val key = SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
         val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
             init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
         }
         FileOutputStream(dest).use { fileOut ->
+            fileOut.write(salt)
             fileOut.write(iv)
             CipherOutputStream(fileOut, cipher).use { cipherOut ->
                 ZipOutputStream(cipherOut).use { zipOut ->
