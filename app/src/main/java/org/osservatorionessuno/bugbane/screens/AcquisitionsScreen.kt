@@ -1,6 +1,7 @@
 package org.osservatorionessuno.bugbane.screens
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -104,15 +105,25 @@ fun AcquisitionsScreen() {
                             context.startActivity(intent)
                         },
                         onRename = { newName ->
-                            val newDir = File(item.dir.parentFile, newName)
-                            if (!newDir.exists() && item.dir.renameTo(newDir)) {
-                                val meta = File(newDir, "acquisition.json")
-                                try {
-                                    val json = JSONObject(meta.readText())
-                                    json.put("uuid", newName)
-                                    meta.writeText(json.toString(1))
-                                } catch (_: Throwable) { }
-                                loadAcquisitions()
+                            val invalid = newName.contains('/') || newName.contains("\\") ||
+                                newName == "." || newName == ".."
+                            if (invalid) {
+                                Toast.makeText(
+                                    context,
+                                    R.string.acquisitions_rename_invalid,
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                val newDir = File(item.dir.parentFile, newName)
+                                if (!newDir.exists() && item.dir.renameTo(newDir)) {
+                                    loadAcquisitions()
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        R.string.acquisitions_rename_failed,
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             }
                         },
                         onDelete = {

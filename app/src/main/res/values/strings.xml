@@ -65,6 +65,8 @@
     <string name="acquisitions_rename">Rename</string>
     <string name="acquisitions_delete">Delete</string>
     <string name="acquisitions_empty_message">You have no acquisition, perform one to see it here</string>
+    <string name="acquisitions_rename_invalid">Invalid name</string>
+    <string name="acquisitions_rename_failed">Unable to rename acquisition</string>
     
     <!-- Scan screen strings -->
     <string name="scan_welcome_title">Welcome to Bugbane</string>
