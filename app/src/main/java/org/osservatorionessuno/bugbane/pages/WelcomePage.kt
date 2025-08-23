@@ -1,6 +1,7 @@
 package org.osservatorionessuno.bugbane.pages
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.runtime.Composable
@@ -17,16 +18,25 @@ object WelcomePage {
     fun create(onNext: () -> Unit): SlideshowPageData {
         val context = LocalContext.current
 
+        val isSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+
         fun handleNext(context: Context) {
-            onNext()
+            if (isSupported) {
+                onNext()
+            }
         }
 
         return SlideshowPageData(
             title = stringResource(R.string.slideshow_welcome_title),
-            description = stringResource(R.string.slideshow_welcome_description),
+            description = if (isSupported) {
+                stringResource(R.string.slideshow_welcome_description)
+            } else {
+                stringResource(R.string.slideshow_unsupported_version)
+            },
             icon = ImageVector.vectorResource(id = R.drawable.ic_bugbane_zoom),
             onClick = { handleNext(context) },
-            shouldSkip = { SlideshowManager.hasSeenHomepage(context) }
+            shouldSkip = { SlideshowManager.hasSeenHomepage(context) },
+            shouldContinue = isSupported
         )
     }
 } 
