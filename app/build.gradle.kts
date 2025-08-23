@@ -6,11 +6,11 @@ plugins {
 
 android {
     namespace = "org.osservatorionessuno.bugbane"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "org.osservatorionessuno.bugbane"
-        minSdk = 29
+        minSdk = 30
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"

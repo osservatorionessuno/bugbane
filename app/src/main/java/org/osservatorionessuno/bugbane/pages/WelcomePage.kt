@@ -18,7 +18,7 @@ object WelcomePage {
     fun create(onNext: () -> Unit): SlideshowPageData {
         val context = LocalContext.current
 
-        val isSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        val isSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
 
         fun handleNext(context: Context) {
             if (isSupported) {

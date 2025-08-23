@@ -13,7 +13,7 @@
     After the analysis, you can share an encrypted copy of the results with trusted third parties.
     \n
     Beware that the results could in some cases contain sensitive information, so be careful with the sharing.</string>
-    <string name="slideshow_unsupported_version">Sorry, bugbane is not supported on Android versions less than 12. Please use AndroidQF or MVT from a trusted PC or Laptop</string>
+    <string name="slideshow_unsupported_version">Sorry, Bugbane is not supported on Android versions lower than 11 (API Level 30). Please use AndroidQF or MVT from a trusted computer.</string>
     <string name="slideshow_welcome_button">I understand</string>
 
     <string name="slideshow_wifi_title">Connect to a Trusted Wi‑Fi Network</string>
