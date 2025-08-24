@@ -1,0 +1,11 @@
+{
+  "indicators": [
+    {
+      "process:name": ["com.bad.actor.malware", "lru-add-drain"],
+      "url:value": ["http://malicious.example.com"],
+      "domain-name:value": ["malicious.example.com"],
+      "app:id": ["com.facebook.katana", "com.sec.android.app.DataCreate"],
+      "android-property:name": ["dalvik.vm.appimageformat"]
+    }
+  ]
+}

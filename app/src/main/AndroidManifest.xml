@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Permission to check network state -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Currently used only to fetch IOCs -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
