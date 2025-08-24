@@ -1,0 +1,9 @@
+{
+  "indicators": [
+    {
+      "process:name": ["com.bad.actor.malware"],
+      "url:value": ["http://malicious.example.com"],
+      "domain-name:value": ["malicious.example.com"]
+    }
+  ]
+}
