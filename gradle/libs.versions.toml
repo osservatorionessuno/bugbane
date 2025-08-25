@@ -1,35 +1,53 @@
 [versions]
-agp = "8.11.1"
-kotlin = "2.0.21"
-coreKtx = "1.10.1"
-junit = "4.13.2"
-junitVersion = "1.1.5"
-espressoCore = "3.5.1"
-lifecycleRuntimeKtx = "2.6.1"
-activityCompose = "1.10.1"
-composeBom = "2024.09.00"
-navigationCompose = "2.7.7"
-
-[libraries]
-androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
-androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
-androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
-androidx-ui = { group = "androidx.compose.ui", name = "ui" }
-androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
-androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
-androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
-androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
-androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
-androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
-androidx-foundation = { group = "androidx.compose.foundation", name = "foundation" }
+agp                   = "8.12.1"
+kotlin                = "2.2.10"
+coreKtx               = "1.17.0"
+junitVersion          = "1.3.0"
+espressoCore          = "3.7.0"
+lifecycleRuntimeKtx   = "2.9.2"
+activityCompose       = "1.10.1"
+composeBom            = "2025.08.00"
+navigationCompose     = "2.9.3"
+junitJupiter          = "5.13.4"
+json                  = "20250517"
+protobuf              = "4.32.0"
+protobufPlugin        = "0.9.5"
+conscrypt             = "2.5.3"
+ahocorasick           = "0.6.3"
+libadb                = "3.0.0"
+sunSecurityAndroid    = "1.1"
 
 [plugins]
-android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+android-application   = { id = "com.android.application",            version.ref = "agp" }
+kotlin-android        = { id = "org.jetbrains.kotlin.android",       version.ref = "kotlin" }
+kotlin-compose        = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+junit5                = { id = "de.mannodermaus.android-junit5",     version = "1.13.1.0" }
+protobuf              = { id = "com.google.protobuf",                version.ref = "protobufPlugin" }
+
+[libraries]
+androidx-core-ktx                 = { group = "androidx.core",               name = "core-ktx",               version.ref = "coreKtx" }
+androidx-junit                    = { group = "androidx.test.ext",           name = "junit",                  version.ref = "junitVersion" }
+androidx-espresso-core            = { group = "androidx.test.espresso",      name = "espresso-core",          version.ref = "espressoCore" }
+androidx-lifecycle-runtime-ktx    = { group = "androidx.lifecycle",          name = "lifecycle-runtime-ktx",  version.ref = "lifecycleRuntimeKtx" }
+androidx-activity-compose         = { group = "androidx.activity",           name = "activity-compose",       version.ref = "activityCompose" }
+androidx-compose-bom              = { group = "androidx.compose",            name = "compose-bom",            version.ref = "composeBom" }
+androidx-ui                       = { group = "androidx.compose.ui",         name = "ui" }
+androidx-ui-graphics              = { group = "androidx.compose.ui",         name = "ui-graphics" }
+androidx-ui-tooling               = { group = "androidx.compose.ui",         name = "ui-tooling" }
+androidx-ui-tooling-preview       = { group = "androidx.compose.ui",         name = "ui-tooling-preview" }
+androidx-ui-test-manifest         = { group = "androidx.compose.ui",         name = "ui-test-manifest" }
+androidx-ui-test-junit4           = { group = "androidx.compose.ui",         name = "ui-test-junit4" }
+androidx-material3                = { group = "androidx.compose.material3",  name = "material3" }
+androidx-navigation-compose       = { group = "androidx.navigation",         name = "navigation-compose",     version.ref = "navigationCompose" }
+androidx-foundation               = { group = "androidx.compose.foundation", name = "foundation" }
+compose-material-icons-extended   = { group = "androidx.compose.material",   name = "material-icons-extended" }
+libadb-android                    = { group = "com.github.MuntashirAkon",    name = "libadb-android",         version.ref = "libadb" }
+sun-security-android              = { group = "com.github.MuntashirAkon",    name = "sun-security-android",   version.ref = "sunSecurityAndroid" }
+conscrypt-android                 = { group = "org.conscrypt",                name = "conscrypt-android",      version.ref = "conscrypt" }
+ahocorasick                       = { group = "org.ahocorasick",              name = "ahocorasick",            version.ref = "ahocorasick" }
+protobuf-javalite                 = { group = "com.google.protobuf",          name = "protobuf-javalite",      version.ref = "protobuf" }
+protoc                            = { group = "com.google.protobuf",          name = "protoc",                 version.ref = "protobuf" }
+junit-jupiter-api                 = { group = "org.junit.jupiter",            name = "junit-jupiter-api",      version.ref = "junitJupiter" }
+junit-jupiter-engine              = { group = "org.junit.jupiter",            name = "junit-jupiter-engine",   version.ref = "junitJupiter" }
+org-json                          = { group = "org.json",                     name = "json",                   version.ref = "json" }
 

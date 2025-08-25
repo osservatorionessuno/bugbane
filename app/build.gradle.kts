@@ -2,8 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("de.mannodermaus.android-junit5") version "1.13.1.0"
-    id("com.google.protobuf") version "0.9.5"
+    alias(libs.plugins.junit5)
+    alias(libs.plugins.protobuf)
 }
 
 android {
@@ -21,7 +21,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -41,7 +41,6 @@ android {
         buildConfig = true
     }
 
-    // Important for local JVM tests that touch Android bits/resources
     testOptions {
         unitTests {
             isReturnDefaultValues = true
@@ -61,26 +60,25 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.foundation)
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("com.github.MuntashirAkon:libadb-android:3.0.0")
-    implementation("com.github.MuntashirAkon:sun-security-android:1.1")
-    // Required for adb encryption
-    implementation("org.conscrypt:conscrypt-android:2.5.3")
+    implementation(libs.compose.material.icons.extended)
+
+    // libadb-android and its dependency
+    implementation(libs.libadb.android)
+    implementation(libs.sun.security.android)
+    // Required for ADB encryption
+    implementation(libs.conscrypt.android)
 
     // Quick string matching for mvt
-    implementation("org.ahocorasick:ahocorasick:0.6.3")
-    // Tombstone protobuf
-    implementation("com.google.protobuf:protobuf-javalite:3.25.3")
+    implementation(libs.ahocorasick)
 
+    // Tombstone protobuf (lite)
+    implementation(libs.protobuf.javalite)
 
     // --- Unit test (JUnit 5) ---
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.13.4")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.13.4")
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
 
-    // If some tests need Android resources/framework behavior on JVM:
-    testImplementation("org.robolectric:robolectric:4.15.1")
-
-    testImplementation("org.json:json:20250517")
+    testImplementation(libs.org.json)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -93,7 +91,8 @@ dependencies {
 
 protobuf {
     protoc {
-        artifact = "com.google.protobuf:protoc:3.25.3"
+        // was: artifact = "com.google.protobuf:protoc:3.25.3"
+        artifact = libs.protoc.get().toString()
     }
     // Generate lite Java classes for Android
     generateProtoTasks {
