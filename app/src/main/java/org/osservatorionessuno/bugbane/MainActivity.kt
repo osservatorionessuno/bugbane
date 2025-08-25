@@ -18,6 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import kotlinx.coroutines.launch
 import io.github.muntashirakon.adb.PRNGFixes
+import androidx.lifecycle.lifecycleScope
+import androidx.work.*
+import kotlinx.coroutines.Dispatchers
+import org.osservatorionessuno.libmvt.common.IndicatorsUpdates
+import org.osservatorionessuno.bugbane.workers.IndicatorsUpdateWorker
+import java.util.concurrent.TimeUnit
 import org.osservatorionessuno.bugbane.components.AppTopBar
 import org.osservatorionessuno.bugbane.components.MergedTopBar
 import org.osservatorionessuno.bugbane.components.NavigationTabs
@@ -36,7 +42,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         PRNGFixes.apply()
-        
+
         // Observers
         viewModel.watchConnectAdb().observe(this) { isConnected ->
             if (!isConnected) {
@@ -49,7 +55,7 @@ class MainActivity : ComponentActivity() {
                 setLacksPermissionsCallback?.invoke(true)
             }
         }
-        
+
         viewModel.watchCommandOutput().observe(this) { output ->
             // TODO: blibla
             Toast.makeText(this@MainActivity, output.toString(), Toast.LENGTH_SHORT).show()
@@ -59,7 +65,13 @@ class MainActivity : ComponentActivity() {
         // Try auto-connecting
         viewModel.autoConnect()
 
-        if (!ConfigurationManager.isNotificationPermissionGranted(this) || !ConfigurationManager.isWirelessDebuggingEnabled(this)) {
+        // Fetch indicators on first launch and schedule daily background updates
+        setupIndicatorsUpdates()
+
+        if (!ConfigurationManager.isNotificationPermissionGranted(this) || !ConfigurationManager.isWirelessDebuggingEnabled(
+                this
+            )
+        ) {
             setLacksPermissionsCallback?.invoke(true)
         }
 
@@ -76,6 +88,40 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun setupIndicatorsUpdates() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // Kick an immediate, one-time run if nothing has been downloaded yet
+        val updates = IndicatorsUpdates(filesDir.toPath(), null)
+        if (updates.latestUpdate == 0L) {
+            val now = OneTimeWorkRequestBuilder<IndicatorsUpdateWorker>()
+                .setConstraints(constraints)
+                .addTag("IndicatorsUpdate") // common tag for querying later if you want
+                .build()
+
+            WorkManager.getInstance(this).enqueueUniqueWork(
+                "IndicatorsUpdateInitial",
+                ExistingWorkPolicy.KEEP,
+                now
+            )
+        }
+
+        // Schedule daily periodic job (unique)
+        val periodic = PeriodicWorkRequestBuilder<IndicatorsUpdateWorker>(1, TimeUnit.DAYS)
+            .setConstraints(constraints)
+            .addTag("IndicatorsUpdate")
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "IndicatorsUpdatePeriodic",
+            ExistingPeriodicWorkPolicy.KEEP,
+            periodic
+        )
+        Log.i("MainActivity", "Scheduled daily indicator update worker")
     }
 }
 

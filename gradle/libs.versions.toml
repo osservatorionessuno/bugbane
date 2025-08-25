@@ -9,13 +9,13 @@ activityCompose       = "1.10.1"
 composeBom            = "2025.08.00"
 navigationCompose     = "2.9.3"
 junitJupiter          = "5.13.4"
-json                  = "20250517"
 protobuf              = "4.32.0"
 protobufPlugin        = "0.9.5"
 conscrypt             = "2.5.3"
 ahocorasick           = "0.6.3"
 libadb                = "3.0.0"
 sunSecurityAndroid    = "1.1"
+work                  = "2.9.0"
 
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
@@ -49,5 +49,5 @@ protobuf-javalite                 = { group = "com.google.protobuf",          na
 protoc                            = { group = "com.google.protobuf",          name = "protoc",                 version.ref = "protobuf" }
 junit-jupiter-api                 = { group = "org.junit.jupiter",            name = "junit-jupiter-api",      version.ref = "junitJupiter" }
 junit-jupiter-engine              = { group = "org.junit.jupiter",            name = "junit-jupiter-engine",   version.ref = "junitJupiter" }
-org-json                          = { group = "org.json",                     name = "json",                   version.ref = "json" }
+androidx-work-runtime-ktx         = { group = "androidx.work",              name = "work-runtime-ktx",      version.ref = "work" }
 

@@ -61,6 +61,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.foundation)
     implementation(libs.compose.material.icons.extended)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation("org.yaml:snakeyaml:2.4")
 
     // libadb-android and its dependency
     implementation(libs.libadb.android)
@@ -77,8 +79,6 @@ dependencies {
     // --- Unit test (JUnit 5) ---
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)
-
-    testImplementation(libs.org.json)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

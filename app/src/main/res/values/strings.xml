@@ -59,7 +59,15 @@
     <string name="settings_general">General Settings</string>
     <string name="settings_developer_options">Disable Developer Options</string>
     <string name="settings_developer_options_desc">It is recommended to disable the Development Options after every scan and re-enable it when needed to prevent unnecessary use.</string>
-    
+    <string name="settings_indicators_title">Indicators</string>
+    <string name="settings_indicators_last_fetch">Last fetch: %1$s</string>
+    <string name="settings_indicators_last_update">Last update: %1$s</string>
+    <string name="settings_indicators_count">Indicator files: %1$d</string>
+
+    <!-- Indicator update notification -->
+    <string name="notification_channel_indicators">Indicators</string>
+    <string name="notification_indicators_updated">Downloaded %1$d new indicators</string>
+
     <!-- Acquisitions screen strings -->
     <string name="acquisitions_title">Acquisitions</string>
     <string name="acquisitions_rename">Rename</string>
