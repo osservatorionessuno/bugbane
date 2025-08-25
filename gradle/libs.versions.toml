@@ -16,6 +16,7 @@ conscrypt             = "2.5.3"
 ahocorasick           = "0.6.3"
 libadb                = "3.0.0"
 sunSecurityAndroid    = "1.1"
+kage                 = "0.3.0"
 
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
@@ -50,4 +51,4 @@ protoc                            = { group = "com.google.protobuf",          na
 junit-jupiter-api                 = { group = "org.junit.jupiter",            name = "junit-jupiter-api",      version.ref = "junitJupiter" }
 junit-jupiter-engine              = { group = "org.junit.jupiter",            name = "junit-jupiter-engine",   version.ref = "junitJupiter" }
 org-json                          = { group = "org.json",                     name = "json",                   version.ref = "json" }
-
+kage                              = { group = "com.github.android-password-store", name = "kage", version.ref = "kage" }
