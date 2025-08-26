@@ -183,6 +183,9 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             Button(onClick = { showFilesDialog = true }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_view_files))
             }
+            Button(onClick = { startRescan() }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan))
+            }
             Text(
                 text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_scans),
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
@@ -237,9 +240,6 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             }
             Button(onClick = { startShare() }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_share))
-            }
-            Button(onClick = { startRescan() }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan))
             }
         }
 
