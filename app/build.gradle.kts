@@ -76,6 +76,9 @@ dependencies {
     // Required for ADB encryption
     implementation(libs.conscrypt.android)
 
+    // Required for age encrypted export/share
+    implementation(libs.kage)
+
     // Quick string matching for mvt
     implementation(libs.ahocorasick)
 

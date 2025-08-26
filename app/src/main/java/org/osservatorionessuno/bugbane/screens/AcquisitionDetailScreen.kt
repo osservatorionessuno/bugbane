@@ -33,12 +33,8 @@ import java.util.Date
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import java.security.SecureRandom
-import javax.crypto.Cipher
-import javax.crypto.CipherOutputStream
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
-import javax.crypto.spec.SecretKeySpec
+import kage.Age
+import kage.crypto.scrypt.ScryptRecipient
 
 @Composable
 fun AcquisitionDetailScreen(acquisitionDir: File) {
@@ -359,30 +355,25 @@ private fun formatBytes(bytes: Long): String {
 private suspend fun createEncryptedArchive(context: Context, sourceDir: File): Pair<File, String> {
     return withContext(Dispatchers.IO) {
         val pass = generatePassphrase()
-        val dest = File.createTempFile("acquisition", ".zip.enc", context.cacheDir)
-        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val spec = PBEKeySpec(pass.toCharArray(), salt, 100_000, 256)
-        val key = SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
-        val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
-            init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
-        }
-        FileOutputStream(dest).use { fileOut ->
-            fileOut.write(salt)
-            fileOut.write(iv)
-            CipherOutputStream(fileOut, cipher).use { cipherOut ->
-                ZipOutputStream(cipherOut).use { zipOut ->
-                    sourceDir.walkTopDown().filter { it.isFile }.forEach { file ->
-                        val entryName = file.relativeTo(sourceDir).path
-                        val entry = ZipEntry(entryName).apply { time = file.lastModified() }
-                        zipOut.putNextEntry(entry)
-                        file.inputStream().use { it.copyTo(zipOut) }
-                        zipOut.closeEntry()
-                    }
-                }
+        val dest = File.createTempFile("acquisition", ".zip.age", context.cacheDir)
+        val plainZip = File.createTempFile("acquisition", ".zip", context.cacheDir)
+        // 256MB goes OOM
+        val WORK_FACTOR = 15
+        ZipOutputStream(FileOutputStream(plainZip)).use { zipOut ->
+            sourceDir.walkTopDown().filter { it.isFile }.forEach { file ->
+                val entryName = file.relativeTo(sourceDir).path
+                val entry = ZipEntry(entryName).apply { time = file.lastModified() }
+                zipOut.putNextEntry(entry)
+                file.inputStream().use { it.copyTo(zipOut) }
+                zipOut.closeEntry()
             }
         }
+        FileOutputStream(dest).use { fileOut ->
+            FileInputStream(plainZip).use { plainIn ->
+                Age.encryptStream(listOf(ScryptRecipient(pass.toByteArray(), workFactor = WORK_FACTOR)), plainIn, fileOut)
+            }
+        }
+        plainZip.delete()
         dest to pass
     }
 }
