@@ -246,7 +246,6 @@ fun ScanScreen(
 
                                 override fun onFinished(cancelled: Boolean) {
                                     coroutineScope.launch {
-                                        isScanning = false
                                         if (!cancelled) {
                                             val latest = baseDir.listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.lastModified() }
                                             if (latest != null) {
@@ -257,6 +256,7 @@ fun ScanScreen(
                                             }
                                             showDisableDialog = true
                                         }
+                                        isScanning = false
                                     }
                                 }
                             })

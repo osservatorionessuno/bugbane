@@ -21,10 +21,12 @@ import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.osservatorionessuno.bugbane.analysis.AcquisitionScanner
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
@@ -46,11 +48,13 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     var size by remember { mutableStateOf(0L) }
     var meta by remember { mutableStateOf<JSONObject?>(null) }
     var files by remember { mutableStateOf(listOf<Pair<String, Long>>()) }
+    var scans by remember { mutableStateOf(listOf<ScanSummary>()) }
     val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
 
     var processing by remember { mutableStateOf(false) }
     var passphrase by remember { mutableStateOf<String?>(null) }
     var showPassDialog by remember { mutableStateOf(false) }
+    var showFilesDialog by remember { mutableStateOf(false) }
     var generatedFile by remember { mutableStateOf<File?>(null) }
 
     LaunchedEffect(acquisitionDir) {
@@ -65,6 +69,15 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 meta = JSONObject(metaFile.readText())
             } catch (_: Throwable) {
             }
+        }
+        scans = loadScans(acquisitionDir)
+        if (scans.isEmpty()) {
+            processing = true
+            withContext(Dispatchers.IO) {
+                AcquisitionScanner.scan(context, acquisitionDir)
+            }
+            scans = loadScans(acquisitionDir)
+            processing = false
         }
     }
 
@@ -115,6 +128,17 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
         }
     }
 
+    fun startRescan() {
+        scope.launch {
+            processing = true
+            withContext(Dispatchers.IO) {
+                AcquisitionScanner.scan(context, acquisitionDir)
+            }
+            scans = loadScans(acquisitionDir)
+            processing = false
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -156,8 +180,11 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 )
             }
 
+            Button(onClick = { showFilesDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_view_files))
+            }
             Text(
-                text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_files),
+                text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_scans),
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
             )
             Box(
@@ -167,8 +194,40 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     .border(1.dp, MaterialTheme.colorScheme.outline)
             ) {
                 LazyColumn(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-                    items(files) { (name, fsize) ->
-                        Text("$name - ${formatBytes(fsize)}")
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_date),
+                                modifier = Modifier.weight(1f),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_indicators),
+                                modifier = Modifier.weight(1f),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_matches),
+                                modifier = Modifier.weight(1f),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    items(scans) { scan ->
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                dateFormat.format(Date.from(scan.started)),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                scan.indicatorsHash.take(8),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                scan.matchCount.toString(),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
             }
@@ -179,7 +238,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             Button(onClick = { startShare() }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_share))
             }
-            Button(onClick = { /* TODO scan again */ }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { startRescan() }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan))
             }
         }
@@ -193,6 +252,27 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 CircularProgressIndicator()
             }
         }
+    }
+
+    if (showFilesDialog) {
+        AlertDialog(
+            onDismissRequest = { showFilesDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showFilesDialog = false }) {
+                    Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_passphrase_close))
+                }
+            },
+            title = { Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_files)) },
+            text = {
+                Box(modifier = Modifier.heightIn(max = 300.dp)) {
+                    LazyColumn {
+                        items(files) { (name, fsize) ->
+                            Text("$name - ${formatBytes(fsize)}")
+                        }
+                    }
+                }
+            }
+        )
     }
 
     if (showPassDialog && passphrase != null) {
@@ -221,6 +301,44 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             }
         )
     }
+}
+
+private data class ScanSummary(
+    val started: Instant,
+    val indicatorsHash: String,
+    val matchCount: Int,
+)
+
+private fun loadScans(acquisitionDir: File): List<ScanSummary> {
+    val analysisDir = File(acquisitionDir, "analysis")
+    if (!analysisDir.exists()) return emptyList()
+    return analysisDir.listFiles { f -> f.isFile && f.extension == "json" }?.mapNotNull { file ->
+        try {
+            val obj = JSONObject(file.readText())
+            val started = Instant.parse(obj.optString("started"))
+            val hash = obj.optString("indicatorsHash").ifEmpty {
+                val arr = obj.optJSONArray("indicators")
+                val hashes = mutableListOf<String>()
+                if (arr != null) {
+                    for (i in 0 until arr.length()) {
+                        hashes += arr.getJSONObject(i).optString("sha256")
+                    }
+                }
+                hashes.sort()
+                sha256(hashes.joinToString(""))
+            }
+            val results = obj.optJSONArray("results")?.length() ?: 0
+            ScanSummary(started, hash, results)
+        } catch (_: Exception) {
+            null
+        }
+    }?.sortedByDescending { it.started } ?: emptyList()
+}
+
+private fun sha256(data: String): String {
+    val md = MessageDigest.getInstance("SHA-256")
+    md.update(data.toByteArray())
+    return md.digest().joinToString("") { "%02x".format(it) }
 }
 
 private fun calculateSize(file: File): Long {

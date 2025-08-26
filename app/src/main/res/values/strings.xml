@@ -97,6 +97,11 @@
     <string name="acquisition_details_started">Started: %1$s</string>
     <string name="acquisition_details_completed">Completed: %1$s</string>
     <string name="acquisition_details_files">Files</string>
+    <string name="acquisition_details_view_files">View Files</string>
+    <string name="acquisition_details_scans">Scans</string>
+    <string name="acquisition_scans_date">Date</string>
+    <string name="acquisition_scans_indicators">Indicators</string>
+    <string name="acquisition_scans_matches">Matches</string>
     <string name="acquisition_details_export">Export</string>
     <string name="acquisition_details_share">Share</string>
     <string name="acquisition_details_rescan">Scan Again</string>
