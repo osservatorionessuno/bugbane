@@ -44,7 +44,7 @@
     <string name="home_scan_button">Start Acquisition</string>
     <string name="home_scanning_button">Acquiring…</string>
     <string name="home_permissions_button">Enable Permissions</string>
-    <string name="scan_disable_dialog_title">After each analysis, it’s recommended to disable Developer Options until the next session.</string>
+    <string name="scan_disable_dialog_title">After each acquisition, it’s recommended to disable Developer Options until the next session.</string>
     <string name="scan_disable_dialog_button">Disable</string>
     <string name="scan_disable_dialog_close_button">Close</string>
     <string name="scan_cancel_button">Stop Acquisition</string>
