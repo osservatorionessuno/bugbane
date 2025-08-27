@@ -13,22 +13,23 @@ android {
     compileSdk = 36
 
     // For deterministic CI build and signatures
-    val inGitHubActions = System.getenv("GITHUB_WORKSPACE") != null
+    val ksPathStr: String? = System.getenv("APK_KEYSTORE")
+    val haveCiKeystore = ksPathStr != null
 
-    if (inGitHubActions) {
+    if (haveCiKeystore) {
         signingConfigs {
             create("ciRelease") {
-                val ksPath  = System.getenv("APK_KEYSTORE") ?: error("APK_KEYSTORE not set")
                 val ksPass  = System.getenv("APK_KEYSTORE_PASSWORD") ?: error("APK_KEYSTORE_PASSWORD not set")
                 val alias   = System.getenv("APK_KEY_ALIAS") ?: error("APK_KEY_ALIAS not set")
                 val keyPass = System.getenv("APK_KEY_PASSWORD") ?: error("APK_KEY_PASSWORD not set")
 
-                storeFile = file(ksPath)
+                // use the actual path string here
+                storeFile = file(ksPathStr!!)
                 storePassword = ksPass
                 keyAlias = alias
                 keyPassword = keyPass
 
-                // Deterministic signing: avoid v1
+                // Deterministic signing (avoid v1/JAR)
                 enableV1Signing = false
                 enableV2Signing = true
                 enableV3Signing = true
@@ -53,7 +54,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (haveCiKeystore)
+                signingConfigs.getByName("ciRelease")
+            else
+                signingConfigs.getByName("debug")
         }
     }
 
