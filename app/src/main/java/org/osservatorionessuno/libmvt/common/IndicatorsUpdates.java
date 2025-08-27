@@ -594,13 +594,32 @@ public class IndicatorsUpdates {
                     reason = "missing github block; fallback to index comparison";
                 }
             } else {
-                // Non-GitHub item: we can't query file commits.
-                // Use the same high-level logic the original code implies:
-                //   - If index is newer than our latest update, refresh these too
-                //   - On first run (latestUpdate=0), this naturally refreshes.
-                changed = (indexEpoch > latestUpdate && indexEpoch > 0);
-                reason = "non-github; follow index (indexEpoch=" + indexEpoch + ")";
-            }
+                // Non-GitHub item.
+                boolean isFileUrl = url.startsWith("file://");
+                boolean firstRun  = (latestUpdate == 0);
+
+                // If it's a local file, refresh at least once — or when the dest is missing.
+                boolean destMissing = false;
+                if (isFileUrl) {
+                    String fileName = url.replaceFirst("^https?://", "").replaceAll("[/\\\\]", "_");
+                    Path dest = indicatorsFolder.resolve(fileName);
+                    try {
+                        destMissing = !java.nio.file.Files.exists(dest);
+                    } catch (Throwable ignored) {}
+                }
+
+                if (isFileUrl && (firstRun || destMissing)) {
+                    changed = true;
+                    reason  = "local file; " + (firstRun ? "first run" : "destination missing");
+                } else if (firstRun) {
+                    // For any other non-GitHub item, refresh on first run.
+                    changed = true;
+                    reason  = "non-github; first run";
+                } else {
+                    // Otherwise follow index commits (which we can’t query here).
+                    changed = (indexEpoch > latestUpdate && indexEpoch > 0);
+                    reason  = "non-github; follow index (indexEpoch=" + indexEpoch + ")";
+                }            }
 
             logI("plan: " + (changed ? "FETCH  " : "SKIP   ") + url + "  -- " + reason);
             plan.add(new IndicatorPlan(url, changed, reason));
