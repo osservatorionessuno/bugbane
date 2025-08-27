@@ -35,12 +35,22 @@ jobs:
           gradle --version
 
       - name: Build with Gradle
-        run: gradle --no-daemon build
+        run: gradle --no-daemon assembleDebug assembleRelease
 
-      - name: Upload APKs
+      - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: apk-${{ github.run_number }}
-          path: "**/build/outputs/apk/**/*.apk"
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload release APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/app-release.apk
+          compression-level: 0
           retention-days: 7
