@@ -21,6 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import android.content.res.Configuration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +51,8 @@ fun ScanScreen(
     val moduleLogIndex = remember { mutableStateMapOf<String, Int>() }
     val moduleBytes = remember { mutableStateMapOf<String, Long>() }
 
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     // Update lacksPermissions based on current permissions
     LaunchedEffect(Unit) {
         val hasPermissions = ConfigurationManager.isNotificationPermissionGranted(context) &&
@@ -63,30 +67,32 @@ fun ScanScreen(
     ) {
         if (isScanning) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (totalModules > 0) {
-                            CircularProgressIndicator(progress = completedModules / totalModules.toFloat())
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("$completedModules / $totalModules")
-                        } else {
-                            CircularProgressIndicator()
+                Row(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (totalModules > 0) {
+                                CircularProgressIndicator(progress = completedModules / totalModules.toFloat())
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("$completedModules / $totalModules")
+                            } else {
+                                CircularProgressIndicator()
+                            }
                         }
                     }
-                }
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    items(progressLogs) { log ->
-                        Text(log)
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(16.dp)
+                    ) {
+                        items(progressLogs) { log ->
+                            Text(log)
+                        }
                     }
                 }
                 Button(
@@ -113,33 +119,67 @@ fun ScanScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 // Welcome content in the center
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_bugbane_zoom),
-                        contentDescription = "Bugbane Logo",
-                        modifier = Modifier.size(200.dp),
-                        alpha = 0.4f
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = stringResource(R.string.scan_welcome_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.scan_welcome_description),
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
+                if (isLandscape) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.Center),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_bugbane_zoom),
+                            contentDescription = "Bugbane Logo",
+                            modifier = Modifier.size(160.dp),
+                            alpha = 0.4f
+                        )
+                        Spacer(modifier = Modifier.width(24.dp))
+                        Column(modifier = Modifier.fillMaxWidth(0.5f)) {
+                            Text(
+                                text = stringResource(R.string.scan_welcome_title),
+                                style = MaterialTheme.typography.headlineMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = stringResource(R.string.scan_welcome_description),
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_bugbane_zoom),
+                            contentDescription = "Bugbane Logo",
+                            modifier = Modifier.size(160.dp),
+                            alpha = 0.4f
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(
+                            text = stringResource(R.string.scan_welcome_title),
+                            style = MaterialTheme.typography.headlineMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.scan_welcome_description),
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
                 }
 
                 // Disable Development Tools Dialog
