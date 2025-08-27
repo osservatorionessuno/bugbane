@@ -12,6 +12,31 @@ android {
     namespace = "org.osservatorionessuno.bugbane"
     compileSdk = 36
 
+    // For deterministic CI build and signatures
+    val inGitHubActions = System.getenv("GITHUB_WORKSPACE") != null
+
+    if (inGitHubActions) {
+        signingConfigs {
+            create("ciRelease") {
+                val ksPath  = System.getenv("APK_KEYSTORE") ?: error("APK_KEYSTORE not set")
+                val ksPass  = System.getenv("APK_KEYSTORE_PASSWORD") ?: error("APK_KEYSTORE_PASSWORD not set")
+                val alias   = System.getenv("APK_KEY_ALIAS") ?: error("APK_KEY_ALIAS not set")
+                val keyPass = System.getenv("APK_KEY_PASSWORD") ?: error("APK_KEY_PASSWORD not set")
+
+                storeFile = file(ksPath)
+                storePassword = ksPass
+                keyAlias = alias
+                keyPassword = keyPass
+
+                // Deterministic signing: avoid v1
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = false
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "org.osservatorionessuno.bugbane"
         minSdk = 30
@@ -101,7 +126,6 @@ dependencies {
 
 protobuf {
     protoc {
-        // was: artifact = "com.google.protobuf:protoc:3.25.3"
         artifact = libs.protoc.get().toString()
     }
     // Generate lite Java classes for Android
