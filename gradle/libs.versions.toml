@@ -17,7 +17,8 @@ libadb                = "3.0.0"
 sunSecurityAndroid    = "1.1"
 work                  = "2.10.3"
 snakeyaml             = "2.4"
-kage                 = "0.3.0"
+kage                  = "0.3.0"
+json                  = "20250517"
 
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
@@ -54,3 +55,4 @@ junit-jupiter-engine              = { group = "org.junit.jupiter",            na
 androidx-work-runtime-ktx         = { group = "androidx.work",              name = "work-runtime-ktx",      version.ref = "work" }
 snakeyaml                         = { group = "org.yaml",                   name = "snakeyaml",             version.ref = "snakeyaml" }
 kage                              = { group = "com.github.android-password-store", name = "kage", version.ref = "kage" }
+org-json                          = { group = "org.json",                     name = "json",                   version.ref = "json" }
