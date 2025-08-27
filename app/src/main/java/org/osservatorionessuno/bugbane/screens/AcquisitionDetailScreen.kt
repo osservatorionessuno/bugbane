@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.bugbane.analysis.AcquisitionScanner
+import org.osservatorionessuno.bugbane.R
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
@@ -40,6 +43,7 @@ import kage.crypto.scrypt.ScryptRecipient
 fun AcquisitionDetailScreen(acquisitionDir: File) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val configuration = LocalConfiguration.current
 
     var size by remember { mutableStateOf(0L) }
     var meta by remember { mutableStateOf<JSONObject?>(null) }
@@ -124,7 +128,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
         }
     }
 
-    fun startRescan() {
+    fun startAnalysis() {
         scope.launch {
             processing = true
             withContext(Dispatchers.IO) {
@@ -136,106 +140,165 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, formatBytes(size)),
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
-            )
-            meta?.let {
-                val started = it.optString("started", null)?.let { s ->
-                    try {
-                        dateFormat.format(Date.from(Instant.parse(s)))
-                    } catch (_: Exception) {
-                        s
-                    }
-                } ?: "-"
-                val completed = it.optString("completed", null)?.let { s ->
-                    try {
-                        dateFormat.format(Date.from(Instant.parse(s)))
-                    } catch (_: Exception) {
-                        s
-                    }
-                } ?: "-"
-
-                Text(
-                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_uuid, it.optString("uuid")),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_started, started),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_completed, completed),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
-
-            Button(onClick = { showFilesDialog = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_view_files))
-            }
-            Button(onClick = { startRescan() }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan))
-            }
-            Text(
-                text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_scans),
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
-            )
-            Box(
+        if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .border(1.dp, MaterialTheme.colorScheme.outline)
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-                    item {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_date),
-                                modifier = Modifier.weight(1f),
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_indicators),
-                                modifier = Modifier.weight(1f),
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_matches),
-                                modifier = Modifier.weight(1f),
-                                fontWeight = FontWeight.SemiBold
-                            )
+                Column(
+                    modifier = Modifier
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, formatBytes(size)),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                    )
+                    meta?.let {
+                        val started = it.optString("started", null)?.let { s ->
+                            try {
+                                dateFormat.format(Date.from(Instant.parse(s)))
+                            } catch (_: Exception) {
+                                s
+                            }
+                        } ?: "-"
+                        val completed = it.optString("completed", null)?.let { s ->
+                            try {
+                                dateFormat.format(Date.from(Instant.parse(s)))
+                            } catch (_: Exception) {
+                                s
+                            }
+                        } ?: "-"
+
+                        Text(
+                            text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_uuid, it.optString("uuid")),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_started, started),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_completed, completed),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(onClick = { showFilesDialog = true }, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_view_files))
+                        }
+                        Button(onClick = { startAnalysis() }, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan))
                         }
                     }
-                    items(scans) { scan ->
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                dateFormat.format(Date.from(scan.started)),
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                scan.indicatorsHash.take(8),
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                scan.matchCount.toString(),
-                                modifier = Modifier.weight(1f)
-                            )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(onClick = { startExport() }, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_export))
+                        }
+                        Button(onClick = { startShare() }, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_share))
                         }
                     }
                 }
-            }
 
-            Button(onClick = { startExport() }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_export))
+                Column(
+                    modifier = Modifier
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_scans),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                    )
+                    ScanList(
+                        scans = scans,
+                        dateFormat = dateFormat,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    )
+                }
             }
-            Button(onClick = { startShare() }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_share))
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, formatBytes(size)),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                )
+                meta?.let {
+                    val started = it.optString("started", null)?.let { s ->
+                        try {
+                            dateFormat.format(Date.from(Instant.parse(s)))
+                        } catch (_: Exception) {
+                            s
+                        }
+                    } ?: "-"
+                    val completed = it.optString("completed", null)?.let { s ->
+                        try {
+                            dateFormat.format(Date.from(Instant.parse(s)))
+                        } catch (_: Exception) {
+                            s
+                        }
+                    } ?: "-"
+
+                    Text(
+                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_uuid, it.optString("uuid")),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_started, started),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_completed, completed),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+
+                Button(onClick = { showFilesDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_view_files))
+                }
+                Button(onClick = { startAnalysis() }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan))
+                }
+                Text(
+                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_scans),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                )
+                ScanList(
+                    scans = scans,
+                    dateFormat = dateFormat,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(onClick = { startExport() }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_export))
+                    }
+                    Button(onClick = { startShare() }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_share))
+                    }
+                }
             }
         }
 
@@ -296,6 +359,56 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 )
             }
         )
+    }
+}
+
+@Composable
+private fun ScanList(
+    scans: List<ScanSummary>,
+    dateFormat: DateFormat,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .border(1.dp, MaterialTheme.colorScheme.outline)
+    ) {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+            item {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_date),
+                        modifier = Modifier.weight(1f),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_indicators),
+                        modifier = Modifier.weight(1f),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_matches),
+                        modifier = Modifier.weight(1f),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            items(scans) { scan ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        dateFormat.format(Date.from(scan.started)),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        scan.indicatorsHash.take(8),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        scan.matchCount.toString(),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
     }
 }
 

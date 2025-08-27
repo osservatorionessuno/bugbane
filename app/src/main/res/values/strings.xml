@@ -99,7 +99,7 @@
     <string name="acquisition_scans_matches">Matches</string>
     <string name="acquisition_details_export">Export</string>
     <string name="acquisition_details_share">Share</string>
-    <string name="acquisition_details_rescan">Run Analysis Again</string>
+    <string name="acquisition_details_rescan">Run Analysis</string>
 
     <!-- Messages for export/share passphrases -->
     <string name="acquisition_export_passphrase">The exported archive contains potentially private information and has been encrypted. The password will be shown only once:\n\n%1$s</string>
