@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.bugbane.analysis.AcquisitionScanner
-import org.osservatorionessuno.bugbane.R
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
@@ -157,14 +156,14 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                     )
                     meta?.let {
-                        val started = it.optString("started", null)?.let { s ->
+                        val started = it.optString("started", "null").let { s ->
                             try {
                                 dateFormat.format(Date.from(Instant.parse(s)))
                             } catch (_: Exception) {
                                 s
                             }
                         } ?: "-"
-                        val completed = it.optString("completed", null)?.let { s ->
+                        val completed = it.optString("completed", "null").let { s ->
                             try {
                                 dateFormat.format(Date.from(Instant.parse(s)))
                             } catch (_: Exception) {
@@ -242,14 +241,14 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                 )
                 meta?.let {
-                    val started = it.optString("started", null)?.let { s ->
+                    val started = it.optString("started", "null").let { s ->
                         try {
                             dateFormat.format(Date.from(Instant.parse(s)))
                         } catch (_: Exception) {
                             s
                         }
                     } ?: "-"
-                    val completed = it.optString("completed", null)?.let { s ->
+                    val completed = it.optString("completed", "null").let { s ->
                         try {
                             dateFormat.format(Date.from(Instant.parse(s)))
                         } catch (_: Exception) {
@@ -471,7 +470,7 @@ private suspend fun createEncryptedArchive(context: Context, sourceDir: File): P
         val dest = File.createTempFile("acquisition", ".zip.age", context.cacheDir)
         val plainZip = File.createTempFile("acquisition", ".zip", context.cacheDir)
         // 256MB goes OOM
-        val WORK_FACTOR = 15
+        val workFactor = 15
         ZipOutputStream(FileOutputStream(plainZip)).use { zipOut ->
             sourceDir.walkTopDown().filter { it.isFile }.forEach { file ->
                 val entryName = file.relativeTo(sourceDir).path
@@ -483,7 +482,7 @@ private suspend fun createEncryptedArchive(context: Context, sourceDir: File): P
         }
         FileOutputStream(dest).use { fileOut ->
             FileInputStream(plainZip).use { plainIn ->
-                Age.encryptStream(listOf(ScryptRecipient(pass.toByteArray(), workFactor = WORK_FACTOR)), plainIn, fileOut)
+                Age.encryptStream(listOf(ScryptRecipient(pass.toByteArray(), workFactor = workFactor)), plainIn, fileOut)
             }
         }
         plainZip.delete()

@@ -47,7 +47,7 @@ fun AcquisitionsScreen() {
             if (!metaFile.exists()) return@mapNotNull null
             try {
                 val json = JSONObject(metaFile.readText())
-                val completed = json.optString("completed", null)?.let {
+                val completed = json.optString("completed", "null").let {
                     try { Date.from(Instant.parse(it)) } catch (e: Exception) { null }
                 }
                 AcquisitionItem(dir, dir.name, completed)

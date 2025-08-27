@@ -76,7 +76,11 @@ fun ScanScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             if (totalModules > 0) {
-                                CircularProgressIndicator(progress = completedModules / totalModules.toFloat())
+                                CircularProgressIndicator(
+                                    progress = {
+                                        (completedModules / totalModules.toFloat()).coerceIn(0f, 1f)
+                                    }
+                                )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("$completedModules / $totalModules")
                             } else {
