@@ -7,11 +7,30 @@ on:
     branches: [ main ]
   workflow_dispatch: {}
 
+env:
+  APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+  APK_KEY_ALIAS:         ${{ secrets.APK_KEY_ALIAS }}
+  APK_KEY_PASSWORD:      ${{ secrets.APK_KEY_PASSWORD }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Stable env
+        run: |
+          echo "TZ=UTC" >> $GITHUB_ENV
+          echo "LANG=C.UTF-8" >> $GITHUB_ENV
+          echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
+      
+      - name: Restore testing keystore
+        env:
+          APK_KEYSTORE_B64: ${{ secrets.APK_KEYSTORE_B64 }}
+        run: |
+          echo "$APK_KEYSTORE_B64" | base64 -d > keystore.jks
+          echo "APK_KEYSTORE=$GITHUB_WORKSPACE/keystore.jks" >> $GITHUB_ENV
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -35,12 +54,22 @@ jobs:
           gradle --version
 
       - name: Build with Gradle
-        run: gradle --no-daemon build
+        run: gradle --no-daemon assembleDebug assembleRelease
 
-      - name: Upload APKs
+      - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: apk-${{ github.run_number }}
-          path: "**/build/outputs/apk/**/*.apk"
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload release APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/app-release.apk
+          compression-level: 0
           retention-days: 7

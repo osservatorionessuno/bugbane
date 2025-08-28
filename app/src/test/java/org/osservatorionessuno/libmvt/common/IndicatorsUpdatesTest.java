@@ -30,7 +30,7 @@ public class IndicatorsUpdatesTest {
         IndicatorsUpdates updates = new IndicatorsUpdates(temp, indexFile.toUri().toString());
         updates.update();
 
-        Path indicatorsDir = temp.resolve("indicators");
+        Path indicatorsDir = temp.resolve("iocs");
         // Match IndicatorsUpdates' filename logic: replace only http(s) scheme and slash/backslash with '_'
         String fileName = stix.toUri().toString()
                 .replaceFirst("^https?://", "")

@@ -1,87 +1,90 @@
 <resources>
     <string name="app_name">Bugbane</string>
-    
+
     <!-- Navigation strings -->
-    <string name="main_nav_scan">Scan</string>
+    <string name="main_nav_scan">Acquire</string>
     <string name="main_nav_acquisitions">Acquisitions</string>
     <string name="main_nav_settings">Settings</string>
 
     <!-- Slideshow strings -->
     <string name="slideshow_welcome_title">Welcome to Bugbane</string>
-    <string name="slideshow_welcome_description">This application is designed to facilitate the consensual forensic analysis of Android devices, for the purpose of identifying traces of compromise of sophisticated mobile spyware attacks.
+    <string name="slideshow_welcome_description">This application helps with consensual forensic analysis of Android devices to identify signs of compromise or surveillance.
     \n\n
-    After the analysis, you can share an encrypted copy of the results with trusted third parties.
-    \n
-    Beware that the results could in some cases contain sensitive information, so be careful with the sharing.</string>
-    <string name="slideshow_unsupported_version">Sorry, Bugbane is not supported on Android versions lower than 11 (API Level 30). Please use AndroidQF or MVT from a trusted computer.</string>
+    The absence of detection from this app does not mean that your device is safe or secure.
+    \n</string>
+    <string name="slideshow_unsupported_version">Sorry, Bugbane is not supported on Android versions lower than 11 (API level 30). Please use AndroidQF or MVT from a trusted computer.</string>
     <string name="slideshow_welcome_button">I understand</string>
 
-    <string name="slideshow_wifi_title">Connect to a Trusted Wi‑Fi Network</string>
-    <string name="slideshow_wifi_description">To continue, connect your device to a protected Wi‑Fi network, such as your home network or a personal hotspot.</string>
-    <string name="slideshow_wifi_button">Open Wi‑Fi Settings</string>
+    <string name="slideshow_wifi_title">Connect to a Trusted Wi-Fi Network</string>
+    <string name="slideshow_wifi_description">To continue, connect your device to a protected Wi-Fi network, such as your home network or a personal hotspot.</string>
+    <string name="slideshow_wifi_button">Open Wi-Fi Settings</string>
 
     <string name="slideshow_notification_title">Enable Notification Permissions</string>
-    <string name="slideshow_notification_description">To use this app, you need to enable Notification Permissions in your device settings.
+    <string name="slideshow_notification_description">To use this app, you need to enable notification permissions.
     \n\n
-    The application will show a notification to allow you to enter the pairing code to pair through ADB Wireless Debugging.</string>
+    Bugbane shows a notification so you can enter the pairing code for ADB Wireless Debugging.</string>
     <string name="slideshow_notification_button">Enable</string>
 
     <string name="slideshow_developer_title">Enable Developer Options</string>
-    <string name="slideshow_developer_description">To use this app, you need to enable Developer Options in your device settings.
+    <string name="slideshow_developer_description">To use this app, enable Developer Options in your device settings.
     \n\n
-    The application will scan you device using ADB Wireless Debugging, available only when the Developer Options are enabled.</string>
+    The application acquires data using ADB Wireless Debugging, which is available only when Developer Options are enabled.</string>
     <string name="slideshow_developer_button">Enable</string>
 
-    <string name="slideshow_wireless_title">Enable Wireless Debugging and Pair the Application</string>
-    <string name="slideshow_wireless_description">To use this app, you need to be connected to a Wi-Fi network and pair through the ADB Wireless Debugging feature.
-    \n\n
-    Enable ADB Wireless Debugging, click \"Pair device with pairing code\" and enter the code in the Bugbane notification.</string>
+    <string name="slideshow_wireless_title">Enable Wireless Debugging and Pair</string>
+    <string name="slideshow_wireless_description">Connect to Wi-Fi, enable ADB Wireless Debugging, tap “Pair device with pairing code,” then enter the code in the Bugbane notification.</string>
     <string name="slideshow_wireless_button">Pair</string>
 
     <string name="slideshow_ready_title">Ready to Start</string>
-    <string name="slideshow_ready_description">You\'re all set! The app is ready to use with all the latest Android development features.
-    \n\n
-    You can now start the scan and share the results with trusted third parties.</string>
+    <string name="slideshow_ready_description">You\'re all set. You can now acquire data and run analyses, then share results with trusted third parties.</string>
     <string name="slideshow_ready_button">Get Started</string>
-    
+
     <!-- Home screen checklist strings -->
     <string name="home_checklist_title">Forensic Checklist</string>
-    <string name="home_scan_button">Start Analysis</string>
-    <string name="home_scanning_button">Analizying...</string>
+    <string name="home_scan_button">Start Acquisition</string>
+    <string name="home_scanning_button">Acquiring…</string>
     <string name="home_permissions_button">Enable Permissions</string>
-    <string name="scan_disable_dialog_title">After every scan, it is recommended to disable the Development Option until the next scan.</string>
+    <string name="scan_disable_dialog_title">After each acquisition, it’s recommended to disable Developer Options until the next session.</string>
     <string name="scan_disable_dialog_button">Disable</string>
     <string name="scan_disable_dialog_close_button">Close</string>
-    <string name="scan_cancel_button">Stop Analysis</string>
-        
+    <string name="scan_cancel_button">Stop Acquisition</string>
+
     <!-- Settings screen strings -->
-    <string name="settings_description">Configure your app preferences and settings here.</string>
+    <string name="settings_description">Configure your preferences and app settings here.</string>
     <string name="settings_general">General Settings</string>
     <string name="settings_developer_options">Disable Developer Options</string>
-    <string name="settings_developer_options_desc">It is recommended to disable the Development Options after every scan and re-enable it when needed to prevent unnecessary use.</string>
-    
+    <string name="settings_developer_options_desc">It’s recommended to disable Developer Options after each session and re-enable them only when needed.</string>
+    <string name="settings_indicators_title">Indicators</string>
+    <string name="settings_indicators_last_fetch">Last fetch: %1$s</string>
+    <string name="settings_indicators_last_update">Last update: %1$s</string>
+    <string name="settings_indicators_count">Indicator files: %1$d</string>
+
+    <!-- Indicator update notification -->
+    <string name="notification_channel_indicators">Indicators</string>
+    <string name="notification_indicators_updated">Downloaded %1$d new indicators</string>
+
     <!-- Acquisitions screen strings -->
     <string name="acquisitions_title">Acquisitions</string>
     <string name="acquisitions_rename">Rename</string>
     <string name="acquisitions_delete">Delete</string>
-    <string name="acquisitions_empty_message">You have no acquisition, perform one to see it here</string>
+    <string name="acquisitions_empty_message">No acquisitions yet. Perform one to see it here.</string>
     <string name="acquisitions_rename_invalid">Invalid name</string>
     <string name="acquisitions_rename_failed">Unable to rename acquisition</string>
-    
-    <!-- Scan screen strings -->
-    <string name="scan_welcome_title">Welcome to Bugbane</string>
-    <string name="scan_welcome_description">Press the \'Start Acquisition\' button to start</string>
-    
+
+    <!-- Scan/Analysis screen strings -->
+    <string name="scan_welcome_title">Acquire Data</string>
+    <string name="scan_welcome_description">Press “Start Acquisition” to begin.</string>
+
     <!-- ADB Pairing Service strings -->
     <string name="notification_channel_adb_pairing">ADB Pairing</string>
     <string name="notification_adb_pairing_succeed_title">ADB Pairing Successful</string>
     <string name="notification_adb_pairing_failed_title">ADB Pairing Failed</string>
-    <string name="notification_adb_pairing_input_code">Enter Pairing Code</string>
-    <string name="notification_adb_pairing_searching_for_service_title">Searching for ADB Pairing Service</string>
-    <string name="notification_adb_pairing_stop_searching">Stop Searching</string>
-    <string name="notification_adb_pairing_service_found_title">ADB Pairing Service Found on Port %d</string>
-    <string name="notification_adb_pairing_working_title">Pairing with ADB Service</string>
-    
+    <string name="notification_adb_pairing_input_code">Enter pairing code</string>
+    <string name="notification_adb_pairing_searching_for_service_title">Searching for ADB pairing service</string>
+    <string name="notification_adb_pairing_stop_searching">Stop searching</string>
+    <string name="notification_adb_pairing_service_found_title">ADB pairing service found on port %d</string>
+    <string name="notification_adb_pairing_working_title">Pairing with ADB service</string>
+
     <!-- Acquisition details strings -->
     <string name="acquisition_details_title">Acquisition Details</string>
     <string name="acquisition_details_size">Size: %1$s</string>
@@ -89,9 +92,14 @@
     <string name="acquisition_details_started">Started: %1$s</string>
     <string name="acquisition_details_completed">Completed: %1$s</string>
     <string name="acquisition_details_files">Files</string>
+    <string name="acquisition_details_view_files">View files</string>
+    <string name="acquisition_details_scans">Analyses</string>
+    <string name="acquisition_scans_date">Date</string>
+    <string name="acquisition_scans_indicators">Indicators</string>
+    <string name="acquisition_scans_matches">Matches</string>
     <string name="acquisition_details_export">Export</string>
     <string name="acquisition_details_share">Share</string>
-    <string name="acquisition_details_rescan">Scan Again</string>
+    <string name="acquisition_details_rescan">Run Analysis</string>
 
     <!-- Messages for export/share passphrases -->
     <string name="acquisition_export_passphrase">The exported archive contains potentially private information and has been encrypted. The password will be shown only once:\n\n%1$s</string>
