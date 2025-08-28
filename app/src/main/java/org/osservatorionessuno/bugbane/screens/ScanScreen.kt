@@ -67,35 +67,70 @@ fun ScanScreen(
     ) {
         if (isScanning) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Row(modifier = Modifier.weight(1f)) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            if (totalModules > 0) {
-                                CircularProgressIndicator(
-                                    progress = {
-                                        (completedModules / totalModules.toFloat()).coerceIn(0f, 1f)
-                                    }
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text("$completedModules / $totalModules")
-                            } else {
-                                CircularProgressIndicator()
+                if (isLandscape) {
+                    Row(modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                if (totalModules > 0) {
+                                    CircularProgressIndicator(
+                                        progress = {
+                                            (completedModules / totalModules.toFloat()).coerceIn(0f, 1f)
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("$completedModules / $totalModules")
+                                } else {
+                                    CircularProgressIndicator()
+                                }
+                            }
+                        }
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .padding(16.dp),
+                        ) {
+                            items(progressLogs) { log ->
+                                Text(log)
                             }
                         }
                     }
-                    LazyColumn(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .padding(16.dp)
-                    ) {
-                        items(progressLogs) { log ->
-                            Text(log)
+                } else {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                if (totalModules > 0) {
+                                    CircularProgressIndicator(
+                                        progress = {
+                                            (completedModules / totalModules.toFloat()).coerceIn(0f, 1f)
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("$completedModules / $totalModules")
+                                } else {
+                                    CircularProgressIndicator()
+                                }
+                            }
+                        }
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                        ) {
+                            items(progressLogs) { log ->
+                                Text(log)
+                            }
                         }
                     }
                 }
@@ -104,17 +139,17 @@ fun ScanScreen(
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
-                    )
+                    ),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = stringResource(R.string.scan_cancel_button),
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                     )
                 }
             }
