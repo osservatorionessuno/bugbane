@@ -1,32 +1,34 @@
-<b>Bugbane</b> è un'applicazione Android open-source progettata per aiutare gli utenti a eseguire un auto-triage forense di base sui propri dispositivi. Utilizza Wireless ADB per raccogliere gli stessi tipi di dati che strumenti come <a href="https://github.com/mvt-project/androidqf">AndroidQF</a> o <a href="https://github.com/mvt-project/mvt">MVT</a> estrarrebbero, ma senza richiedere computer esterni, cavi o competenze con la riga di comando.
+<b>Bugbane</b> è un'applicazione Android open-source progettata per aiutare gli utenti a eseguire un'autovalutazione forense sui propri dispositivi. Utilizza ADB wireless per raccogliere gli stessi tipi di dati che strumenti come <a href="https://github.com/mvt-project/androidqf">AndroidQF</a> o <a href="https://github.com/mvt-project/mvt">MVT</a> estrarrebbero, ma senza richiedere un computer, cavi o competenze da riga di comando.
 
 <b>Requisiti</b>
 <ul>
-  <li>Wireless ADB deve essere disponibile sul tuo dispositivo (Android 11+).</li>
-  <li>Una connessione Wi-Fi per associare il dispositivo localmente.</li>
-  <li>Comprensione di base del fatto che questo strumento è pensato per l’auto-triage e <i>non</i> per un sistema completo di rilevamento.</li>
+  <li>ADB wireless deve essere disponibile sul dispositivo (Android 11+).</li>
+  <li>Una connessione Wi-Fi locale per associare il dispositivo.</li>
+  <li>Comprensione che questo strumento è pensato per l'autovalutazione e <i>non</i> può garantire il rilevamento di spyware o stalkerware.</li>
 </ul>
 
 <b>Funzionalità</b>
 <ul>
-  <li>Una procedura guidata passo-passo per abilitare le opzioni sviluppatore, associare ADB e prepararsi all’acquisizione.</li>
-  <li>Acquisizione forense con un clic dei log e delle configurazioni rilevanti del dispositivo.</li>
-  <li>Opzioni di esportazione cifrata verso altre app come Signal o su file.</li>
+  <li>Procedura guidata passo-passo per abilitare le opzioni sviluppatore, associare ADB e preparare l'acquisizione.</li>
+  <li>Acquisizione forense con un solo clic dei log e delle configurazioni rilevanti del dispositivo.</li>
+  <li>Opzioni di esportazione cifrata delle acquisizioni tramite finestre di dialogo di sistema, Signal o email.</li>
   <li>Possibilità di eliminare o rinominare localmente le acquisizioni esistenti.</li>
+  <li>Indicatori di compromissione aggiornati <b>periodicamente</b> da <a href="https://github.com/mvt-project/mvt-indicators/blob/main/indicators.yaml">mvt-indicators</a>.</li>
+  <li>Possibilità di conservare le acquisizioni sul dispositivo e analizzarle nuovamente con indicatori aggiornati per rilevare compromissioni passate.</li>
 </ul>
 
 <b>Sicurezza e Privacy</b>
-<p>Bugbane non trasmette automaticamente i tuoi dati. Tutte le esportazioni rimangono sul dispositivo finché non decidi di condividerle con organizzazioni della società civile fidate o analisti.</p>
+<p>Bugbane non trasmette automaticamente i tuoi dati. Tutte le esportazioni restano sul dispositivo finché non decidi di condividerle con organizzazioni fidate o analisti.</p>
 
-<b>Roadmap</b>
+<b>Miglioramenti Previsti</b>
 <ul>
-  <li>Scansione locale degli IOC per un rilevamento preliminare.</li>
-  <li>Flussi di lavoro ottimizzati per le organizzazioni che collaborano.</li>
-  <li>Miglioramenti alla localizzazione e all’accessibilità.</li>
+  <li>Flussi di lavoro semplificati per organizzazioni collaboratrici.</li>
+  <li>Miglioramenti alla localizzazione e all'accessibilità.</li>
+  <li>Rianalisi automatica delle acquisizioni precedenti dopo ogni aggiornamento degli indicatori.</li>
 </ul>
 
 <b>Traduzioni</b>
 <p>Aiutaci a migliorare le traduzioni e la documentazione contribuendo tramite il nostro <a href="https://github.com/osservatorionessuno/bugbane">repository GitHub</a>.</p>
 
-<b>Avviso importante</b>
-<p>Bugbane è pensato per chi sospetta che il proprio dispositivo possa essere compromesso da stalkerware, spyware o attività forensi non consensuali. <b>Il rilevamento non è ancora implementato</b> e nessuna app può confermare con certezza che il tuo telefono sia pulito. Se hai motivi fondati per credere che il tuo dispositivo sia compromesso, valuta di utilizzare un dispositivo separato e affidabile e consulta professionisti qualificati.</p>
+<b>Avviso Importante</b>
+<p>Bugbane è pensato per chi sospetta che il proprio dispositivo possa essere compromesso da stalkerware, spyware o strumenti forensi non consensuali. Tuttavia, nessuna app può confermare con certezza che il tuo telefono sia sicuro. Se hai forti motivi per credere che il tuo dispositivo sia compromesso, valuta l'uso di un dispositivo affidabile separato e consulta professionisti.</p>
