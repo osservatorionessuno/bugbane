@@ -1,4 +1,4 @@
-name: Build & Reproducibility Check
+name: Reproducibility Check
 
 on:
   push:
@@ -96,11 +96,11 @@ jobs:
           name: app-release-ubuntu-24.04
           path: ./artifacts/ubuntu-24.04
 
-      - name: Install tools (APT only)
+      - name: Install tools
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y1 --no-install-recommends \
             apksigcopier \
             androguard \
             apktool \
@@ -127,7 +127,7 @@ jobs:
           fi
           echo "✅ apksigcopier reports no differences."
 
-      - name: diffoscope (report only; ignore exit)
+      - name: diffoscope report
         continue-on-error: true
         run: |
           set -euxo pipefail
