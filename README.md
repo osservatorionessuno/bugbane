@@ -18,6 +18,9 @@ Exports are intended to be [AndroidQF](https://github.com/botherder/androidqf)-c
 
 This project is still evolving. A beta release will be announced when ready, and testing will be opened at that stage.
 
+## License
+Portions of the code in Shizuku are distributed under the Apache 2.0 License, whereas Bugbane is released under the GNU General Public License, Version 3 (GPLv3).
+
 ## Technical details
 Bugbane uses the pairing logic from [Shizuku](https://github.com/RikkaApps/Shizuku), forked and included in our code, and [libadb-android](https://github.com/MuntashirAkon/libadb-android) as a dependency. This allows it to interact with the device's debugging service exactly as a computer connected via USB would.
  - Commands are executed with shell privileges.
