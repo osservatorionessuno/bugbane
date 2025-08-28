@@ -1,3 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Bugbane</string>
+    <string name="main_nav_scan">Scansione</string>
+    <string name="main_nav_acquisitions">Acquisizioni</string>
+    <string name="main_nav_settings">Impostazioni</string>
+    <string name="slideshow_welcome_title">Benvenuto in Bugbane</string>
 </resources>
