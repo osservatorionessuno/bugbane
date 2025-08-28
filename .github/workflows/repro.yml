@@ -1,0 +1,146 @@
+name: Build & Reproducibility Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+env:
+  APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+  APK_KEY_ALIAS:         ${{ secrets.APK_KEY_ALIAS }}
+  APK_KEY_PASSWORD:      ${{ secrets.APK_KEY_PASSWORD }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stable env
+        run: |
+          echo "TZ=UTC" >> $GITHUB_ENV
+          echo "LANG=C.UTF-8" >> $GITHUB_ENV
+          echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
+
+      - name: Restore testing keystore
+        env:
+          APK_KEYSTORE_B64: ${{ secrets.APK_KEYSTORE_B64 }}
+        run: |
+          echo "$APK_KEYSTORE_B64" | base64 -d > keystore.jks
+          echo "APK_KEYSTORE=$GITHUB_WORKSPACE/keystore.jks" >> $GITHUB_ENV
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platforms;android-36 build-tools;36.0.0
+      - name: Install Gradle (official distribution)
+        env:
+          GRADLE_VERSION: "8.13"
+        run: |
+          curl -L -o gradle-${GRADLE_VERSION}-bin.zip https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
+          unzip -q gradle-${GRADLE_VERSION}-bin.zip -d "$HOME/gradle"
+          echo "$HOME/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+          gradle --version
+
+      - name: Build with Gradle
+        run: gradle --no-daemon assembleDebug assembleRelease
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-${{ matrix.os }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload release APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ matrix.os }}
+          path: app/build/outputs/apk/release/app-release.apk
+          compression-level: 0
+          retention-days: 7
+
+  repro-check:
+    name: Reproducibility
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+      - name: Download APK from ubuntu-22.04
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-ubuntu-22.04
+          path: ./artifacts/ubuntu-22.04
+
+      - name: Download APK from ubuntu-24.04
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release-ubuntu-24.04
+          path: ./artifacts/ubuntu-24.04
+
+      - name: Install tools (APT only)
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            apksigcopier \
+            androguard \
+            apktool \
+            diffoscope \
+            libarchive-tools \
+            default-jre-headless
+
+      - name: apksigcopier compare
+        id: apkcmp
+        run: |
+          set -euo pipefail
+          A=./artifacts/ubuntu-22.04/app-release.apk
+          B=./artifacts/ubuntu-24.04/app-release.apk
+          # apksigcopier prints nothing & exits 0 when it sees no relevant differences
+          apksigcopier compare "$A" "$B" | tee apksigcopier-compare.txt
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "❌ apksigcopier compare failed (exit $status)."
+            exit "$status"
+          fi
+          if [ -s apksigcopier-compare.txt ]; then
+            echo "❌ apksigcopier reports differences."
+            exit 1
+          fi
+          echo "✅ apksigcopier reports no differences."
+
+      - name: diffoscope (report only; ignore exit)
+        continue-on-error: true
+        run: |
+          set -euxo pipefail
+          A=./artifacts/ubuntu-22.04/app-release.apk
+          B=./artifacts/ubuntu-24.04/app-release.apk
+          diffoscope "$A" "$B" | tee diffoscope.txt || true
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducibility-reports
+          path: |
+            apksigcopier-compare.txt
+            diffoscope.txt
+          retention-days: 7
