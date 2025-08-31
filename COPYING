@@ -1,21 +1,24 @@
-LibADB Android is provided under:
+Bugbane is licensed under GPL 3.0 terms, except as otherwise noted below
+and/or in individual files.
 
-	SPDX-License-Identifier: GPL-3.0-or-later or Apache-2.0
+Bugbane includes packages and snippets written by third parties.
+The following third party packages/snippets are included, and carry their own
+copyright notices and license terms:
 
-Being under the terms of the GNU General Public License version 3 or
-later, according with:
+* A few code snippets were originally borrowed from MuntashirAkon's 
+  <https://github.com/MuntashirAkon/libadb-android/> and had since been 
+  modified:
 
-	LICENSES/GPL-3.0-or-later
+	* AdbConnectionManager.java
+	* AdbViewModel.java
 
-or Apache License, Version 2.0, according with:
+    Distributed under the GNU General Public License, version 3
 
-	LICENSES/Apache-2.0
+* A few code snippets were originally borrowed from Shizuku 
+  <https://github.com/RikkaApps/Shizuku> and had since been 
+  modified:
 
-In addition, other licenses may also apply. Please navigate to:
+	* AdbPairingService.kt / AdbPairingService.java
 
-	LICENSES/
-
-to see all the licenses used in this project.
-
-All contributions to the LibADB Android are subject to this COPYING
-file.
+    Distributed under the Apache License 2.0
+	<https://github.com/RikkaApps/Shizuku/blob/master/LICENSE>
