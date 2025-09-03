@@ -27,10 +27,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.osservatorionessuno.bugbane.components.SlideshowPage
 import org.osservatorionessuno.bugbane.pages.*
 import org.osservatorionessuno.bugbane.ui.theme.Theme
-import org.osservatorionessuno.bugbane.utils.AdbViewModel
+import org.osservatorionessuno.bugbane.utils.AdbManager
 
 class SlideshowActivity : ComponentActivity() {
-    private val viewModel: AdbViewModel by viewModels()
+    private val viewModel: AdbManager by viewModels()
     private val totalPages = 6
 
     override fun onCreate(savedInstanceState: Bundle?) {

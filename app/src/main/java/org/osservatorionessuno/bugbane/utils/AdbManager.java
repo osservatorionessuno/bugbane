@@ -1,13 +1,11 @@
 package org.osservatorionessuno.bugbane.utils;
 
-import android.app.Application;
+import android.content.Context;
 import android.os.Build;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
-import androidx.lifecycle.AndroidViewModel;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
@@ -32,7 +30,7 @@ import io.github.muntashirakon.adb.LocalServices;
 import io.github.muntashirakon.adb.android.AdbMdns;
 import io.github.muntashirakon.adb.android.AndroidUtils;
 
-public class AdbViewModel extends AndroidViewModel {
+public class AdbManager {
     private final ExecutorService executor = Executors.newFixedThreadPool(3);
     private final MutableLiveData<Boolean> connectAdb = new MutableLiveData<>();
     private final MutableLiveData<Boolean> pairAdb = new MutableLiveData<>();
@@ -46,14 +44,16 @@ public class AdbViewModel extends AndroidViewModel {
     private String mPairingHost;
     private int mPairingPort = -1;
 
+    private Context appContext = null;
+
     @Nullable
     private AdbStream adbShellStream;
 
-    public AdbViewModel(@NonNull Application application) {
-        super(application);
+    public AdbManager(@NonNull Context applicationContext) {
+        this.appContext = applicationContext;
     }
 
-    public LiveData<Boolean> watchConnectAdb() {
+    public MutableLiveData<Boolean> watchConnectAdb() {
         return connectAdb;
     }
 
@@ -73,9 +73,7 @@ public class AdbViewModel extends AndroidViewModel {
         return pairingPort;
     }
 
-    @Override
-    protected void onCleared() {
-        super.onCleared();
+    public void handleOnCleared() {
         executor.submit(() -> {
             try {
                 if (adbShellStream != null) {
@@ -92,10 +90,10 @@ public class AdbViewModel extends AndroidViewModel {
     public void connect(int port) {
         executor.submit(() -> {
             try {
-                AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(getApplication());
+                AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(this.appContext);
                 boolean connectionStatus;
                 try {
-                    connectionStatus = manager.connect(AndroidUtils.getHostIpAddress(getApplication()), port);
+                    connectionStatus = manager.connect(AndroidUtils.getHostIpAddress(this.appContext), port);
                 } catch (Throwable th) {
                     th.printStackTrace();
                     connectionStatus = false;
@@ -115,7 +113,7 @@ public class AdbViewModel extends AndroidViewModel {
     public void disconnect() {
         executor.submit(() -> {
             try {
-                AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(getApplication());
+                AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(this.appContext);
                 manager.disconnect();
                 connectAdb.postValue(false);
             } catch (Throwable th) {
@@ -131,7 +129,7 @@ public class AdbViewModel extends AndroidViewModel {
             final String[] host = {null};
             CountDownLatch resolveHostAndPort = new CountDownLatch(1);
 
-            AdbMdns adbMdns = new AdbMdns(getApplication(), AdbMdns.SERVICE_TYPE_TLS_PAIRING, (hostAddress, port) -> {
+            AdbMdns adbMdns = new AdbMdns(this.appContext, AdbMdns.SERVICE_TYPE_TLS_PAIRING, (hostAddress, port) -> {
                 atomicPort.set(port);
                 if (hostAddress != null) {
                     host[0] = hostAddress.getHostAddress();
@@ -160,8 +158,8 @@ public class AdbViewModel extends AndroidViewModel {
             try {
                 boolean pairingStatus;
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(getApplication());
-                    String host = mPairingHost != null ? mPairingHost : AndroidUtils.getHostIpAddress(getApplication());
+                    AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(this.appContext);
+                    String host = mPairingHost != null ? mPairingHost : AndroidUtils.getHostIpAddress(this.appContext);
                     int p = port > 0 ? port : mPairingPort;
                     pairingStatus = manager.pair(host, p, pairingCode);
                 } else pairingStatus = false;
@@ -177,11 +175,11 @@ public class AdbViewModel extends AndroidViewModel {
     @WorkerThread
     private void autoConnectInternal() {
         try {
-            AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(getApplication());
+            AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(this.appContext);
             boolean connected = false;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 try {
-                    connected = manager.connectTls(getApplication(), 5000);
+                    connected = manager.connectTls(this.appContext, 5000);
                 } catch (AdbPairingRequiredException | InterruptedException ie) {
                     askPairAdb.postValue(true);
                 } catch (Throwable th) {
@@ -218,7 +216,7 @@ public class AdbViewModel extends AndroidViewModel {
         executor.submit(() -> {
             try {
                 if (adbShellStream == null || adbShellStream.isClosed()) {
-                    AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(getApplication());
+                    AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(this.appContext);
                     adbShellStream = manager.openStream(LocalServices.SHELL);
                     new Thread(outputGenerator).start();
                 }
@@ -257,9 +255,9 @@ public class AdbViewModel extends AndroidViewModel {
         qfCancelled.set(false);
         qfFuture = executor.submit(() -> {
             try {
-                AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(getApplication());
+                AbsAdbConnectionManager manager = AdbConnectionManager.getInstance(this.appContext);
                 File out = new org.osservatorionessuno.bugbane.qf.QuickForensics()
-                        .run(getApplication(), manager, baseDir, listener);
+                        .run(this.appContext, manager, baseDir, listener);
                 if (qfCancelled.get()) {
                     commandOutput.postValue("QuickForensics cancelled");
                 } else {

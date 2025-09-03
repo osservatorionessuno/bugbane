@@ -3,7 +3,6 @@ package org.osservatorionessuno.bugbane
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -18,9 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import kotlinx.coroutines.launch
 import io.github.muntashirakon.adb.PRNGFixes
-import androidx.lifecycle.lifecycleScope
 import androidx.work.*
-import kotlinx.coroutines.Dispatchers
 import org.osservatorionessuno.libmvt.common.IndicatorsUpdates
 import org.osservatorionessuno.bugbane.workers.IndicatorsUpdateWorker
 import java.util.concurrent.TimeUnit
@@ -30,64 +27,76 @@ import org.osservatorionessuno.bugbane.components.NavigationTabs
 import org.osservatorionessuno.bugbane.screens.ScanScreen
 import org.osservatorionessuno.bugbane.screens.AcquisitionsScreen
 import org.osservatorionessuno.bugbane.ui.theme.Theme
-import org.osservatorionessuno.bugbane.utils.SlideshowManager
-import org.osservatorionessuno.bugbane.utils.AdbViewModel
-import org.osservatorionessuno.bugbane.utils.AdbPairingService
-import org.osservatorionessuno.bugbane.utils.ConfigurationManager
+import org.osservatorionessuno.bugbane.utils.AdbManager
+import org.osservatorionessuno.bugbane.utils.AppState
+import org.osservatorionessuno.bugbane.utils.ConfigurationViewModel
 
 class MainActivity : ComponentActivity() {
-    private val viewModel: AdbViewModel by viewModels()
-    private var setLacksPermissionsCallback: ((Boolean) -> Unit)? = null
+    private val viewModel: AdbManager by viewModels()
+    private val configViewModel: ConfigurationViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         PRNGFixes.apply()
 
-        // Observers
-        viewModel.watchConnectAdb().observe(this) { isConnected ->
-            if (!isConnected) {
-                setLacksPermissionsCallback?.invoke(true)
-            }
-        }
-
-        viewModel.watchAskPairAdb().observe(this) { resetPairing ->
-            if (resetPairing) {
-                setLacksPermissionsCallback?.invoke(true)
-            }
-        }
-
-        viewModel.watchCommandOutput().observe(this) { output ->
-            // TODO: blibla
-            Toast.makeText(this@MainActivity, output.toString(), Toast.LENGTH_SHORT).show()
-            Log.d("COMMAND OUTPUT", output.toString())
-        }
-
-        // Try auto-connecting
-        viewModel.autoConnect()
-
         // Fetch indicators on first launch and schedule daily background updates
         setupIndicatorsUpdates()
-
-        if (!ConfigurationManager.isNotificationPermissionGranted(this) || !ConfigurationManager.isWirelessDebuggingEnabled(
-                this
-            )
-        ) {
-            setLacksPermissionsCallback?.invoke(true)
-        }
-
-        if (!SlideshowManager.hasSeenHomepage(this)) {
-            // On first start, run the SlideshowActivity manually
-            SlideshowActivity.start(this)
-        }
 
         enableEdgeToEdge()
         setContent {
             Theme {
-                MainContent { callback ->
-                    setLacksPermissionsCallback = callback
+                val permissionState by configViewModel.configurationState.collectAsState()
+
+                LaunchedEffect(permissionState) {
+                    if (permissionState != AppState.AdbConnected) {
+                        // Permissions slideshow
+                        val startPage = AppState.valuesInOrder().indexOf(permissionState)
+                        val intent = Intent(this@MainActivity, SlideshowActivity::class.java)
+                            .putExtra("startPage", startPage)
+                        startActivity(intent)
+                    }
                 }
+
+                if (permissionState == AppState.AdbConnected) {
+                    MainContent() // Real app content
+                }
+                // Otherwise: maybe waiting for the state to be returned. todo
             }
         }
+
+        // Observers
+//        viewModel.watchConnectAdb().observe(this) { isConnected ->
+//            if (!isConnected) {
+//                setLacksPermissionsCallback?.invoke(true)
+//            }
+//        }
+//
+//        viewModel.watchAskPairAdb().observe(this) { resetPairing ->
+//            if (resetPairing) {
+//                setLacksPermissionsCallback?.invoke(true)
+//            }
+//        }
+//
+//        viewModel.watchCommandOutput().observe(this) { output ->
+//            // TODO: blibla
+//            Toast.makeText(this@MainActivity, output.toString(), Toast.LENGTH_SHORT).show()
+//            Log.d("COMMAND OUTPUT", output.toString())
+//        }
+//
+//        // Try auto-connecting
+//        viewModel.autoConnect()
+//
+//        if (!ConfigurationManager.isNotificationPermissionGranted(this) || !ConfigurationManager.isWirelessDebuggingEnabled(
+//                this
+//            )
+//        ) {
+//            setLacksPermissionsCallback?.invoke(true)
+//        }
+
+//        if (!SlideshowManager.hasSeenHomepage(this)) {
+//            // On first start, run the SlideshowActivity manually
+//            SlideshowActivity.start(this)
+//        }
     }
 
     private fun setupIndicatorsUpdates() {
@@ -124,10 +133,9 @@ class MainActivity : ComponentActivity() {
         Log.i("MainActivity", "Scheduled daily indicator update worker")
     }
 }
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun MainContent(onSetLacksPermissionsCallback: ((Boolean) -> Unit) -> Unit) {
+fun MainContent() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val configuration = LocalConfiguration.current
     val pagerState = rememberPagerState(pageCount = { 2 })
@@ -143,13 +151,6 @@ fun MainContent(onSetLacksPermissionsCallback: ((Boolean) -> Unit) -> Unit) {
     // Function to set lacks permissions state
     fun setLacksPermissions(lacks: Boolean) {
         lacksPermissions = lacks
-    }
-    
-    // Provide the callback to the parent
-    LaunchedEffect(Unit) {
-        onSetLacksPermissionsCallback { lacks ->
-            setLacksPermissions(lacks)
-        }
     }
     
     Scaffold(

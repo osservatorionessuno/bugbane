@@ -1,13 +1,5 @@
 package org.osservatorionessuno.bugbane.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -33,6 +25,7 @@ import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
 import org.osservatorionessuno.bugbane.AcquisitionActivity
+import org.osservatorionessuno.bugbane.utils.AdbManager
 import java.io.File
 
 @Composable
@@ -42,7 +35,7 @@ fun ScanScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
-    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<org.osservatorionessuno.bugbane.utils.AdbViewModel>()
+    val adbManager = AdbManager(context.applicationContext)
     var isScanning by remember { mutableStateOf(false) }
     var showDisableDialog by remember { mutableStateOf(false) }
     var completedModules by remember { mutableStateOf(0) }
@@ -135,7 +128,7 @@ fun ScanScreen(
                     }
                 }
                 Button(
-                    onClick = { viewModel.cancelQuickForensics() },
+                    onClick = { adbManager.cancelQuickForensics() },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
@@ -290,7 +283,7 @@ fun ScanScreen(
                             moduleBytes.clear()
                             completedModules = 0
                             totalModules = 0
-                            viewModel.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
+                            adbManager.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
                                 override fun onModuleStart(name: String, completed: Int, total: Int) {
                                     coroutineScope.launch {
                                         totalModules = total
@@ -321,7 +314,7 @@ fun ScanScreen(
                                     }
                                 }
 
-                                override fun isCancelled(): Boolean = viewModel.isQuickForensicsCancelled()
+                                override fun isCancelled(): Boolean = adbManager.isQuickForensicsCancelled()
 
                                 override fun onFinished(cancelled: Boolean) {
                                     coroutineScope.launch {
