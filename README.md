@@ -19,7 +19,7 @@ Bugbane is an open-source Android application designed to help potential spyware
 
 Unlike existing tools such as [MVT](https://mvt.re), Bugbane does not require a separate computer, command-line usage, or debugging skills. It uses ADB Wireless Debugging to issue commands directly to the same device on which it is installed, through a guided, user-friendly interface.
 
-Exports are intended to be [AndroidQF](https://github.com/botherder/androidqf)-compliant, making them portable and analyzable off-device using existing tools. Since exported data can contain sensitive personal information, the initial scan is performed on-device using a separately developed [libmvt](https://github.com/osservatorionessuno/libmvt), a Java re-implementation of MVT that reuses the same IOCs as the original.
+Exports are intended to be [AndroidQF](https://github.com/botherder/androidqf)-compliant, making them portable and analyzable off-device using existing tools, and can be easily shared via Signal or other communication tools. Each export is automatically encrypted with a random password using [age](https://github.com/FiloSottile/age). Since exported data can contain sensitive personal information, the initial scan is performed on-device using a re-implementation of MVT that reuses the same IOCs as the original.
 
 This project is still evolving. A beta release will be announced when ready, and testing will be opened at that stage.
 
