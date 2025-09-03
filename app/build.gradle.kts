@@ -12,24 +12,24 @@ android {
     namespace = "org.osservatorionessuno.bugbane"
     compileSdk = 36
 
-    // For deterministic CI build and signatures
-    val ksPathStr: String? = System.getenv("APK_KEYSTORE")
-    val haveCiKeystore = ksPathStr != null
+    // Lazy, configuration-cache-safe env reads
+    val ksPath  = providers.environmentVariable("APK_KEYSTORE")
+    val ksPass  = providers.environmentVariable("APK_KEYSTORE_PASSWORD")
+    val alias   = providers.environmentVariable("APK_KEY_ALIAS")
+    val keyPass = providers.environmentVariable("APK_KEY_PASSWORD")
 
-    if (haveCiKeystore) {
+    // When set, we build an *unsigned* release for F-Droid to sign later
+    val isFdroidBuild = providers.environmentVariable("FDROID_BUILD").isPresent
+
+    // Only define a signingConfig when we're NOT in F-Droid mode
+    if (!isFdroidBuild && ksPath.isPresent && ksPass.isPresent && alias.isPresent && keyPass.isPresent) {
         signingConfigs {
             create("ciRelease") {
-                val ksPass  = System.getenv("APK_KEYSTORE_PASSWORD") ?: error("APK_KEYSTORE_PASSWORD not set")
-                val alias   = System.getenv("APK_KEY_ALIAS") ?: error("APK_KEY_ALIAS not set")
-                val keyPass = System.getenv("APK_KEY_PASSWORD") ?: error("APK_KEY_PASSWORD not set")
+                storeFile     = file(ksPath.get())
+                storePassword = ksPass.get()
+                keyAlias      = alias.get()
+                keyPassword   = keyPass.get()
 
-                // use the actual path string here
-                storeFile = file(ksPathStr!!)
-                storePassword = ksPass
-                keyAlias = alias
-                keyPassword = keyPass
-
-                // Deterministic signing (avoid v1/JAR)
                 enableV1Signing = false
                 enableV2Signing = true
                 enableV3Signing = true
@@ -43,7 +43,7 @@ android {
         minSdk = 30
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -54,10 +54,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = if (haveCiKeystore)
-                signingConfigs.getByName("ciRelease")
-            else
-                signingConfigs.getByName("debug")
+            if (!isFdroidBuild && this@android.signingConfigs.findByName("ciRelease") != null) {
+                signingConfig = this@android.signingConfigs.getByName("ciRelease")
+            } else {
+                // No signingConfig assigned => Gradle will output app-release-unsigned.apk
+            }
         }
     }
 
@@ -66,9 +67,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     kotlin {
-        compilerOptions {
-            jvmTarget = JvmTarget.JVM_11
-        }
+        compilerOptions { jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11 }
     }
 
     buildFeatures {
