@@ -17,21 +17,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.osservatorionessuno.bugbane.components.SlideshowPage
-import org.osservatorionessuno.bugbane.pages.*
 import org.osservatorionessuno.bugbane.ui.theme.Theme
 import org.osservatorionessuno.bugbane.utils.AdbManager
+import org.osservatorionessuno.bugbane.utils.AppState
+import org.osservatorionessuno.bugbane.utils.ConfigurationManager
+import org.osservatorionessuno.bugbane.utils.ConfigurationViewModel
 
 class SlideshowActivity : ComponentActivity() {
-    private val viewModel: AdbManager by viewModels()
-    private val totalPages = 6
+    private val viewModel = AdbManager(application)
+    private val configViewModel: ConfigurationViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,10 +56,10 @@ class SlideshowActivity : ComponentActivity() {
         setContent {
             Theme {
                 SlideshowScreen(
+                    configViewModel,
                     onSlideshowComplete = {
                         restartMainActivity()
-                    },
-                    totalPages = totalPages
+                    }
                 )
             }
         }
@@ -84,51 +83,45 @@ class SlideshowActivity : ComponentActivity() {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SlideshowScreen(
+    viewModel: ConfigurationViewModel,
     onSlideshowComplete: () -> Unit,
-    totalPages: Int
 ) {
-    val pagerState = rememberPagerState(pageCount = { totalPages })
+    val allStates = AppState.valuesInOrder().filter { it != AppState.AdbConnected }
+    val context = LocalContext.current
+    val permissionState by viewModel.configurationState.collectAsState()
+
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { allStates.size })
+
     val currentPage by remember { derivedStateOf { pagerState.currentPage } }
     val coroutineScope = rememberCoroutineScope()
-    
-    val goToNextPage = {
-        coroutineScope.launch {
-            pagerState.animateScrollToPage(currentPage + 1)
+
+    suspend fun updatePager(permissionState: AppState) {
+        val currentIndex = allStates.indexOf(permissionState)
+        if (currentIndex in allStates.indices) {
+            pagerState.animateScrollToPage(currentIndex)
+        } else if (permissionState == AppState.AdbConnected) {
+            onSlideshowComplete()
         }
     }
 
-    val slideshowPages = listOf(
-        WelcomePage.create { goToNextPage() },
-        WifiConnectionPage.create { goToNextPage() },
-        NotificationPermissionPage.create { goToNextPage() },
-        DeveloperOptionsPage.create { goToNextPage() },
-        WirelessDebuggingPage.create { goToNextPage() },
-        FinalPage.create(onSlideshowComplete)
-    )
-
-    // Check if current page should be skipped and automatically advance
-    LaunchedEffect(currentPage) {
-        val currentPageData = slideshowPages.getOrNull(currentPage)
-        if (currentPageData?.shouldSkip?.invoke() == true) {
-            goToNextPage()
-        }
+    // Skip screens already satisfied
+    LaunchedEffect(permissionState) {
+        updatePager(permissionState)
     }
 
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, currentPage) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                val currentPageData = slideshowPages.getOrNull(currentPage)
-                if (currentPageData?.shouldSkip?.invoke() == true) {
-                    goToNextPage()
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
+    // todo: test onResume then remove this block
+//    val lifecycleOwner = LocalLifecycleOwner.current
+//    DisposableEffect(lifecycleOwner, currentPage) {
+//        val observer = LifecycleEventObserver { _, event ->
+//            if (event == Lifecycle.Event.ON_RESUME) {
+//                updatePager(permissionState)
+//            }
+//        }
+//        lifecycleOwner.lifecycle.addObserver(observer)
+//        onDispose {
+//            lifecycleOwner.lifecycle.removeObserver(observer)
+//        }
+//    }
 
     Column(
         modifier = Modifier
@@ -144,7 +137,7 @@ fun SlideshowScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center
         ) {
-            slideshowPages.forEachIndexed { index, _ ->
+            allStates.forEachIndexed { index, _ ->
                 Box(
                     modifier = Modifier
                         .padding(4.dp)
@@ -169,7 +162,8 @@ fun SlideshowScreen(
             modifier = Modifier.weight(1f),
             userScrollEnabled = false
         ) { pageIndex ->
-            SlideshowPage(page = slideshowPages[pageIndex])
+            val state = allStates[pageIndex]
+            SlideshowPage(state = state, onClickContinue = { ConfigurationManager.launchIntentByState(context, state) })
         }
     }
 }

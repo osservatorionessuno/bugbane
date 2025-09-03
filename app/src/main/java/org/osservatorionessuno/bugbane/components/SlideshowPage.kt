@@ -2,6 +2,12 @@ package org.osservatorionessuno.bugbane.components
 
 import android.app.Activity
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -9,26 +15,81 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.utils.AppState
+import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 
 data class SlideshowPageData(
     val title: String,
     val description: String,
     val icon: ImageVector? = null,
     val buttonText: String? = null,
-    val onClick: (() -> Unit)? = null,
-    val shouldSkip: (() -> Boolean)? = null,
+    val onClick: (() -> Unit)? = null, // todo launching activity
+//    val shouldSkip: (() -> Boolean)? = null,
     val shouldContinue: Boolean = true
 )
 
 @Composable
-fun SlideshowPage(page: SlideshowPageData) {
+fun getSlideshowScreenContent(state: AppState): SlideshowPageData {
+    when (state) {
+        AppState.NeedWelcomeScreen -> return SlideshowPageData(
+            title = stringResource(R.string.slideshow_welcome_title),
+            description = stringResource(R.string.slideshow_welcome_description),
+            icon = ImageVector.Companion.vectorResource(R.drawable.ic_bugbane_zoom),
+            buttonText = "",
+        )
+        AppState.NeedWifi -> return SlideshowPageData(
+            title = stringResource(R.string.slideshow_wifi_title),
+            description = stringResource(R.string.slideshow_wifi_description),
+            icon = Icons.Filled.Wifi,
+            buttonText = stringResource(R.string.slideshow_wifi_button),
+        )
+        AppState.NeedNotificationConfiguration -> return SlideshowPageData(
+            title = stringResource(R.string.slideshow_notification_title),
+            description = stringResource(R.string.slideshow_notification_description),
+            icon = Icons.Default.Notifications,
+            buttonText = stringResource(R.string.slideshow_notification_button),
+        )
+        AppState.NeedDeveloperOptions -> return SlideshowPageData(
+            title = stringResource(R.string.slideshow_developer_title),
+            description = stringResource(R.string.slideshow_developer_description),
+            icon = Icons.Default.Settings,
+            buttonText = stringResource(R.string.slideshow_developer_button),
+        )
+        AppState.NeedWirelessDebugging -> return SlideshowPageData(title = stringResource(R.string.slideshow_wireless_title),
+            description = stringResource(R.string.slideshow_wireless_description),
+            icon = Icons.Filled.Build,
+            buttonText = stringResource(R.string.slideshow_wireless_button),
+        )
+        // TODO
+//        ConfigurationState.NeedAdbPairingService -> SlideshowScreenContent(title = stringResource(R.string.slideshow_wireless_title),
+//            description = stringResource(R.string.slideshow_wireless_description),
+//            icon = Icons.Filled.Build,
+//            buttonText = "Pairing in progress..."
+//        )
+        AppState.AdbConnected -> return SlideshowPageData(
+            title = stringResource(R.string.slideshow_ready_title),
+            description = stringResource(R.string.slideshow_ready_description),
+            icon = Icons.AutoMirrored.Filled.ArrowForward,
+            buttonText = stringResource(R.string.slideshow_ready_button)
+        )
+        // TODO: probably pairing, but checks can be better
+        else -> return getSlideshowScreenContent(AppState.NeedAdbPairingService) //TODO
+    }
+    // Unreachable?
+}
+
+
+@Composable
+fun SlideshowPage(state: AppState, onClickContinue: (() -> Unit)?) {
     val context = LocalContext.current
-    
+    val page = getSlideshowScreenContent(state)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()

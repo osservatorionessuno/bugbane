@@ -127,7 +127,7 @@ object ConfigurationManager {
         return settingsIntent
     }
 
-    fun launchPermissionsIntent(context: Context, state: AppState) {
+    fun launchIntentByState(context: Context, state: AppState) {
         val intent = when (state) {
             AppState.NeedWifi -> Intent(Settings.ACTION_WIFI_SETTINGS)
             AppState.NeedNotificationConfiguration -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
