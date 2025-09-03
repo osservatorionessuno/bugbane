@@ -1,0 +1,36 @@
+Categories:
+  - Security
+  - System
+License: GPL-3.0-or-later
+AuthorName: Osservatorio Nessuno
+WebSite: https://osservatorionessuno.org
+SourceCode: https://github.com/osservatorionessuno/bugbane
+IssueTracker: https://github.com/osservatorionessuno/bugbane/issues
+Changelog: https://github.com/osservatorionessuno/bugbane/releases
+
+AutoName: Bugbane
+Summary: On-device Android forensics toolkit
+Description: |-
+  Bugbane is an open-source Android app that helps potential spyware and
+  stalkerware victims self-triage their devices and export evidence for
+  analysis when needed. It performs an on-device guided scan and uses ADB
+  Wireless Debugging to execute commands directly on the device.
+
+RepoType: git
+Repo: https://github.com/osservatorionessuno/bugbane.git
+
+Builds:
+  - versionName: 0.1.0
+    versionCode: 1
+    commit: HEAD
+    subdir: .
+    prebuild: |
+      gradle --version
+      gradle wrapper --gradle-version 8.13
+      chmod +x gradlew
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+
+AutoUpdateMode: None
+UpdateCheckMode: None
