@@ -1,6 +1,11 @@
 # Bugbane
 <img width="100" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/icons/ic_bugbane_zoom.svg" />
 
+[![GitHub Release](https://img.shields.io/github/v/release/osservatorionessuno/bugbane)](https://github.com/osservatorionessuno/bugbane/releases/latest)
+[![F-Droid Version](https://img.shields.io/f-droid/v/org.osservatorionessuno.bugbane)](https://f-droid.org/packages/org.osservatorionessuno.bugbane/)
+[![GitHub License](https://img.shields.io/github/license/osservatorionessuno/bugbane)](https://github.com/osservatorionessuno/bugbane/blob/main/LICENSE)
+[![Liberapay patrons](https://img.shields.io/liberapay/patrons/0n_odv)](https://liberapay.com/0n_odv/)
+[![Stato traduzione](https://hosted.weblate.org/widget/bugbane/bugbane/svg-badge.svg)](https://hosted.weblate.org/engage/bugbane/)
 
 > [!CAUTION]
 > This project is under active development and is not recommended for non-technical users at this stage.
