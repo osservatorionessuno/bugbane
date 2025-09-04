@@ -44,7 +44,7 @@
     <string name="home_scan_button">Start Acquisition</string>
     <string name="home_scanning_button">Acquiring…</string>
     <string name="home_permissions_button">Enable Permissions</string>
-    <string name="scan_disable_dialog_title">After each acquisition, it's recommended to disable Developer Options until the next session.</string>
+    <string name="scan_disable_dialog_title">After each acquisition, it\'s recommended to disable Developer Options until the next session.</string>
     <string name="scan_disable_dialog_button">Disable</string>
     <string name="scan_disable_dialog_close_button">Close</string>
     <string name="scan_cancel_button">Stop Acquisition</string>
@@ -53,7 +53,7 @@
     <string name="settings_description">Configure your preferences and app settings here.</string>
     <string name="settings_general">General Settings</string>
     <string name="settings_developer_options">Disable Developer Options</string>
-    <string name="settings_developer_options_desc">It's recommended to disable Developer Options after each session and re-enable them only when needed.</string>
+    <string name="settings_developer_options_desc">It\'s recommended to disable Developer Options after each session and re-enable them only when needed.</string>
     <string name="settings_indicators_title">Indicators</string>
     <string name="settings_indicators_last_fetch">Last fetch: %1$s</string>
     <string name="settings_indicators_last_update">Last update: %1$s</string>
