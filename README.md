@@ -1,8 +1,9 @@
 # Bugbane
 <img width="100" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/icons/ic_bugbane_zoom.svg" />
 
-[![Build status]](https://github.com/osservatorionessuno/bugbane/actions/workflows/build.yml/badge.svg?branch=main)
-[![Reproducibility status]](https://github.com/osservatorionessuno/bugbane/actions/workflows/repro.yml/badge.svg?branch=main)
+[![Build status](https://github.com/osservatorionessuno/bugbane/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/osservatorionessuno/bugbane/actions/workflows/build.yml?query=branch:main)
+[![Reproducibility status](https://github.com/osservatorionessuno/bugbane/actions/workflows/repro.yml/badge.svg?branch=main)](https://github.com/osservatorionessuno/bugbane/actions/workflows/repro.yml?query=branch:main)
+
 [![GitHub Release](https://img.shields.io/github/v/release/osservatorionessuno/bugbane)](https://github.com/osservatorionessuno/bugbane/releases/latest)
 [![F-Droid version](https://img.shields.io/f-droid/v/org.osservatorionessuno.bugbane)](https://f-droid.org/packages/org.osservatorionessuno.bugbane/)
 [![GitHub license](https://img.shields.io/github/license/osservatorionessuno/bugbane)](https://github.com/osservatorionessuno/bugbane/blob/main/LICENSE)
