@@ -13,7 +13,24 @@ env:
   APK_KEY_PASSWORD:      ${{ secrets.APK_KEY_PASSWORD }}
 
 jobs:
+  resolve-ref:
+    runs-on: ubuntu-latest
+    outputs:
+      repo: ${{ steps.out.outputs.repo }}
+      sha:  ${{ steps.out.outputs.sha }}
+    steps:
+      - id: out
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "repo=${{ github.event.pull_request.head.repo.full_name }}" >> $GITHUB_OUTPUT
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+            echo "sha=${{ github.sha }}"       >> $GITHUB_OUTPUT
+          fi
+
   build:
+    needs: resolve-ref
     strategy:
       fail-fast: false
       matrix:
@@ -21,14 +38,20 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository (resolved)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          repository: ${{ needs.resolve-ref.outputs.repo }}
+          ref:        ${{ needs.resolve-ref.outputs.sha }}
 
       - name: Stable env
         run: |
           echo "TZ=UTC" >> $GITHUB_ENV
           echo "LANG=C.UTF-8" >> $GITHUB_ENV
           echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
-          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
+          EPOCH=$(git show -s --format=%ct ${{ needs.resolve-ref.outputs.sha }})
+          echo "SOURCE_DATE_EPOCH=$EPOCH" >> $GITHUB_ENV
 
       - name: Restore testing keystore
         env:
@@ -48,7 +71,9 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: |
-            platforms;android-36 build-tools;36.0.0
+            platforms;android-36
+            build-tools;36.0.0
+
       - name: Install Gradle (official distribution)
         env:
           GRADLE_VERSION: "8.13"
@@ -80,6 +105,7 @@ jobs:
           retention-days: 7
 
   fdroid-build:
+    needs: resolve-ref
     runs-on: ubuntu-latest
     env:
       TZ: UTC
@@ -88,28 +114,21 @@ jobs:
       APPID: org.osservatorionessuno.bugbane
       FDROID_BUILD: "1"
 
-
     steps:
-      - name: Checkout repository
-        if: ${{ github.event_name != 'pull_request' }}
+      - name: Checkout repository (resolved)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Checkout PR head repository/sha
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ needs.resolve-ref.outputs.repo }}
+          ref:        ${{ needs.resolve-ref.outputs.sha }}
 
       - name: Stable env
         run: |
           echo "TZ=UTC" >> $GITHUB_ENV
           echo "LANG=C.UTF-8" >> $GITHUB_ENV
           echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
-          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
+          EPOCH=$(git show -s --format=%ct ${{ needs.resolve-ref.outputs.sha }})
+          echo "SOURCE_DATE_EPOCH=$EPOCH" >> $GITHUB_ENV
 
       - name: Install system dependencies
         run: |
@@ -131,7 +150,8 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: |
-            platforms;android-36 build-tools;36.0.0
+            platforms;android-36
+            build-tools;36.0.0
 
       - name: Install Gradle
         env:
@@ -176,16 +196,13 @@ jobs:
           git -C "$TMP_META_DIR" config user.name  "CI"
           git -C "$TMP_META_DIR" commit -m "Use custom metadata for ${APPID}" >/dev/null
 
-      - name: Pin metadata commit in temp repo
+      - name: Pin metadata commit in temp repo (resolved SHA)
         run: |
           set -euo pipefail
           TMP_META_DIR="${TMP_META_DIR:?}"
           APPFILE="$TMP_META_DIR/metadata/${APPID}.yml"
-          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
-            PIN=$(git describe --tags --abbrev=0)
-          else
-            PIN=$(git rev-parse HEAD)
-          fi
+          PIN="${{ needs.resolve-ref.outputs.sha }}"
+          echo "Using PIN=$PIN"
           sed -i -E "0,/^(\s*commit:\s*).*/s//\1$PIN/" "$APPFILE"
           git -C "$TMP_META_DIR" add "$APPFILE"
           git -C "$TMP_META_DIR" commit -m "Pin commit to $PIN" >/dev/null
@@ -237,7 +254,6 @@ jobs:
         run: |
           set -euo pipefail
           cd "$TMP_META_DIR"
-          # F-Droid names like repo/<appid>_<versionCode>.apk
           FD_APK=$(ls -t repo/${APPID}_*.apk | head -n1)
           echo "FD_APK=$FD_APK"
           echo "fd_apk_path=$TMP_META_DIR/$FD_APK" >> $GITHUB_OUTPUT
@@ -253,7 +269,7 @@ jobs:
   repro-check:
     name: Reproducibility
     runs-on: ubuntu-24.04
-    needs: [build, fdroid-build]   # <— depend on both
+    needs: [build, fdroid-build]
     steps:
       - name: Download APK from ubuntu-22.04
         uses: actions/download-artifact@v4
