@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.bugbane.analysis.AcquisitionScanner
+import org.osservatorionessuno.bugbane.ScanDetailActivity
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
@@ -221,6 +223,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                     )
                     ScanList(
+                        acquisitionDir = acquisitionDir,
                         scans = scans,
                         dateFormat = dateFormat,
                         modifier = Modifier
@@ -281,6 +284,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                 )
                 ScanList(
+                    acquisitionDir = acquisitionDir,
                     scans = scans,
                     dateFormat = dateFormat,
                     modifier = Modifier
@@ -363,10 +367,12 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
 
 @Composable
 private fun ScanList(
+    acquisitionDir: File,
     scans: List<ScanSummary>,
     dateFormat: DateFormat,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Box(
         modifier = modifier
             .border(1.dp, MaterialTheme.colorScheme.outline)
@@ -392,7 +398,17 @@ private fun ScanList(
                 }
             }
             items(scans) { scan ->
-                Row(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val intent = Intent(context, ScanDetailActivity::class.java).apply {
+                                putExtra(ScanDetailActivity.EXTRA_ACQUISITION_PATH, acquisitionDir.absolutePath)
+                                putExtra(ScanDetailActivity.EXTRA_SCAN_PATH, scan.file.absolutePath)
+                            }
+                            context.startActivity(intent)
+                        }
+                ) {
                     Text(
                         dateFormat.format(Date.from(scan.started)),
                         modifier = Modifier.weight(1f)
@@ -412,6 +428,7 @@ private fun ScanList(
 }
 
 private data class ScanSummary(
+    val file: File,
     val started: Instant,
     val indicatorsHash: String,
     val matchCount: Int,
@@ -436,7 +453,7 @@ private fun loadScans(acquisitionDir: File): List<ScanSummary> {
                 sha256(hashes.joinToString(""))
             }
             val results = obj.optJSONArray("results")?.length() ?: 0
-            ScanSummary(started, hash, results)
+            ScanSummary(file, started, hash, results)
         } catch (_: Exception) {
             null
         }

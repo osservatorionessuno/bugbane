@@ -75,4 +75,15 @@
     <string name="acquisition_share_message">Archivio di acquisizione. Passphrase: %1$s</string>
     <string name="acquisition_passphrase_copy">Copia nella clipboard</string>
     <string name="acquisition_passphrase_close">Chiudi</string>
+    
+    <!-- Scan details strings -->
+    <string name="scan_details_title">Dettagli analisi</string>
+    <string name="scan_details_artifact">Artefatto</string>
+    <string name="scan_details_type">Tipo</string>
+    <string name="scan_details_ioc">IOC</string>
+    <string name="scan_details_context_dialog_title">Contesto</string>
+    <string name="scan_details_acquisition_name">Nome acquisizione: %1$s</string>
+    <string name="scan_details_acquisition_uuid">UUID acquisizione: %1$s</string>
+    <string name="scan_details_acquisition_completed">Acquisizione completata: %1$s</string>
+    <string name="scan_details_analysis_completed">Analisi completata: %1$s</string>
 </resources>
