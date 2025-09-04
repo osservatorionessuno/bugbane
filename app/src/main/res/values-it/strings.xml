@@ -64,10 +64,10 @@
     <string name="acquisition_details_completed">Completato: %1$s</string>
     <string name="acquisition_details_files">File</string>
     <string name="acquisition_details_view_files">Visualizza i file</string>
-    <string name="acquisition_details_scans">Analisi</string>
-    <string name="acquisition_scans_date">Data</string>
-    <string name="acquisition_scans_indicators">Indicatori</string>
-    <string name="acquisition_scans_matches">Corrispondenza</string>
+    <string name="acquisition_details_analyses">Analisi</string>
+    <string name="acquisition_analyses_date">Data</string>
+    <string name="acquisition_analyses_indicators">Indicatori</string>
+    <string name="acquisition_analyses_matches">Corrispondenza</string>
     <string name="acquisition_details_export">Esporta</string>
     <string name="acquisition_details_share">Condividi</string>
     <string name="acquisition_details_rescan">Esegui analisi</string>
@@ -77,13 +77,13 @@
     <string name="acquisition_passphrase_close">Chiudi</string>
     
     <!-- Scan details strings -->
-    <string name="scan_details_title">Dettagli analisi</string>
-    <string name="scan_details_artifact">Artefatto</string>
-    <string name="scan_details_type">Tipo</string>
-    <string name="scan_details_ioc">IOC</string>
-    <string name="scan_details_context_dialog_title">Contesto</string>
-    <string name="scan_details_acquisition_name">Nome acquisizione: %1$s</string>
-    <string name="scan_details_acquisition_uuid">UUID acquisizione: %1$s</string>
-    <string name="scan_details_acquisition_completed">Acquisizione completata: %1$s</string>
-    <string name="scan_details_analysis_completed">Analisi completata: %1$s</string>
+    <string name="analysis_details_title">Dettagli analisi</string>
+    <string name="analysis_details_artifact">Artefatto</string>
+    <string name="analysis_details_type">Tipo</string>
+    <string name="analysis_details_ioc">IOC</string>
+    <string name="analysis_details_context_dialog_title">Contesto</string>
+    <string name="analysis_details_acquisition_name">Nome acquisizione: %1$s</string>
+    <string name="analysis_details_acquisition_uuid">UUID acquisizione: %1$s</string>
+    <string name="analysis_details_acquisition_completed">Acquisizione completata: %1$s</string>
+    <string name="analysis_details_analysis_completed">Analisi completata: %1$s</string>
 </resources>

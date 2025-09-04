@@ -44,7 +44,7 @@
     <string name="home_scan_button">Start Acquisition</string>
     <string name="home_scanning_button">Acquiring…</string>
     <string name="home_permissions_button">Enable Permissions</string>
-    <string name="scan_disable_dialog_title">After each acquisition, it’s recommended to disable Developer Options until the next session.</string>
+    <string name="scan_disable_dialog_title">After each acquisition, it's recommended to disable Developer Options until the next session.</string>
     <string name="scan_disable_dialog_button">Disable</string>
     <string name="scan_disable_dialog_close_button">Close</string>
     <string name="scan_cancel_button">Stop Acquisition</string>
@@ -53,7 +53,7 @@
     <string name="settings_description">Configure your preferences and app settings here.</string>
     <string name="settings_general">General Settings</string>
     <string name="settings_developer_options">Disable Developer Options</string>
-    <string name="settings_developer_options_desc">It’s recommended to disable Developer Options after each session and re-enable them only when needed.</string>
+    <string name="settings_developer_options_desc">It's recommended to disable Developer Options after each session and re-enable them only when needed.</string>
     <string name="settings_indicators_title">Indicators</string>
     <string name="settings_indicators_last_fetch">Last fetch: %1$s</string>
     <string name="settings_indicators_last_update">Last update: %1$s</string>
@@ -93,10 +93,10 @@
     <string name="acquisition_details_completed">Completed: %1$s</string>
     <string name="acquisition_details_files">Files</string>
     <string name="acquisition_details_view_files">View files</string>
-    <string name="acquisition_details_scans">Analyses</string>
-    <string name="acquisition_scans_date">Date</string>
-    <string name="acquisition_scans_indicators">Indicators</string>
-    <string name="acquisition_scans_matches">Matches</string>
+    <string name="acquisition_details_analyses">Analyses</string>
+    <string name="acquisition_analyses_date">Date</string>
+    <string name="acquisition_analyses_indicators">Indicators</string>
+    <string name="acquisition_analyses_matches">Matches</string>
     <string name="acquisition_details_export">Export</string>
     <string name="acquisition_details_share">Share</string>
     <string name="acquisition_details_rescan">Run Analysis</string>
@@ -108,13 +108,13 @@
     <string name="acquisition_passphrase_close">Close</string>
 
     <!-- Scan details strings -->
-    <string name="scan_details_title">Scan Details</string>
-    <string name="scan_details_artifact">Artifact</string>
-    <string name="scan_details_type">Type</string>
-    <string name="scan_details_ioc">IOC</string>
-    <string name="scan_details_context_dialog_title">Context</string>
-    <string name="scan_details_acquisition_name">Acquisition name: %1$s</string>
-    <string name="scan_details_acquisition_uuid">Acquisition UUID: %1$s</string>
-    <string name="scan_details_acquisition_completed">Acquisition completed: %1$s</string>
-    <string name="scan_details_analysis_completed">Analysis completed: %1$s</string>
+    <string name="analysis_details_title">Analysis Details</string>
+    <string name="analysis_details_artifact">Artifact</string>
+    <string name="analysis_details_type">Type</string>
+    <string name="analysis_details_ioc">IOC</string>
+    <string name="analysis_details_context_dialog_title">Context</string>
+    <string name="analysis_details_acquisition_name">Acquisition name: %1$s</string>
+    <string name="analysis_details_acquisition_uuid">Acquisition UUID: %1$s</string>
+    <string name="analysis_details_acquisition_completed">Acquisition completed: %1$s</string>
+    <string name="analysis_details_analysis_completed">Analysis completed: %1$s</string>
 </resources>

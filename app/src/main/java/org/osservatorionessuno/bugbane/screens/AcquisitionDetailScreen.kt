@@ -219,7 +219,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_scans),
+                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_analyses),
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                     )
                     ScanList(
@@ -280,7 +280,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan))
                 }
                 Text(
-                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_scans),
+                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_analyses),
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                 )
                 ScanList(
@@ -381,17 +381,17 @@ private fun ScanList(
             item {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_date),
+                        stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_analyses_date),
                         modifier = Modifier.weight(1f),
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_indicators),
+                        stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_analyses_indicators),
                         modifier = Modifier.weight(1f),
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_scans_matches),
+                        stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_analyses_matches),
                         modifier = Modifier.weight(1f),
                         fontWeight = FontWeight.SemiBold
                     )

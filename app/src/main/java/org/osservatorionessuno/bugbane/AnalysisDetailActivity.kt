@@ -48,7 +48,7 @@ fun ScanDetailContent(acquisitionDir: File, scanFile: File) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.scan_details_title)) },
+                title = { Text(stringResource(R.string.analysis_details_title)) },
                 navigationIcon = {
                     IconButton(onClick = { (context as? ComponentActivity)?.finish() }) {
                         Icon(

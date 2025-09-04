@@ -60,7 +60,7 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            stringResource(R.string.scan_details_acquisition_name, acquisitionDir.name),
+            stringResource(R.string.analysis_details_acquisition_name, acquisitionDir.name),
             style = MaterialTheme.typography.bodyLarge
         )
         acquisitionMeta?.let {
@@ -69,11 +69,11 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
                 try { dateFormat.format(Date.from(Instant.parse(s))) } catch (_: Exception) { s }
             }
             Text(
-                stringResource(R.string.scan_details_acquisition_uuid, uuid),
+                stringResource(R.string.analysis_details_acquisition_uuid, uuid),
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                stringResource(R.string.scan_details_acquisition_completed, completed),
+                stringResource(R.string.analysis_details_acquisition_completed, completed),
                 style = MaterialTheme.typography.bodyLarge
             )
         }
@@ -82,7 +82,7 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
                 try { dateFormat.format(Date.from(Instant.parse(s))) } catch (_: Exception) { s }
             }
             Text(
-                stringResource(R.string.scan_details_analysis_completed, completed),
+                stringResource(R.string.analysis_details_analysis_completed, completed),
                 style = MaterialTheme.typography.bodyLarge
             )
         }
@@ -97,7 +97,7 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
                     Text(stringResource(R.string.acquisition_passphrase_close))
                 }
             },
-            title = { Text(stringResource(R.string.scan_details_context_dialog_title)) },
+            title = { Text(stringResource(R.string.analysis_details_context_dialog_title)) },
             text = { Text(res.context) }
         )
     }
@@ -125,17 +125,17 @@ private fun ResultList(
             item {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        stringResource(R.string.scan_details_artifact),
+                        stringResource(R.string.analysis_details_artifact),
                         modifier = Modifier.weight(1f),
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        stringResource(R.string.scan_details_type),
+                        stringResource(R.string.analysis_details_type),
                         modifier = Modifier.weight(1f),
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        stringResource(R.string.scan_details_ioc),
+                        stringResource(R.string.analysis_details_ioc),
                         modifier = Modifier.weight(1f),
                         fontWeight = FontWeight.SemiBold
                     )
