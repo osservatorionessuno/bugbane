@@ -79,7 +79,6 @@ fun SettingsScreen() {
                 // Reset Slideshow Button
                 Button(
                     onClick = {
-                        SlideshowManager.resetHomepageState(context, true) // DEBUG: remove in production
                         ConfigurationManager.openDeveloperOptions(context)
                     },
                     modifier = Modifier.fillMaxWidth(),
