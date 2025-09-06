@@ -14,7 +14,7 @@
 > This project is under active development and is not recommended for non-technical users at this stage.
 > The installation and usage of Bugbane can be detected by spyware and stalkerware. Do not use it when there is a direct risk of physical harm.
 
-Bugbane is an open-source Android application designed to help potential spyware and stalkerware victims self-triage their own device and, when appropriate, export evidence for later analysis by trusted organizations.
+Bugbane is an open-source Android application designed to help potential spyware and stalkerware victims self-triage their own device and, when appropriate, export evidence for later analysis by trusted organizations. [Read more and see the demo in our blog post](https://osservatorionessuno.org/blog/2025/09/bugbane-simplifying-consensual-android-forensics/) ([Italian version](https://osservatorionessuno.org/it/blog/2025/09/bugbane-rendere-la-rilevazione-di-spyware-accessibile-a-tutti/)).
 
 
 <img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" /> <img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/fastlane/metadata/android/en-US/images/phoneScreenshots/9.png" /> <img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/fastlane/metadata/android/en-US/images/phoneScreenshots/7.png" />
