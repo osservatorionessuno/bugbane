@@ -31,11 +31,14 @@
     <string name="slideshow_developer_description">To use this app, enable Developer Options in your device settings.
     \n\n
     The application acquires data using ADB Wireless Debugging, which is available only when Developer Options are enabled.</string>
-    <string name="slideshow_developer_button">Enable</string>
+    <string name="slideshow_button_text_enable">Enable</string>
 
-    <string name="slideshow_wireless_title">Enable Wireless Debugging and Pair</string>
-    <string name="slideshow_wireless_description">Connect to Wi-Fi, enable ADB Wireless Debugging, tap “Pair device with pairing code,” then enter the code in the Bugbane notification.</string>
-    <string name="slideshow_wireless_button">Pair</string>
+    <string name="slideshow_wireless_and_pair_title">Enable Wireless Debugging and Pair</string>
+    <string name="slideshow_wireless_and_pair_description">Connect to Wi-Fi, enable ADB Wireless Debugging, tap “Pair device with pairing code,” then enter the code in the Bugbane notification.</string>
+    <string name="slideshow_wireless_and_pair_button">Pair</string>
+
+    <string name="slideshow_wireless_title">Enable Wireless Debugging</string>
+    <string name="slideshow_wireless_description">Connect to Wi-Fi and enable ADB Wireless Debugging.</string>
 
     <string name="slideshow_ready_title">Ready to Start</string>
     <string name="slideshow_ready_description">You\'re all set. You can now acquire data and run analyses, then share results with trusted third parties.</string>

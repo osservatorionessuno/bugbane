@@ -20,10 +20,11 @@
     <string name="slideshow_notification_button">Abilita</string>
     <string name="slideshow_developer_title">Abilita opzioni sviluppatore</string>
     <string name="slideshow_developer_description">Per utilizzare quesa applicazione, è necessario abilitare le opzioni sviluppatore.\n\nL\'applicazione acquisisce dati usando l\'ADB Wireless Debugging, che è disponibile solo quando le opzioni sviluppatore sono abilitate.</string>
-    <string name="slideshow_developer_button">Abilita</string>
-    <string name="slideshow_wireless_title">Abilita Wireless Debugging e accoppia</string>
-    <string name="slideshow_wireless_description">Connettiti ad una rete Wi-Fi, abilita l\'opzione ADB Wireless Debugging, premi \"Accoppia dispositivo con codice di accoppiamento\", poi inserirsci il codice visualizzato nella notifica di Bugbane.</string>
-    <string name="slideshow_wireless_button">Accoppia</string>
+    <string name="slideshow_button_text_enable">Abilita</string>
+    <string name="slideshow_wireless_and_pair_title">Abilita Wireless Debugging e accoppia</string>
+    <string name="slideshow_wireless_and_pair_description">Connettiti ad una rete Wi-Fi, abilita l\'opzione ADB Wireless Debugging, premi \"Accoppia dispositivo con codice di accoppiamento\", poi inserirsci il codice visualizzato nella notifica di Bugbane.</string>
+    <string name="slideshow_wireless_and_pair_button">Accoppia</string>
+    <string name="slideshow_wireless_description">Connettiti ad una rete Wi-Fi e abilita l\'opzione ADB Wireless Debugging.</string>
     <string name="slideshow_ready_title">Pronto per iniziare</string>
     <string name="slideshow_ready_description">Tutto pronto. Ora puoi acquisire dati ed eseguire analisi, successivamente condividere i risultati con terze parti fidate.</string>
     <string name="slideshow_ready_button">Inizia</string>
@@ -90,4 +91,5 @@
     <string name="analysis_details_acquisition_uuid">UUID acquisizione: %1$s</string>
     <string name="analysis_details_acquisition_completed">Acquisizione completata: %1$s</string>
     <string name="analysis_details_analysis_completed">Analisi completata: %1$s</string>
+    <string name="slideshow_wireless_title">Abilita Wireless Debugging</string>
 </resources>
