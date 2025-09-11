@@ -13,11 +13,13 @@
     The absence of detection from this app does not mean that your device is safe or secure.
     \n</string>
     <string name="slideshow_unsupported_version">Sorry, Bugbane is not supported on Android versions lower than 11 (API level 30). Please use AndroidQF or MVT from a trusted computer.</string>
+    <string name="slideshow_button_exit">Exit</string>
     <string name="slideshow_welcome_button">I understand</string>
 
     <string name="slideshow_wifi_title">Connect to a Trusted Wi-Fi Network</string>
     <string name="slideshow_wifi_description">To continue, connect your device to a protected Wi-Fi network, such as your home network or a personal hotspot.</string>
     <string name="slideshow_wifi_button">Open Wi-Fi Settings</string>
+    <string name="slideshow_button_continue">Continue</string>
 
     <string name="slideshow_notification_title">Enable Notification Permissions</string>
     <string name="slideshow_notification_description">To use this app, you need to enable notification permissions.
