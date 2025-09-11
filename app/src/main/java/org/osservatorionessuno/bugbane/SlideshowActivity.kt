@@ -1,8 +1,10 @@
 package org.osservatorionessuno.bugbane
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,6 +29,7 @@ import org.osservatorionessuno.bugbane.utils.AdbManager
 import org.osservatorionessuno.bugbane.utils.AppState
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.utils.ConfigurationViewModel
+import org.osservatorionessuno.bugbane.utils.SlideshowManager
 
 class SlideshowActivity : ComponentActivity() {
     private val viewModel = AdbManager(application)
@@ -87,7 +90,6 @@ fun SlideshowScreen(
     onSlideshowComplete: () -> Unit,
 ) {
     val allStates = AppState.valuesInOrder().filter { it != AppState.AdbConnected }
-    val context = LocalContext.current
     val permissionState by viewModel.configurationState.collectAsState()
 
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { allStates.size })
@@ -163,9 +165,13 @@ fun SlideshowScreen(
             userScrollEnabled = false
         ) { pageIndex ->
             val state = allStates[pageIndex]
-            SlideshowPage(state = state, onClickContinue = { ConfigurationManager.launchIntentByState(context, state) })
+            SlideshowPage(
+                state = state,
+                onClickContinue = { SlideshowManager::handleOnContinue }
+            ) // todo
         }
     }
 }
+
 
  

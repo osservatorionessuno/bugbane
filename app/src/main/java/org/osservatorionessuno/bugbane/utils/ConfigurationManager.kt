@@ -10,9 +10,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-
-private const val PREFS_NAME = "app_prefs"
-private const val KEY_HAS_SEEN_HOMEPAGE = "has_seen_homepage"
+import androidx.core.content.edit
 
 object ConfigurationManager {
 
@@ -58,6 +56,11 @@ object ConfigurationManager {
             context.startActivity(settingsIntent)
         } catch (e: Exception) {
         }
+    }
+
+    // Can just do this via the manifest, but including here is ~harmless
+    fun isSupportedDevice() : Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
     }
 
     fun isNotificationPermissionGranted(context: Context): Boolean {
@@ -107,43 +110,4 @@ object ConfigurationManager {
         }
     }
 
-    fun needWelcomeScreen(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getBoolean(KEY_HAS_SEEN_HOMEPAGE, false)
-    }
-
-
-    fun wirelessDebuggingIntent(): Intent {
-        // Open wireless debugging settings
-        val EXTRA_FRAGMENT_ARG_KEY = ":settings:fragment_args_key"
-        val EXTRA_SHOW_FRAGMENT_ARGUMENTS = ":settings:show_fragment_args"
-        val settingsIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-            putExtra(EXTRA_FRAGMENT_ARG_KEY, "toggle_adb_wireless")
-            val bundle = Bundle().apply {
-                putString(EXTRA_FRAGMENT_ARG_KEY, "toggle_adb_wireless")
-            }
-            putExtra(EXTRA_SHOW_FRAGMENT_ARGUMENTS, bundle)
-        }
-        return settingsIntent
-    }
-
-    fun launchIntentByState(context: Context, state: AppState) {
-        val intent = when (state) {
-            AppState.NeedWifi -> Intent(Settings.ACTION_WIFI_SETTINGS)
-            AppState.NeedNotificationConfiguration -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-            }
-            AppState.NeedDeveloperOptions -> Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)
-            AppState.NeedWirelessDebugging -> wirelessDebuggingIntent()
-
-            // TODO: anything else that needs an activity launched?
-            else -> null
-        }
-        intent?.let {
-            try {
-                context.startActivity(it)
-            } catch (e: Exception) {
-            }
-        }
-    }
 }

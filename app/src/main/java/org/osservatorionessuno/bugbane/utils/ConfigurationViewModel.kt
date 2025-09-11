@@ -35,39 +35,40 @@ class ConfigurationViewModel (
                 if (_configurationState.value != newState) {
                     _configurationState.value = newState
                 }
-                delay(5000)
+                delay(1000)
             }
         }
     }
 
-    private fun checkState(): AppState {
-        // Get the "best" state - all requisites/logic enforced here.
-        // If a user has completed the welcome screen, is connected to
-        // wifi and has an active adb connection, skip the other checks.
-        // If a user is missing one of those, they will need to pair again,
-        // so check for notifications enabled, etc
-        val needWelcomeScreen = ConfigurationManager.needWelcomeScreen(appContext)
-        if (needWelcomeScreen) return AppState.NeedWelcomeScreen
+    fun checkState(): AppState {
+        // Get the "best" state - all requisites/logic enforced here and order matters.
+        // If a user has completed the welcome screen, is connected to wifi and has an
+        // active adb connection, skip the other checks.
+        // If a user is missing one of those, they will need pairing flow again.
 
-        val wifi = ConfigurationManager.isConnectedToWifi(appContext)
-        if (!wifi) return AppState.NeedWifi
+        // TODO: This can be defined in the manifest if it's just about API level
+        if (!ConfigurationManager.isSupportedDevice()) return AppState.DeviceUnsupported
 
-        val devOptions = ConfigurationManager.isDeveloperOptionsEnabled(appContext)
-        if (!devOptions) return AppState.NeedDeveloperOptions
+        // Consent page
+        if (!SlideshowManager.canSkipWelcomeScreen(appContext)) return AppState.NeedWelcomeScreen
 
-        // Skip other checks if we are already connected
-        // TODO: on first view, show "Get started"; on later views, jump to acquisitions screen
+        // See if we're already connected. If yes but it's the first time, we're in state
+        // AdbConnectedFinishOnboarding, otherwise state AdbConnected
+        // (TODO - check if need wifi check explicitly or not)
+        // also TODO: ContentObserver (https://developer.android.com/reference/android/database/ContentObserver)
         val adbConnected = ConfigurationManager.isAdbEnabled(appContext)
-        if (adbConnected) return AppState.AdbConnected
+        if (adbConnected && SlideshowManager.hasSeenHomepage(appContext)) return AppState.AdbConnected
+        if (adbConnected && !SlideshowManager.hasSeenHomepage(appContext)) return AppState.AdbConnectedFinishOnboarding
 
-        val notifications = ConfigurationManager.isNotificationPermissionGranted(appContext)
-        if (!notifications) return AppState.NeedNotificationConfiguration
+        // Notifications aren't strictly needed unless we're not connected to adb
+        if (!ConfigurationManager.isNotificationPermissionGranted(appContext)) return AppState.NeedNotificationConfiguration
 
-        val wirelessDebugging = ConfigurationManager.isWirelessDebuggingEnabled(appContext)
-        if (!wirelessDebugging) return AppState.NeedWirelessDebugging
+        // Wifi, developer options, wireless debugging
+        if (!ConfigurationManager.isConnectedToWifi(appContext)) return AppState.NeedWifi
+        if (!ConfigurationManager.isDeveloperOptionsEnabled(appContext)) return AppState.NeedDeveloperOptions
+        if (!ConfigurationManager.isWirelessDebuggingEnabled(appContext)) return AppState.NeedWirelessDebugging
 
-        // TODO: this can be better with watching adb connection as a state
+        // If we get here, we need and are ready for the ADB pairing wizard flow (todo handled by another viewmodel?)
         return AppState.NeedAdbPairingService
-        // If we get here, we are probably pairing
     }
 }
