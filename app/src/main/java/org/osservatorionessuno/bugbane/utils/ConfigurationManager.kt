@@ -6,54 +6,18 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import android.content.Intent
-import android.os.Bundle
 import android.provider.Settings
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import androidx.core.content.edit
 
+// Manages phone settings (App-specific settings belong in SlideshowManager)
 object ConfigurationManager {
-
-    fun openDeviceSettings(context: Context) {
-        // Open the developer options settings
-        val intent = Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)
-        try {
-            context.startActivity(intent)
-        } catch (ignored: Exception) {
-        }
-    }
 
     fun openDeveloperOptions(context: Context) {
         // Open the developer options settings
         val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
         try {
             context.startActivity(intent)
-        } catch (e: Exception) {
-        }
-    }
-
-    fun openWifiSettings(context: Context) {
-        // Open Wi-Fi settings
-        val intent = Intent(Settings.ACTION_WIFI_SETTINGS)
-        try {
-            context.startActivity(intent)
-        } catch (e: Exception) {
-        }
-    }
-
-    fun openWirelessDebugging(context: Context) {
-        // Open wireless debugging settings
-        val EXTRA_FRAGMENT_ARG_KEY = ":settings:fragment_args_key"
-        val EXTRA_SHOW_FRAGMENT_ARGUMENTS = ":settings:show_fragment_args"
-        val settingsIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-            putExtra(EXTRA_FRAGMENT_ARG_KEY, "toggle_adb_wireless")
-            val bundle = Bundle().apply {
-                putString(EXTRA_FRAGMENT_ARG_KEY, "toggle_adb_wireless")
-            }
-            putExtra(EXTRA_SHOW_FRAGMENT_ARGUMENTS, bundle)
-        }
-        try {
-            context.startActivity(settingsIntent)
         } catch (e: Exception) {
         }
     }
@@ -109,5 +73,4 @@ object ConfigurationManager {
             false
         }
     }
-
 }
