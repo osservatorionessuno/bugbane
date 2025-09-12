@@ -17,7 +17,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import android.content.res.Configuration
 import android.util.Log
-import android.widget.Toast
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -29,13 +28,13 @@ import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
 import org.osservatorionessuno.bugbane.AcquisitionActivity
-import org.osservatorionessuno.bugbane.utils.AdbManager
+import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
 import org.osservatorionessuno.bugbane.utils.AdbState
 import org.osservatorionessuno.bugbane.utils.AppState
-import org.osservatorionessuno.bugbane.utils.ConfigurationViewModel
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
 import java.io.File
 
+private const val TAG = "ScanScreen"
 @Composable
 fun ScanScreen() {
     val coroutineScope = rememberCoroutineScope()
@@ -44,10 +43,9 @@ fun ScanScreen() {
     val application = LocalContext.current.applicationContext as Application
     val viewModel = remember { ViewModelFactory.get(application) }
 
-    // todo: eventually just the adbState?
     val appState = viewModel.configurationState.collectAsStateWithLifecycle()
     val adbManager = viewModel.adbManager
-    val adbState: State<AdbState> = adbManager.adbState.collectAsStateWithLifecycle()
+    val adbState = adbManager.adbState.collectAsStateWithLifecycle()
 
     var showDisableDialog by remember { mutableStateOf(false) }
     var completedModules by remember { mutableStateOf(0) }
@@ -57,12 +55,6 @@ fun ScanScreen() {
     val moduleBytes = remember { mutableStateMapOf<String, Long>() }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    LaunchedEffect(adbState.value) {
-        if (adbState.value == AdbState.ReadyToPair || adbState.value == AdbState.ReadyToConnect) {
-            adbManager.autoConnect()
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -281,12 +273,8 @@ fun ScanScreen() {
                 // Scan Button fixed at the bottom
                 Button(
                     onClick = {
-                        when (adbState.value) {
-                            AdbState.RequisitesMissing, AdbState.ErrorConnect, AdbState.ErrorPair -> {
-                                SlideshowActivity.start(context)
-                                return@Button
-                            }
-                            AdbState.ConnectedIdle -> {
+                        when (appState.value) {
+                            AppState.AdbConnected -> {
                                 val baseDir = File(context.filesDir, "acquisitions")
                                 progressLogs.clear()
                                 moduleLogIndex.clear()
@@ -342,32 +330,28 @@ fun ScanScreen() {
                                     }
                                 })
                             }
-                            AdbState.ConnectedAcquiring -> {
-                                // Scan already in progress; button is disabled below
+                            AppState.AdbConnecting, AppState.TryAutoConnect -> {
+                                // No-op and button is disabled below
                             }
                             else -> {
-                                // ReadyToPair, ReadyToConnect (connection in progress?)
-                                // TODO
-                                Log.e("Bugbane", "Unhandled state $adbState.value")
-                                Toast.makeText(
-                                    context,
-                                    R.string.notification_adb_pairing_working_title,
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                // Restart the slideshow, but leave the option to return to this activity
+                                val intent = Intent(context, SlideshowActivity::class.java)
+                                intent.putExtra(INTENT_EXIT_BACKPRESS, false)
+                                context.startActivity(intent)
+                                return@Button
                             }
                         }
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth(),
-                    enabled = (adbState.value != AdbState.ConnectedAcquiring),
+                    enabled = (appState.value !in arrayOf(AppState.AdbScanning, AppState.TryAutoConnect, AppState.AdbConnecting)),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = when (adbState.value) {
-                            AdbState.ConnectedAcquiring -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                            in AdbState.errorStates() ->
+                        containerColor = when (appState.value) {
+                            AppState.AdbScanning, AppState.AdbConnecting, AppState.TryAutoConnect -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            AppState.AdbConnected -> MaterialTheme.colorScheme.secondary
+                            else ->
                                 MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
-
-                            else -> MaterialTheme.colorScheme.secondary
                         }
                     )
                 ) {
@@ -378,10 +362,11 @@ fun ScanScreen() {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = when (adbState.value) {
-                            AdbState.ConnectedAcquiring -> stringResource(R.string.home_scanning_button)
-                            AdbState.ConnectedIdle -> stringResource(R.string.home_scan_button)
-                            else // (adbState is AdbState.RequisitesMissing or pairing is in progress)
+                        text = when (appState.value) {
+                            AppState.AdbScanning -> stringResource(R.string.home_scanning_button)
+                            AppState.AdbConnected -> stringResource(R.string.home_scan_button)
+                            AppState.TryAutoConnect, AppState.AdbConnecting -> stringResource(R.string.notification_adb_pairing_working_title)
+                            else
                                 -> stringResource(R.string.home_permissions_button)
                         },
                         style = MaterialTheme.typography.bodyLarge.copy(
