@@ -6,11 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
 import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
-import android.content.IntentFilter
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +17,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.MainActivity
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
+private const val TAG = "ConfigurationViewModel"
+
+/** ViewModel that holds and emits AppState, the overall state flow,
+ * and manages transitions between states.
+ * States are not inherently ordered or aware of their position in the StateFlow;
+ * state flow is controlled via:
+ *  ConfigurationViewModel::getState() (runs checks and returns current state)
+ *  ConfiguationViewModel::checkUpdateState() (emits that value in a StateFlow), and
+ *  ConfigurationViewModel::onChangeStateRequest() defines transition ("next")
+ *  behaviour for each state.
+ *
+ * A single ConfigurationViewModel instance is used and is scoped to the application's
+ * lifecycle (all Context references are to Application Context). This means the
+ * ViewModel is responsible for registering and de-registering services/listeners.
+ */
+@OptIn(ExperimentalAtomicApi::class)
 class ConfigurationViewModel private constructor(
     val appContext: Context,
     // adb state: needs pair, paired, scanning, etc
@@ -33,7 +51,7 @@ class ConfigurationViewModel private constructor(
             return ConfigurationViewModel(
                 application.applicationContext,
                 AdbManager(application.applicationContext),
-                WifiConnectivityMonitor(application.applicationContext)
+                WifiConnectivityMonitor(application)
             )
         }
     }
@@ -42,82 +60,93 @@ class ConfigurationViewModel private constructor(
     private val _configurationState = MutableStateFlow<AppState>(AppState.NeedWelcomeScreen)
     val configurationState: StateFlow<AppState> = _configurationState.asStateFlow()
 
-    private val adbPairingReceiver =
-        AdbPairingResultReceiver(
-            onSuccess = {
-                Log.d("Bugbane", "paired successfully")
-                _configurationState.value = AppState.AdbConnected
-                stopAdbPairingService()
-            },
-            onFailure = { errorMessage ->
-                // TODO (should be an adbManager state)
-                Log.e("Bugbane", "failed pairing attempt")
-                _configurationState.value = AppState.NeedWirelessDebuggingAndPair
-                stopAdbPairingService()
-            }
-        )
+    private val hasTriedAutoConnect = AtomicBoolean(false)
 
     init {
         // Set up listeners for states that can affect AppState
         observeAdbConfiguration()
         observeWifiConnectivity()
+        observeAppState()
     }
     internal fun observeAdbConfiguration() {
         viewModelScope.launch {
-            adbManager.adbState.collect { adbState -> checkUpdateState()
+            // Use main checkUpdate method
+            adbManager.adbState.collect { adbState ->
+                checkUpdateState()
             }
         }
     }
     internal fun observeWifiConnectivity() {
         viewModelScope.launch {
+            // Use main checkUpdate method
             wifiConnectivityMonitor.wifiState.collect { isConnected ->
-                if (!isConnected) {
-                    // Could also directly set _appState to AppState.NeedsWifi,
-                    // but better to keep all the state logic in one place,
-                    // especially for evolving logic (eg looking at past acquisitions)
-                    checkUpdateState()
-                }
+                Log.d(TAG, "Wifi connectivity change, tell ADB manager")
+                adbManager.checkState()
             }
         }
-
     }
+
+    // Handle transition states that should require no user interaction (autoconnect)
+    internal fun observeAppState() {
+        viewModelScope.launch {
+            configurationState.collect { appState ->
+                if (appState == AppState.TryAutoConnect && !hasTriedAutoConnect.load()) {
+                    Log.d(TAG, "Try autoconnect")
+                    adbManager.autoConnect()
+                    hasTriedAutoConnect.store(true)
+                } else if (appState !in arrayOf(AppState.AdbConnecting, AppState.TryAutoConnect)) {
+                    hasTriedAutoConnect.store(false)
+                }
+                checkUpdateState()
+            }
+        }
+    }
+
 
     internal fun checkState(): AppState {
         // Get the "best" state - requisites/logic enforced here.
         // If a user has completed the welcome screen, is connected to wifi and has an
         // active adb connection, skip the other checks.
         // If a user is missing one of those, they will need pairing flow again.
-        // Note: User could also scan an prior acquisition, where permissions aren't needed,
-        // but that is independent of the device's permissions/states, so address it in UI.
+        // Check only: don't introduce side-effects here.
 
         // TODO: This can be defined in the manifest if it's just about API level
+        val isOnboarding = !SlideshowManager.hasSeenHomepage(appContext)
         if (!ConfigurationManager.isSupportedDevice()) return AppState.DeviceUnsupported
-
         if (!SlideshowManager.canSkipWelcomeScreen(appContext)) return AppState.NeedWelcomeScreen
+        val isConnectedToWifi = wifiConnectivityMonitor.wifiState.value
 
-        // TODO: ContentObserver? (https://developer.android.com/reference/android/database/ContentObserver)
-        val adbConnected = ConfigurationManager.isAdbEnabled(appContext) && adbManager.adbState.value in AdbState.successStates()
-        if (adbConnected && SlideshowManager.hasSeenHomepage(appContext)) return AppState.AdbConnected
-        if (adbConnected && !SlideshowManager.hasSeenHomepage(appContext)) return AppState.AdbConnectedFinishOnboarding
+        // adbConnected -> we're connected, connected+scanning, or connected for the first time (connected finish onboarding).
+        // Don't just rely on adb, since it's async and may lag to report its status
+        val isWirelessDebug = ConfigurationManager.isAdbEnabled(appContext) && isConnectedToWifi
 
-        // If we get here, we need to go through the pairing workflow again, so ensure prereqs are met
+        if (isWirelessDebug && adbManager.adbState.value == AdbState.ConnectedIdle && !isOnboarding) return AppState.AdbConnected
+        if (isWirelessDebug && adbManager.adbState.value == AdbState.ConnectedIdle && isOnboarding) return AppState.AdbConnectedFinishOnboarding
+        if (isWirelessDebug && adbManager.adbState.value == AdbState.ConnectedAcquiring) return AppState.AdbScanning
+
+        // Are we trying to connect already?
+        if (adbManager.adbState.value == AdbState.Connecting) return AppState.AdbConnecting
+
+        // If we get here, we may need to go through the pairing workflow again, so ensure prereqs are met
         if (!ConfigurationManager.isNotificationPermissionGranted(appContext)) return AppState.NeedNotificationConfiguration
-        if (!ConfigurationManager.isConnectedToWifi(appContext)) return AppState.NeedWifi
+        if (!isConnectedToWifi) return AppState.NeedWifi
         if (!ConfigurationManager.isDeveloperOptionsEnabled(appContext)) return AppState.NeedDeveloperOptions
+        if (!isWirelessDebug || hasTriedAutoConnect.load()) return AppState.NeedWirelessDebuggingAndPair
 
-        if (!ConfigurationManager.isWirelessDebuggingEnabled(appContext) ||!ConfigurationManager.isAdbEnabled(appContext)) return AppState.NeedWirelessDebuggingAndPair
-
-        // TODO: could do NeedAdbPairingService here (autoconnect optimization) if the above check could tell if we have a saved connection
-        return AppState.NeedWirelessDebuggingAndPair
+        Log.d(TAG, "checkState: isAdbEnabled=${ConfigurationManager.isAdbEnabled(appContext)} adbManager ${adbManager.adbState.value}")
+        return AppState.TryAutoConnect
     }
 
     fun checkUpdateState() {
         // StateFlow doesn't emit duplicates, so this is fine
-        _configurationState.value = checkState()
+        val newState = checkState()
+        Log.d(TAG, "checkUpdateState: $newState")
+        _configurationState.value = newState
     }
 
     // Handle state transition (user-initiated)
     fun onChangeStateRequest(currentState: AppState) {
+        Log.d(TAG, "onChangeRequest from $currentState" )
         when (currentState) {
             AppState.DeviceUnsupported -> {
                 (appContext as? Activity)?.finishAffinity()
@@ -125,67 +154,31 @@ class ConfigurationViewModel private constructor(
             AppState.NeedWelcomeScreen -> {
                 // Clicked "I understand," nothing else to do
                 SlideshowManager.setHasSeenWelcomeScreen(appContext)
+                checkUpdateState()
             }
             AppState.NeedWifi, AppState.NeedNotificationConfiguration, AppState.NeedDeveloperOptions -> {
                 getIntentForAppState(currentState)?.let { it ->
-                    it.addFlags(FLAG_ACTIVITY_NEW_TASK)
+                    it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
                     appContext.startActivity(it)
                 }
             }
             AppState.NeedWirelessDebuggingAndPair -> {
                 getIntentForAppState(currentState)?.let { it ->
-                    it.addFlags(FLAG_ACTIVITY_NEW_TASK)
+                    it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
                     appContext.startActivity(it)
                 }
-                startAdbPairingService()
+                adbManager.startAdbPairingService()
             }
             AppState.AdbConnectedFinishOnboarding -> {
                 SlideshowManager.markHomepageAsSeen(appContext)
+                checkUpdateState()
             }
             else -> { // Should be unreachable
-                Log.e(appContext.packageName, "$currentState not handled")
-            }
-        }
-        checkUpdateState()
-    }
-
-    internal fun stopAdbPairingService() {
-        adbPairingReceiver.let { it ->
-            try {
-                appContext.unregisterReceiver(it)
-            } catch (e: Exception) {
-                // TODO
-                Log.w("Bugbane", "Error unregistering adbBroadcastreceiver")
+                Log.w(TAG, "$currentState not handled by onChangeStateRequest")
             }
         }
     }
 
-    internal fun startAdbPairingService() {
-        // Create BroadcastReceiver for pairing results.
-        Log.d("Bugbane", "Start pairing service...")
-        // TODO: AdbManager should handle all the pairing code and report state back directly
-
-        val filter = IntentFilter(AdbPairingService.ACTION_PAIRING_RESULT)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // This broadcast is internal to the app, so keep it private
-            appContext.registerReceiver(adbPairingReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            // Pre-Android 13: old two-argument API
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            appContext.registerReceiver(adbPairingReceiver, filter)
-        }
-        //        ConfigurationManager.openWirelessDebugging(appContext)
-
-        // Start ADB pairing service
-        val pairingIntent = AdbPairingService.startIntent(appContext)
-        try {
-            appContext.startForegroundService(pairingIntent)
-        } catch (ignored: Throwable) {
-            appContext.startService(pairingIntent)
-        }
-        // (Wait for pairing result, then update state and stop the service)
-    }
 
     internal fun getIntentForAppState(state: AppState): Intent? {
         return when (state) {
@@ -221,7 +214,6 @@ class ConfigurationViewModel private constructor(
         // Unregister listeners/close sockets
         wifiConnectivityMonitor.cleanup()
         adbManager.cleanup()
-        stopAdbPairingService()
     }
 }
 

@@ -1,18 +1,15 @@
 package org.osservatorionessuno.bugbane.utils
 
 import android.content.Context
+import android.content.IntentFilter
 import android.os.Build
+import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import io.github.muntashirakon.adb.AdbPairingRequiredException
 import io.github.muntashirakon.adb.AdbStream
 import io.github.muntashirakon.adb.LocalServices
-import io.github.muntashirakon.adb.android.AdbMdns
-import io.github.muntashirakon.adb.android.AdbMdns.OnAdbDaemonDiscoveredListener
-import io.github.muntashirakon.adb.android.AndroidUtils
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,30 +18,41 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
 import java.io.InputStreamReader
-import java.net.InetAddress
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.Volatile
+
+private const val TAG = "AdbManager"
 
 class AdbManager(applicationContext: Context) {
     private val executor: ExecutorService = Executors.newFixedThreadPool(3)
-    private val _adbState = MutableStateFlow<AdbState>(AdbState.ReadyToPair)
+    private var _adbState = MutableStateFlow<AdbState>(AdbState.Initial)
     val adbState: StateFlow<AdbState> = _adbState.asStateFlow()
+
+    private val adbPairingReceiver =
+        AdbPairingResultReceiver(
+            onSuccess = {
+                Log.d(TAG, "paired successfully")
+                _adbState.value = AdbState.Ready
+                stopAdbPairingService()
+                autoConnect()
+            },
+            onFailure = { errorMessage ->
+                Log.e(TAG, "Failed pairing attempt: $errorMessage")
+                _adbState.value = AdbState.ErrorConnect
+                stopAdbPairingService()
+            }
+        )
+
     private val commandOutput = MutableLiveData<CharSequence?>()
-    private val pairingPort = MutableLiveData<Int?>()
     private var qfFuture: Future<*>? = null
     private val qfCancelled = AtomicBoolean(false)
 
-    private var mPairingHost: String? = null
-    private var mPairingPort = -1
-
     private var appContext: Context? = null
+    private var adbConnectionManager: AdbConnectionManager
 
     private var adbShellStream: AdbStream? = null
 
@@ -52,138 +60,144 @@ class AdbManager(applicationContext: Context) {
        return commandOutput
     }
 
+    internal fun stopAdbPairingService() {
+        adbPairingReceiver.let { it ->
+            try {
+                appContext?.unregisterReceiver(it)
+            } catch (_: IllegalArgumentException) {
+                Log.i(TAG, "Can't unregister adbBroadcastReceiver (already unregistered?)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unregistering adbBroadcastreceiver: $e")
+            }
+        }
+    }
+
+    internal fun startAdbPairingService() {
+        // Create BroadcastReceiver for pairing results.
+        Log.d(TAG, "Start pairing service...")
+        val filter = IntentFilter(AdbPairingService.ACTION_PAIRING_RESULT)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // This broadcast is internal to the app, so keep it private
+            appContext?.registerReceiver(adbPairingReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            // Pre-Android 13: old two-argument API
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            appContext?.registerReceiver(adbPairingReceiver, filter)
+        }
+
+        // Start ADB pairing service
+        val pairingIntent = AdbPairingService.startIntent(appContext)
+        try {
+            appContext?.startForegroundService(pairingIntent)
+        } catch (ignored: Throwable) {
+            appContext?.startService(pairingIntent)
+        }
+        // (Wait for pairing result, then update state and stop the service)
+    }
+
+
     fun cleanup() {
+        // Might not be running, but just in case.
+        stopAdbPairingService()
+
         val stream = adbShellStream
         adbShellStream = null
         executor.submit(Runnable {
             try {
                 stream?.close()
             } catch (e: java.lang.Exception) {
+                Log.e(TAG, "Error during cleanup: ${e.message}")
                 e.printStackTrace()
             }
         })
         executor.shutdown()
     }
 
-    fun connect(port: Int) {
-        executor.submit(Runnable {
-            try {
-                val manager = AdbConnectionManager.getInstance(this.appContext!!)
-                try {
-                    if (manager.connect(AndroidUtils.getHostIpAddress(this.appContext!!), port)) {
-                        _adbState.value = AdbState.ConnectedIdle
-                    } // no "else" - method can return false if there is an existing connection already
-                } catch (th: Throwable) {
-                    th.printStackTrace()
-                    _adbState.value = AdbState.ErrorPair
-                }
-            } catch (th: Throwable) {
-                th.printStackTrace()
-                _adbState.value = AdbState.ErrorPair
-            }
-        })
-    }
-
     fun autoConnect() {
-        executor.submit(Runnable { this.autoConnectInternal() })
+        val state = _adbState.value
+        if (state !in arrayOf(AdbState.ConnectedIdle, AdbState.ConnectedAcquiring, AdbState.Connecting)) {
+            executor.submit(Runnable { this.autoConnectInternal() })
+        } else {
+            Log.w("Bugbane", "autoConnect called but adbState is $state")
+        }
     }
 
-    fun disconnect() {
-        executor.submit(Runnable {
-            try {
-                val manager = AdbConnectionManager.getInstance(this.appContext!!)
-                manager.disconnect()
-                _adbState.value = AdbState.ReadyToConnect
-            } catch (th: Throwable) {
-                th.printStackTrace()
-                // TODO: ConnectedIdle not be accurate here, but it follows the prior logic
-                _adbState.value = AdbState.ConnectedIdle
-            }
-        })
-    }
-
-    fun getPairingPort() {
-        executor.submit(Runnable {
-            val atomicPort = AtomicInteger(-1)
-            val host = arrayOf<String?>(null)
-            val resolveHostAndPort = CountDownLatch(1)
-
-            val adbMdns = AdbMdns(
-                this.appContext!!,
-                AdbMdns.SERVICE_TYPE_TLS_PAIRING,
-                OnAdbDaemonDiscoveredListener { hostAddress: InetAddress?, port: Int ->
-                    atomicPort.set(port)
-                    if (hostAddress != null) {
-                        host[0] = hostAddress.getHostAddress()
-                    }
-                    resolveHostAndPort.countDown()
-                })
-            adbMdns.start()
-
-            try {
-                if (!resolveHostAndPort.await(1, TimeUnit.MINUTES)) {
-                    return@Runnable
+    fun checkState() {
+        Log.d(TAG, "Adb received request to re-evaluate state.")
+        try {
+            // connection isn't null, isConnected, connection is established
+            if (adbConnectionManager.isConnected) {
+                if (_adbState.value != AdbState.ConnectedAcquiring) {
+                    _adbState.value = AdbState.ConnectedIdle
+                } else {
+                    _adbState.value = AdbState.ConnectedAcquiring
                 }
-            } catch (ignore: InterruptedException) {
-            } finally {
-                adbMdns.stop()
-            }
-
-            mPairingPort = atomicPort.get()
-            mPairingHost = host[0]
-            pairingPort.postValue(mPairingPort)
-            _adbState.value = AdbState.ReadyToPair
-        })
-    }
-
-    fun pair(port: Int, pairingCode: String) {
-        executor.submit(Runnable {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    val manager = AdbConnectionManager.getInstance(this.appContext!!)
-                    val host =
-                        (if (mPairingHost != null) mPairingHost else AndroidUtils.getHostIpAddress(
-                            this.appContext!!
-                        ))!!
-                    val p = if (port > 0) port else mPairingPort
-                    if (manager.pair(host, p, pairingCode)) {
-                        _adbState.value = AdbState.ReadyToConnect
-                    } else {
-                        _adbState.value = AdbState.ErrorPair
-                    }
+            } else {
+                // connection isn't null, isConnected (not yet established)
+                if (adbConnectionManager.adbConnection != null && adbConnectionManager.adbConnection!!.isConnected) {
+                    Log.d(TAG, "manager reports ready")
+                    _adbState.value = AdbState.Ready
                 }
-                autoConnectInternal()
-            } catch (th: Throwable) {
-                th.printStackTrace()
-                _adbState.value = AdbState.ErrorPair
             }
-        })
+        } catch (e: Exception) {
+            Log.d(TAG, "Couldn't get adbState: ${e.message}")
+        }
+        Log.d(TAG, "State is unknown")
     }
 
     @WorkerThread
     private fun autoConnectInternal() {
         try {
-            val manager = AdbConnectionManager.getInstance(this.appContext!!)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                try {
-                    if (manager.connectTls(this.appContext!!, 5000)) {
-                        _adbState.value = AdbState.ConnectedIdle // no "else", because false could mean existing connection
+            if (adbConnectionManager.isConnected) {
+                Log.d(TAG, "already connected")
+                if (_adbState.value != AdbState.ConnectedAcquiring) {
+                    _adbState.value = AdbState.ConnectedIdle
+                }
+                return
+            }
+            else if (_adbState.value in arrayOf(AdbState.Connecting, AdbState.ConnectedIdle, AdbState.ConnectedAcquiring)) {
+                // This isn't necessarily an error (could be Connecting), but it's sus
+                Log.w(TAG, "skipping autoConnectInternal: manager.isConnected was false but AdbState is ${adbState.value}.")
+                return
+            } else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Log.d(TAG, "AdbState ${adbState.value}, try autoConnectInternal")
+                    _adbState.value = AdbState.Connecting
+                    try {
+                        // Slight TOCTOU here, but only if manager transitioned from connecting ->
+                        // connected while we were running this method.
+                        // manager.connectTls returns false if the connection failed *or* there
+                        // was another existing connection; we check manager.isConnected first
+                        // so that we can try to distinguish between those two cases.
+                        if (adbConnectionManager.connectTls(this.appContext!!, 5000)) {
+                            Log.d(TAG, "autoconnect successful")
+                            _adbState.value = AdbState.ConnectedIdle
+                        } else {
+                            // Probably an error but could also be a race :(
+                            Log.w(TAG, "connectTls returned false")
+                            _adbState.value = AdbState.Ready
+                        }
+                    } catch (ie: AdbPairingRequiredException) {
+                        Log.i(TAG, "AdbPairingRequiredException during autoconnect")
+                        _adbState.value = AdbState.RequisitesMissing
+                    } catch (ie: InterruptedException) {
+                        Log.w(TAG, "Error during autoconnect")
+                        ie.printStackTrace()
+                        _adbState.value = AdbState.ErrorConnect
+                    } catch (th: Throwable) {
+                        Log.e(TAG, "$th during autoconnect")
+                        th.printStackTrace()
+                        _adbState.value = AdbState.ErrorConnect
                     }
-                } catch (ie: AdbPairingRequiredException) {
-                    _adbState.value = AdbState.RequisitesMissing
-                } catch (ie: InterruptedException) {
-                    _adbState.value = AdbState.ErrorConnect
-                } catch (th: Throwable) {
-                    th.printStackTrace()
-                    _adbState.value = AdbState.ErrorConnect
                 }
             }
         } catch (th: Throwable) {
+            Log.e(TAG, "Error retrieving AdbConnectionManager instance")
             th.printStackTrace()
             _adbState.value = AdbState.ErrorConnect
         }
     }
-
     @Volatile
     private var clearEnabled = false
     private val outputGenerator = Runnable {
@@ -201,20 +215,22 @@ class AdbManager(applicationContext: Context) {
                 }
             }
         } catch (e: IOException) {
+            Log.d(TAG, "${e.message} (adbStream error?)")
+            _adbState.value = AdbState.Cancelled
             e.printStackTrace()
         }
     }
 
     init {
         this.appContext = applicationContext
+        this.adbConnectionManager = AdbConnectionManager.getInstance(appContext!!) as AdbConnectionManager
     }
 
     fun execute(command: String) {
         executor.submit(Runnable {
             try {
                 if (adbShellStream == null || adbShellStream!!.isClosed) {
-                    val manager = AdbConnectionManager.getInstance(this.appContext!!)
-                    adbShellStream = manager.openStream(LocalServices.SHELL)
+                    adbShellStream = adbConnectionManager.openStream(LocalServices.SHELL)
                     Thread(outputGenerator).start()
                 }
                 if (command == "clear") {
@@ -227,7 +243,8 @@ class AdbManager(applicationContext: Context) {
                 }
             } catch (e: java.lang.Exception) {
                 e.printStackTrace()
-                _adbState.value = AdbState.RequisitesMissing
+                Log.w(TAG, "adbShelLStream error ${e.message}")
+                _adbState.value = AdbState.Cancelled
             }
         })
     }
@@ -242,10 +259,10 @@ class AdbManager(applicationContext: Context) {
 
     @Synchronized
     fun cancelQuickForensics() {
-        qfCancelled.set(true)
         if (_adbState.value == AdbState.ConnectedAcquiring) {
             _adbState.value = AdbState.ConnectedIdle
         }
+        qfCancelled.set(true)
     }
 
     fun runQuickForensics(
@@ -253,23 +270,35 @@ class AdbManager(applicationContext: Context) {
         listener: QuickForensics.ProgressListener
     ) {
         if (this.isQuickForensicsRunning) {
+            Log.d(TAG, "QuickForensics already running")
+            commandOutput.postValue("QuickForensics is still running")
+            return
+        } else if (!adbConnectionManager.isConnected) {
+            Log.i(TAG, "Need to reconnect first")
+            commandOutput.postValue("Reconnect adb first")
+            _adbState.value = AdbState.Ready
             return
         }
         qfCancelled.set(false)
         _adbState.value = AdbState.ConnectedAcquiring
         qfFuture = executor.submit(Runnable {
             try {
-                val manager = AdbConnectionManager.getInstance(this.appContext!!)
                 val out = QuickForensics()
-                    .run(this.appContext!!, manager, baseDir, listener)
+                    .run(this.appContext!!, adbConnectionManager, baseDir, listener)
                 if (qfCancelled.get()) {
                     commandOutput.postValue("QuickForensics cancelled")
-                    _adbState.value = AdbState.ConnectedIdle
+                    _adbState.value = AdbState.Cancelled
                 } else {
                     commandOutput.postValue("QuickForensics completed: " + out.getAbsolutePath())
                     _adbState.value = AdbState.ConnectedIdle
                 }
-            } catch (e: java.lang.Exception) {
+            } catch (io: IOException) {
+                // Could be reconnection issue
+                io.printStackTrace()
+                commandOutput.postValue("Error running QuickForensics: " + io.message)
+                _adbState.value = AdbState.Cancelled
+            }
+            catch (e: java.lang.Exception) {
                 e.printStackTrace()
                 commandOutput.postValue("Error running QuickForensics: " + e.message)
                 _adbState.value = AdbState.ErrorAcquisition

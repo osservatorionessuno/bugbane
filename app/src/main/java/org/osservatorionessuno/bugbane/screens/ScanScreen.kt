@@ -1,5 +1,6 @@
 package org.osservatorionessuno.bugbane.screens
 
+import android.app.Application
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -15,28 +16,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import android.content.res.Configuration
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
 import org.osservatorionessuno.bugbane.AcquisitionActivity
 import org.osservatorionessuno.bugbane.utils.AdbManager
+import org.osservatorionessuno.bugbane.utils.AdbState
+import org.osservatorionessuno.bugbane.utils.AppState
+import org.osservatorionessuno.bugbane.utils.ConfigurationViewModel
+import org.osservatorionessuno.bugbane.utils.ViewModelFactory
 import java.io.File
 
 @Composable
-fun ScanScreen(
-    lacksPermissions: Boolean = false,
-    onLacksPermissionsChange: (Boolean) -> Unit = {}
-) {
+fun ScanScreen() {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
-    val adbManager = AdbManager(context.applicationContext)
-    var isScanning by remember { mutableStateOf(false) }
+
+    val application = LocalContext.current.applicationContext as Application
+    val viewModel = remember { ViewModelFactory.get(application) }
+
+    // todo: eventually just the adbState?
+    val appState = viewModel.configurationState.collectAsStateWithLifecycle()
+    val adbManager = viewModel.adbManager
+    val adbState: State<AdbState> = adbManager.adbState.collectAsStateWithLifecycle()
+
     var showDisableDialog by remember { mutableStateOf(false) }
     var completedModules by remember { mutableStateOf(0) }
     var totalModules by remember { mutableStateOf(0) }
@@ -46,11 +58,10 @@ fun ScanScreen(
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    // Update lacksPermissions based on current permissions
-    LaunchedEffect(Unit) {
-        val hasPermissions = ConfigurationManager.isNotificationPermissionGranted(context) &&
-                           ConfigurationManager.isWirelessDebuggingEnabled(context)
-        onLacksPermissionsChange(!hasPermissions)
+    LaunchedEffect(adbState.value) {
+        if (adbState.value == AdbState.ReadyToPair || adbState.value == AdbState.ReadyToConnect) {
+            adbManager.autoConnect()
+        }
     }
 
     Column(
@@ -58,7 +69,7 @@ fun ScanScreen(
             .fillMaxSize()
             .padding(8.dp)
     ) {
-        if (isScanning) {
+        if (adbState.value == AdbState.ConnectedAcquiring) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (isLandscape) {
                     Row(modifier = Modifier.weight(1f)) {
@@ -270,81 +281,94 @@ fun ScanScreen(
                 // Scan Button fixed at the bottom
                 Button(
                     onClick = {
-                        if (lacksPermissions) {
-                            SlideshowActivity.start(context)
-                            return@Button
-                        }
-
-                        if (!isScanning) {
-                            val baseDir = File(context.filesDir, "acquisitions")
-                            isScanning = true
-                            progressLogs.clear()
-                            moduleLogIndex.clear()
-                            moduleBytes.clear()
-                            completedModules = 0
-                            totalModules = 0
-                            adbManager.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
-                                override fun onModuleStart(name: String, completed: Int, total: Int) {
-                                    coroutineScope.launch {
-                                        totalModules = total
-                                        moduleLogIndex[name] = progressLogs.size
-                                        moduleBytes[name] = 0L
-                                        progressLogs.add("Running $name: 0 B")
-                                    }
-                                }
-
-                                override fun onModuleProgress(name: String, bytes: Long) {
-                                    coroutineScope.launch {
-                                        val idx = moduleLogIndex[name] ?: return@launch
-                                        moduleBytes[name] = bytes
-                                        progressLogs[idx] = "Running $name: ${formatBytes(bytes)}"
-                                    }
-                                }
-
-                                override fun onModuleComplete(name: String, completed: Int, total: Int) {
-                                    coroutineScope.launch {
-                                        completedModules = completed
-                                        val idx = moduleLogIndex[name]
-                                        val finalBytes = moduleBytes[name] ?: 0L
-                                        if (idx != null) {
-                                            progressLogs[idx] = "Completed $name: ${formatBytes(finalBytes)}"
-                                        } else {
-                                            progressLogs.add("Completed $name: ${formatBytes(finalBytes)}")
+                        when (adbState.value) {
+                            AdbState.RequisitesMissing, AdbState.ErrorConnect, AdbState.ErrorPair -> {
+                                SlideshowActivity.start(context)
+                                return@Button
+                            }
+                            AdbState.ConnectedIdle -> {
+                                val baseDir = File(context.filesDir, "acquisitions")
+                                progressLogs.clear()
+                                moduleLogIndex.clear()
+                                moduleBytes.clear()
+                                completedModules = 0
+                                totalModules = 0
+                                adbManager.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
+                                    override fun onModuleStart(name: String, completed: Int, total: Int) {
+                                        coroutineScope.launch {
+                                            totalModules = total
+                                            moduleLogIndex[name] = progressLogs.size
+                                            moduleBytes[name] = 0L
+                                            progressLogs.add("Running $name: 0 B")
                                         }
                                     }
-                                }
 
-                                override fun isCancelled(): Boolean = adbManager.isQuickForensicsCancelled()
+                                    override fun onModuleProgress(name: String, bytes: Long) {
+                                        coroutineScope.launch {
+                                            val idx = moduleLogIndex[name] ?: return@launch
+                                            moduleBytes[name] = bytes
+                                            progressLogs[idx] = "Running $name: ${formatBytes(bytes)}"
+                                        }
+                                    }
 
-                                override fun onFinished(cancelled: Boolean) {
-                                    coroutineScope.launch {
-                                        if (!cancelled) {
-                                            val latest = baseDir.listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.lastModified() }
-                                            if (latest != null) {
-                                                val intent = Intent(context, AcquisitionActivity::class.java).apply {
-                                                    putExtra(AcquisitionActivity.EXTRA_PATH, latest.absolutePath)
-                                                }
-                                                context.startActivity(intent)
+                                    override fun onModuleComplete(name: String, completed: Int, total: Int) {
+                                        coroutineScope.launch {
+                                            completedModules = completed
+                                            val idx = moduleLogIndex[name]
+                                            val finalBytes = moduleBytes[name] ?: 0L
+                                            if (idx != null) {
+                                                progressLogs[idx] = "Completed $name: ${formatBytes(finalBytes)}"
+                                            } else {
+                                                progressLogs.add("Completed $name: ${formatBytes(finalBytes)}")
                                             }
-                                            showDisableDialog = true
                                         }
-                                        isScanning = false
                                     }
-                                }
-                            })
+
+                                    override fun isCancelled(): Boolean = adbManager.isQuickForensicsCancelled
+
+                                    override fun onFinished(cancelled: Boolean) {
+                                        coroutineScope.launch {
+                                            if (!cancelled) {
+                                                val latest = baseDir.listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.lastModified() }
+                                                if (latest != null) {
+                                                    val intent = Intent(context, AcquisitionActivity::class.java).apply {
+                                                        putExtra(AcquisitionActivity.EXTRA_PATH, latest.absolutePath)
+                                                    }
+                                                    context.startActivity(intent)
+                                                }
+                                                showDisableDialog = true
+                                            }
+                                        }
+                                    }
+                                })
+                            }
+                            AdbState.ConnectedAcquiring -> {
+                                // Scan already in progress; button is disabled below
+                            }
+                            else -> {
+                                // ReadyToPair, ReadyToConnect (connection in progress?)
+                                // TODO
+                                Log.e("Bugbane", "Unhandled state $adbState.value")
+                                Toast.makeText(
+                                    context,
+                                    R.string.notification_adb_pairing_working_title,
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth(),
-                    enabled = !isScanning,
+                    enabled = (adbState.value != AdbState.ConnectedAcquiring),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isScanning)
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                        else if (lacksPermissions)
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
-                        else
-                            MaterialTheme.colorScheme.secondary
+                        containerColor = when (adbState.value) {
+                            AdbState.ConnectedAcquiring -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                            in AdbState.errorStates() ->
+                                MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
+
+                            else -> MaterialTheme.colorScheme.secondary
+                        }
                     )
                 ) {
                     Icon(
@@ -354,12 +378,12 @@ fun ScanScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isScanning)
-                            stringResource(R.string.home_scanning_button)
-                        else if (lacksPermissions)
-                            stringResource(R.string.home_permissions_button)
-                        else
-                            stringResource(R.string.home_scan_button),
+                        text = when (adbState.value) {
+                            AdbState.ConnectedAcquiring -> stringResource(R.string.home_scanning_button)
+                            AdbState.ConnectedIdle -> stringResource(R.string.home_scan_button)
+                            else // (adbState is AdbState.RequisitesMissing or pairing is in progress)
+                                -> stringResource(R.string.home_permissions_button)
+                        },
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.Medium
                         )

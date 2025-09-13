@@ -7,8 +7,6 @@ import android.os.Build
 import android.util.Log
 import android.content.Intent
 import android.provider.Settings
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 
 // Manages phone settings (App-specific settings belong in SlideshowManager)
 object ConfigurationManager {
@@ -34,14 +32,6 @@ object ConfigurationManager {
             return true
         }
         return false
-    }
-
-    fun isConnectedToWifi(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return false
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
     fun isWirelessDebuggingEnabled(context: Context): Boolean {

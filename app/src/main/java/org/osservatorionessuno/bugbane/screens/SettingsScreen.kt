@@ -12,7 +12,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
-import org.osservatorionessuno.bugbane.utils.SlideshowManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.libmvt.common.IndicatorsUpdates
