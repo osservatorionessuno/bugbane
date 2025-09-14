@@ -1,10 +1,13 @@
 package org.osservatorionessuno.bugbane.workers
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
@@ -24,6 +27,7 @@ class IndicatorsUpdateWorker(
     workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
 
+    @SuppressLint("MissingPermission") // TODO
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         // Cross-thread/process lock
         val lockFile = File(applicationContext.filesDir, "indicators_update.lock")
@@ -58,6 +62,7 @@ class IndicatorsUpdateWorker(
         private const val TAG = "IndicatorsUpdateWorker"
         private const val CHANNEL_ID = "indicator_updates"
 
+        @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
         fun notify(context: Context, newCount: Long) {
             val manager = NotificationManagerCompat.from(context)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
