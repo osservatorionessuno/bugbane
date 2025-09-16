@@ -1,10 +1,15 @@
 name: F-Droid
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref_sha:
+        required: true
+        type: string
+      repo_full_name:
+        required: true
+        type: string
+  workflow_dispatch: {}
 
 env:
   TZ: UTC
@@ -12,33 +17,24 @@ env:
   LC_ALL: C.UTF-8
   serverwebroot: /tmp
   APPID: org.osservatorionessuno.bugbane
-  FDROID_BUILD: "1"
 
 jobs:
   fdroid-ci:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        if: ${{ github.event_name != 'pull_request' }}
+      - name: Checkout repository (exact PR head or push)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Checkout PR head repository/sha
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ inputs.repo_full_name }}
+          ref: ${{ inputs.ref_sha }}
 
       - name: Stable env
         run: |
           echo "TZ=UTC" >> $GITHUB_ENV
           echo "LANG=C.UTF-8" >> $GITHUB_ENV
           echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
-          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct ${{ inputs.ref_sha }})" >> $GITHUB_ENV
 
       - name: Install system dependencies
         run: |
@@ -94,17 +90,17 @@ jobs:
           echo "Using APPID=$APPID"
 
       - name: Prepare full fdroiddata
+        env:
+          REPO_URL: https://github.com/${{ inputs.repo_full_name }}.git
+          PIN: ${{ inputs.ref_sha }}
         run: |
           set -euo pipefail
           TMP_META_DIR="$(mktemp -d)"
           echo "TMP_META_DIR=$TMP_META_DIR" >> $GITHUB_ENV
-          echo "Using temp repo: $TMP_META_DIR"
           mkdir -p "$serverwebroot/repo/status"
 
-          # Clone upstream fdroiddata (includes config/, icons, etc.)
           git clone --depth 1 https://gitlab.com/fdroid/fdroiddata.git "$TMP_META_DIR"
 
-          # Overwrite our app's metadata file into that clone
           test -f "metadata/${APPID}.yml" || { echo "::error::metadata/${APPID}.yml not found"; exit 1; }
           cp "metadata/${APPID}.yml" "$TMP_META_DIR/metadata/${APPID}.yml"
 
@@ -118,32 +114,17 @@ jobs:
           YAML
           chmod 600 config.yml
 
-          # Commit so the repo is clean
-          git -C "$TMP_META_DIR" add "metadata/${APPID}.yml"
-          git -C "$TMP_META_DIR" add "config.yml"
-          git -C "$TMP_META_DIR" config user.email "ci@example.invalid"
-          git -C "$TMP_META_DIR" config user.name  "CI"
-          git -C "$TMP_META_DIR" commit -m "Use custom metadata for ${APPID}" >/dev/null
-
-      - name: Pin metadata commit in temp repo
-        run: |
-          set -euo pipefail
-          TMP_META_DIR="${TMP_META_DIR:?}"
           APPFILE="$TMP_META_DIR/metadata/${APPID}.yml"
 
-          # Pin to latest tag if available, else to HEAD of our source repo
-          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
-            PIN=$(git describe --tags --abbrev=0)
-          else
-            PIN=$(git rev-parse HEAD)
-          fi
-          echo "Using PIN=$PIN"
-          # Replace only the first 'commit:' occurrence
-          sed -i -E "0,/^(\s*commit:\s*).*/s//\1$PIN/" "$APPFILE"
+          # Rewrite ONLY the first Repo: and commit: lines (use '|' delimiter + POSIX [[:space:]])
+          sed -i -E "0,/^([[:space:]]*Repo:[[:space:]]*).*/ s||\1${REPO_URL}|" "$APPFILE"
+          sed -i -E "0,/^([[:space:]]*commit:[[:space:]]*).*/ s||\1${PIN}|" "$APPFILE"
 
-          git -C "$TMP_META_DIR" add "$APPFILE"
-          git -C "$TMP_META_DIR" commit -m "Pin commit to $PIN" >/dev/null
-          echo "PIN=$PIN" >> $GITHUB_ENV
+          echo '== After rewrite =='
+          grep -nE '^[[:space:]]*(Repo|commit):' "$APPFILE" || sed -n '1,120p' "$APPFILE"
+
+          git -C "$TMP_META_DIR" add "metadata/${APPID}.yml" "config.yml"
+          git -C "$TMP_META_DIR" -c user.email=ci@example.invalid -c user.name=CI commit -m "Use custom metadata for ${APPID}" >/dev/null
 
       - name: F-Droid checkupdates
         run: |
@@ -166,44 +147,41 @@ jobs:
           cd "$TMP_META_DIR"
           fdroid build --verbose --no-tarball "$APPID"
 
-      - name: Restore combined keystore (APK + repo)
-        env:
-          APK_KEYSTORE_B64: ${{ secrets.APK_KEYSTORE_B64 }}
+      - name: Generate CI keystore and wire it into config.yml
         run: |
           set -euo pipefail
-          echo "$APK_KEYSTORE_B64" | base64 -d > ci-two-keys.jks
-          chmod 600 ci-two-keys.jks
-          echo "CI_KEYSTORE=$GITHUB_WORKSPACE/ci-two-keys.jks" >> $GITHUB_ENV
-          ls -lh "$GITHUB_WORKSPACE/ci-two-keys.jks"
-          sha256sum "$GITHUB_WORKSPACE/ci-two-keys.jks"
+          : "${TMP_META_DIR:?TMP_META_DIR missing}"
 
-      - name: Append signing config to config.yml
-        env:
-          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
-          APK_KEY_ALIAS:         ${{ secrets.APK_KEY_ALIAS }}
-          APK_KEY_PASSWORD:      ${{ secrets.APK_KEY_PASSWORD }}
-          REPO_KEY_ALIAS:        ${{ secrets.REPO_KEY_ALIAS }}
-        run: |
-          set -euo pipefail
+          CI_KEYSTORE="$GITHUB_WORKSPACE/ci-two-keys.jks"
+          CI_STOREPASS="single-use-ci-storepass"
+          CI_KEYPASS="$CI_STOREPASS"
+          CI_ALIAS="ci"
+
+          keytool -genkeypair \
+            -alias "$CI_ALIAS" \
+            -keyalg RSA -keysize 4096 -sigalg SHA256withRSA \
+            -validity 36500 \
+            -storetype JKS \
+            -keystore "$CI_KEYSTORE" \
+            -storepass "$CI_STOREPASS" \
+            -keypass "$CI_KEYPASS" \
+            -dname "CN=CI Repo,O=Example,C=US"
+
           cd "$TMP_META_DIR"
           {
             echo "keystore: \"$CI_KEYSTORE\""
-            echo "keystorepass: \"$APK_KEYSTORE_PASSWORD\""
-            echo "keyalias: \"$APK_KEY_ALIAS\""
-            echo "keypass: \"$APK_KEY_PASSWORD\""
-            echo "repo_keyalias: \"$REPO_KEY_ALIAS\""
+            echo "keystorepass: \"$CI_STOREPASS\""
+            echo "keyalias: \"$CI_ALIAS\""
+            echo "keypass: \"$CI_KEYPASS\""
+            echo "repo_keyalias: \"$CI_ALIAS\""
             echo "keyaliases:"
-            echo "  ${APPID}: \"$APK_KEY_ALIAS\""
+            echo "  ${APPID}: \"$CI_ALIAS\""
           } >> config.yml
           chmod 600 config.yml
+          echo "==== config.yml ===="
+          sed -n '1,160p' config.yml
 
       - name: Publish
-        env:
-          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
-          APK_KEY_ALIAS:         ${{ secrets.APK_KEY_ALIAS }}
-          APK_KEY_PASSWORD:      ${{ secrets.APK_KEY_PASSWORD }}
-          REPO_KEY_ALIAS:        ${{ secrets.REPO_KEY_ALIAS }}
-
         run: |
           set -euo pipefail
           cd "$TMP_META_DIR"
