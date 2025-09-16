@@ -1,291 +1,55 @@
-name: Reproducibility Check
+name: Reproducibility
 
 on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
   workflow_dispatch: {}
 
-env:
-  APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
-  APK_KEY_ALIAS:         ${{ secrets.APK_KEY_ALIAS }}
-  APK_KEY_PASSWORD:      ${{ secrets.APK_KEY_PASSWORD }}
-
 jobs:
-  resolve-ref:
-    runs-on: ubuntu-latest
-    outputs:
-      repo: ${{ steps.out.outputs.repo }}
-      sha:  ${{ steps.out.outputs.sha }}
-    steps:
-      - id: out
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "repo=${{ github.event.pull_request.head.repo.full_name }}" >> $GITHUB_OUTPUT
-            echo "sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
-          else
-            echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
-            echo "sha=${{ github.sha }}"       >> $GITHUB_OUTPUT
-          fi
-
   build:
-    needs: resolve-ref
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
-    runs-on: ${{ matrix.os }}
+    uses: ./.github/workflows/build.yml
+    with:
+      ref_sha: ${{ github.event_name == 'pull_request'
+                  && github.event.pull_request.head.sha || github.sha }}
+      repo_full_name: ${{ github.event_name == 'pull_request'
+                         && github.event.pull_request.head.repo.full_name || github.repository }}
 
-    steps:
-      - name: Checkout repository (resolved)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          repository: ${{ needs.resolve-ref.outputs.repo }}
-          ref:        ${{ needs.resolve-ref.outputs.sha }}
-
-      - name: Stable env
-        run: |
-          echo "TZ=UTC" >> $GITHUB_ENV
-          echo "LANG=C.UTF-8" >> $GITHUB_ENV
-          echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
-          EPOCH=$(git show -s --format=%ct ${{ needs.resolve-ref.outputs.sha }})
-          echo "SOURCE_DATE_EPOCH=$EPOCH" >> $GITHUB_ENV
-
-      - name: Restore testing keystore
-        env:
-          APK_KEYSTORE_B64: ${{ secrets.APK_KEYSTORE_B64 }}
-        run: |
-          echo "$APK_KEYSTORE_B64" | base64 -d > keystore.jks
-          echo "APK_KEYSTORE=$GITHUB_WORKSPACE/keystore.jks" >> $GITHUB_ENV
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platforms;android-36 build-tools;36.0.0
-
-      - name: Install Gradle (official distribution)
-        env:
-          GRADLE_VERSION: "8.13"
-        run: |
-          curl -L -o gradle-${GRADLE_VERSION}-bin.zip https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
-          unzip -q gradle-${GRADLE_VERSION}-bin.zip -d "$HOME/gradle"
-          echo "$HOME/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
-          gradle --version
-
-      - name: Build with Gradle
-        run: gradle --no-daemon assembleDebug assembleRelease
-
-      - name: Upload debug APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug-${{ matrix.os }}
-          path: app/build/outputs/apk/debug/app-debug.apk
-          compression-level: 0
-          retention-days: 7
-
-      - name: Upload release APK
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-${{ matrix.os }}
-          path: app/build/outputs/apk/release/app-release.apk
-          compression-level: 0
-          retention-days: 7
-
-  fdroid-build:
-    needs: resolve-ref
-    runs-on: ubuntu-latest
-    env:
-      TZ: UTC
-      LANG: C.UTF-8
-      LC_ALL: C.UTF-8
-      APPID: org.osservatorionessuno.bugbane
-      FDROID_BUILD: "1"
-
-    steps:
-      - name: Checkout repository (resolved)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          repository: ${{ needs.resolve-ref.outputs.repo }}
-          ref:        ${{ needs.resolve-ref.outputs.sha }}
-
-      - name: Stable env
-        run: |
-          echo "TZ=UTC" >> $GITHUB_ENV
-          echo "LANG=C.UTF-8" >> $GITHUB_ENV
-          echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
-          EPOCH=$(git show -s --format=%ct ${{ needs.resolve-ref.outputs.sha }})
-          echo "SOURCE_DATE_EPOCH=$EPOCH" >> $GITHUB_ENV
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            git curl locales \
-            python3 python3-pip python3-launchpadlib \
-            openjdk-17-jdk-headless apksigner mercurial \
-            jq unzip diffutils rsync
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platforms;android-36 build-tools;36.0.0
-
-      - name: Install Gradle
-        env:
-          GRADLE_VERSION: "8.13"
-        run: |
-          curl -L -o gradle-${GRADLE_VERSION}-bin.zip https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
-          unzip -q gradle-${GRADLE_VERSION}-bin.zip -d "$HOME/gradle"
-          echo "$HOME/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
-          gradle --version
-
-      - name: Add fdroidserver to PATH/ENV
-        run: |
-          git clone --depth 1 https://gitlab.com/fdroid/fdroidserver.git fdroidserver
-          cd fdroidserver
-          pip install --upgrade pip setuptools wheel
-          pip install .
-          cd ..
-          chmod +x fdroidserver/fdroid
-          echo "$GITHUB_WORKSPACE/fdroidserver" >> "$GITHUB_PATH"
-          echo "PYTHONPATH=$GITHUB_WORKSPACE/fdroidserver:$GITHUB_WORKSPACE/fdroidserver/examples" >> "$GITHUB_ENV"
-
-      - name: Prepare full fdroiddata
-        env:
-          APPID: ${{ env.APPID }}
-        run: |
-          set -euo pipefail
-          TMP_META_DIR="$(mktemp -d)"
-          echo "TMP_META_DIR=$TMP_META_DIR" >> $GITHUB_ENV
-          git clone --depth 1 https://gitlab.com/fdroid/fdroiddata.git "$TMP_META_DIR"
-          test -f "metadata/${APPID}.yml" || { echo "::error::metadata/${APPID}.yml not found"; exit 1; }
-          cp "metadata/${APPID}.yml" "$TMP_META_DIR/metadata/${APPID}.yml"
-          cd "$TMP_META_DIR"
-          cat > config.yml <<'YAML'
-          repo_url: https://example.invalid/repo
-          make_current_version_link: false
-          gradle: gradle
-          cachedir: /tmp/.cache/fdroid
-          gradle_version_dir: /home/runner/.gradle/wrapper/dists
-          YAML
-          git -C "$TMP_META_DIR" add "metadata/${APPID}.yml" "config.yml"
-          git -C "$TMP_META_DIR" config user.email "ci@example.invalid"
-          git -C "$TMP_META_DIR" config user.name  "CI"
-          git -C "$TMP_META_DIR" commit -m "Use custom metadata for ${APPID}" >/dev/null
-
-      - name: Pin metadata commit in temp repo (resolved SHA)
-        run: |
-          set -euo pipefail
-          TMP_META_DIR="${TMP_META_DIR:?}"
-          APPFILE="$TMP_META_DIR/metadata/${APPID}.yml"
-          PIN="${{ needs.resolve-ref.outputs.sha }}"
-          echo "Using PIN=$PIN"
-          sed -i -E "0,/^(\s*commit:\s*).*/s//\1$PIN/" "$APPFILE"
-          git -C "$TMP_META_DIR" add "$APPFILE"
-          git -C "$TMP_META_DIR" commit -m "Pin commit to $PIN" >/dev/null
-          echo "PIN=$PIN" >> $GITHUB_ENV
-
-      - name: F-Droid build (unsigned)
-        run: |
-          set -euo pipefail
-          cd "$TMP_META_DIR"
-          fdroid build --verbose --no-tarball "$APPID"
-
-      - name: Restore combined keystore (APK + repo)
-        env:
-          APK_KEYSTORE_B64: ${{ secrets.APK_KEYSTORE_B64 }}
-        run: |
-          set -euo pipefail
-          echo "$APK_KEYSTORE_B64" | base64 -d > ci-two-keys.jks
-          chmod 600 ci-two-keys.jks
-          echo "CI_KEYSTORE=$GITHUB_WORKSPACE/ci-two-keys.jks" >> $GITHUB_ENV
-
-      - name: Append signing config to config.yml
-        env:
-          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
-          APK_KEY_ALIAS:         ${{ secrets.APK_KEY_ALIAS }}
-          APK_KEY_PASSWORD:      ${{ secrets.APK_KEY_PASSWORD }}
-          REPO_KEY_ALIAS:        ${{ secrets.REPO_KEY_ALIAS }}
-        run: |
-          set -euo pipefail
-          cd "$TMP_META_DIR"
-          {
-            echo "keystore: \"$CI_KEYSTORE\""
-            echo "keystorepass: \"$APK_KEYSTORE_PASSWORD\""
-            echo "keyalias: \"$APK_KEY_ALIAS\""     # APK signing
-            echo "keypass: \"$APK_KEY_PASSWORD\""
-            echo "keyaliases:"
-            echo "  ${APPID}: \"$APK_KEY_ALIAS\""
-            echo "repo_keyalias: \"$REPO_KEY_ALIAS\""  # index signing
-          } >> config.yml
-          chmod 600 config.yml
-
-      - name: F-Droid publish (signs APK into repo/)
-        run: |
-          set -euo pipefail
-          cd "$TMP_META_DIR"
-          fdroid publish --verbose --error-on-failed "$APPID"
-
-      - name: Collect signed APK
-        id: pick
-        run: |
-          set -euo pipefail
-          cd "$TMP_META_DIR"
-          FD_APK=$(ls -t repo/${APPID}_*.apk | head -n1)
-          echo "FD_APK=$FD_APK"
-          echo "fd_apk_path=$TMP_META_DIR/$FD_APK" >> $GITHUB_OUTPUT
-
-      - name: Upload F-Droid APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-fdroid
-          path: ${{ steps.pick.outputs.fd_apk_path }}
-          compression-level: 0
-          retention-days: 7
-
-  repro-check:
-    name: Reproducibility
+  fdroid:
+    uses: ./.github/workflows/fdroid.yml
+    with:
+      ref_sha: ${{ github.event_name == 'pull_request'
+                  && github.event.pull_request.head.sha || github.sha }}
+      repo_full_name: ${{ github.event_name == 'pull_request'
+                         && github.event.pull_request.head.repo.full_name || github.repository }}
+  repro:
+    name: Reproducibility Check
+    needs: [build, fdroid]
     runs-on: ubuntu-24.04
-    needs: [build, fdroid-build]
+
     steps:
-      - name: Download APK from ubuntu-22.04
+      - name: Download Build artifact (ubuntu-22.04)
         uses: actions/download-artifact@v4
         with:
           name: app-release-ubuntu-22.04
-          path: ./artifacts/ubuntu-22.04
+          path: artifacts/ubuntu-22.04
 
-      - name: Download APK from ubuntu-24.04
+      - name: Download Build artifact (ubuntu-24.04)
         uses: actions/download-artifact@v4
         with:
           name: app-release-ubuntu-24.04
-          path: ./artifacts/ubuntu-24.04
+          path: artifacts/ubuntu-24.04
 
-      - name: Download F-Droid APK
+      - name: Download F-Droid artifact
         uses: actions/download-artifact@v4
         with:
-          name: app-release-fdroid
-          path: ./artifacts/fdroid
+          name: fdroids
+          path: artifacts/fdroid
+
+      - name: Show artifact tree
+        run: |
+          set -euo pipefail
+          find artifacts -maxdepth 4 -type f -print
 
       - name: Install tools
         run: |
@@ -295,45 +59,52 @@ jobs:
             apksigner apksigcopier androguard apktool diffoscope \
             libarchive-tools default-jre-headless
 
-      - name: apksigcopier compare (22.04 vs 24.04)
+      - name: Compare 22.04 vs 24.04
         run: |
           set -euo pipefail
           A=./artifacts/ubuntu-22.04/app-release.apk
           B=./artifacts/ubuntu-24.04/app-release.apk
-          apksigcopier compare "$A" "$B" | tee apksigcopier-compare-22-vs-24.txt
-          [ ! -s apksigcopier-compare-22-vs-24.txt ] || { echo "diff detected"; exit 1; }
+          test -f "$A" && test -f "$B"
+          # apksigcopier compares APK contents ignoring signatures
+          apksigcopier compare "$A" "$B"
 
-      - name: apksigcopier compare (22.04 vs F-Droid)
+      - name: Compare vs F-Droid repo APK
         run: |
           set -euo pipefail
           A=./artifacts/ubuntu-22.04/app-release.apk
-          F=(./artifacts/fdroid/*.apk)
-          apksigcopier compare "$A" "$F" | tee apksigcopier-compare-22-vs-fdroid.txt
-          [ ! -s apksigcopier-compare-22-vs-fdroid.txt ] || { echo "diff detected"; exit 1; }
+          B=./artifacts/ubuntu-24.04/app-release.apk
+          # F-Droid puts signed APKs in repo/, pick the newest one
+          F=$(ls -t ./artifacts/fdroid/repo/*.apk | head -n1)
+          echo "Comparing against F-Droid APK: $F"
+          apksigcopier compare "$A" "$F"
+          apksigcopier compare "$B" "$F"
 
-      - name: apksigcopier compare (24.04 vs F-Droid)
+      - name: diffoscope (22.04 vs 24.04)
+        if: always()
+        continue-on-error: true
         run: |
           set -euo pipefail
-          B=./artifacts/ubuntu-24.04/app-release.apk
-          F=(./artifacts/fdroid/*.apk)
-          apksigcopier compare "$B" "$F" | tee apksigcopier-compare-24-vs-fdroid.txt
-          [ ! -s apksigcopier-compare-24-vs-fdroid.txt ] || { echo "diff detected"; exit 1; }
+          A=artifacts/ubuntu-22.04/app-release.apk
+          B=artifacts/ubuntu-24.04/app-release.apk
+          diffoscope "$A" "$B" > diffoscope-22-vs-24.txt || true
 
       - name: diffoscope (22.04 vs F-Droid)
+        if: always()
         continue-on-error: true
         run: |
-          set -euxo pipefail
-          A=./artifacts/ubuntu-22.04/app-release.apk
-          F=(./artifacts/fdroid/*.apk)
-          diffoscope "$A" "$F" | tee diffoscope-22-vs-fdroid.txt || true
+          set -euo pipefail
+          A=artifacts/ubuntu-22.04/app-release.apk
+          F=$(ls -t artifacts/fdroid/repo/*.apk | head -n1)
+          diffoscope "$A" "$F" > diffoscope-22-vs-fdroid.txt || true
 
       - name: diffoscope (24.04 vs F-Droid)
+        if: always()
         continue-on-error: true
         run: |
-          set -euxo pipefail
-          B=./artifacts/ubuntu-24.04/app-release.apk
-          F=(./artifacts/fdroid/*.apk)
-          diffoscope "$B" "$F" | tee diffoscope-24-vs-fdroid.txt || true
+          set -euo pipefail
+          B=artifacts/ubuntu-24.04/app-release.apk
+          F=$(ls -t artifacts/fdroid/repo/*.apk | head -n1)
+          diffoscope "$B" "$F" > diffoscope-24-vs-fdroid.txt || true
 
       - name: Upload reports
         if: always()
@@ -341,6 +112,7 @@ jobs:
         with:
           name: reproducibility-reports
           path: |
-            apksigcopier-compare-*.txt
-            diffoscope-*.txt
+            diffoscope-22-vs-24.txt
+            diffoscope-22-vs-fdroid.txt
+            diffoscope-24-vs-fdroid.txt
           retention-days: 7

@@ -1,36 +1,37 @@
 name: Build
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_call:
+    inputs:
+      ref_sha:
+        required: true
+        type: string
+      repo_full_name:
+        required: true
+        type: string
   workflow_dispatch: {}
 
-env:
-  APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
-  APK_KEY_ALIAS:         ${{ secrets.APK_KEY_ALIAS }}
-  APK_KEY_PASSWORD:      ${{ secrets.APK_KEY_PASSWORD }}
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          repository: ${{ inputs.repo_full_name }}
+          ref: ${{ inputs.ref_sha }}
 
       - name: Stable env
         run: |
           echo "TZ=UTC" >> $GITHUB_ENV
           echo "LANG=C.UTF-8" >> $GITHUB_ENV
           echo "LC_ALL=C.UTF-8" >> $GITHUB_ENV
-          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> $GITHUB_ENV
-      
-      - name: Restore testing keystore
-        env:
-          APK_KEYSTORE_B64: ${{ secrets.APK_KEYSTORE_B64 }}
-        run: |
-          echo "$APK_KEYSTORE_B64" | base64 -d > keystore.jks
-          echo "APK_KEYSTORE=$GITHUB_WORKSPACE/keystore.jks" >> $GITHUB_ENV
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct ${{ inputs.ref_sha }})" >> $GITHUB_ENV
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -44,6 +45,7 @@ jobs:
         with:
           packages: |
             platforms;android-36 build-tools;36.0.0
+
       - name: Install Gradle (official distribution)
         env:
           GRADLE_VERSION: "8.13"
@@ -60,7 +62,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: app-debug-${{ matrix.os }}
           path: app/build/outputs/apk/debug/app-debug.apk
           compression-level: 0
           retention-days: 7
@@ -69,7 +71,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: app-release-${{ matrix.os }}
           path: app/build/outputs/apk/release/app-release.apk
           compression-level: 0
           retention-days: 7
