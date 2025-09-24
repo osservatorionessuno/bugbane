@@ -17,10 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import kotlinx.coroutines.launch
-import io.github.muntashirakon.adb.PRNGFixes
-import androidx.lifecycle.lifecycleScope
 import androidx.work.*
-import kotlinx.coroutines.Dispatchers
 import org.osservatorionessuno.libmvt.common.IndicatorsUpdates
 import org.osservatorionessuno.bugbane.workers.IndicatorsUpdateWorker
 import java.util.concurrent.TimeUnit
@@ -34,6 +31,7 @@ import org.osservatorionessuno.bugbane.utils.SlideshowManager
 import org.osservatorionessuno.bugbane.utils.AdbViewModel
 import org.osservatorionessuno.bugbane.utils.AdbPairingService
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
+import org.lsposed.hiddenapibypass.HiddenApiBypass
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AdbViewModel by viewModels()
@@ -41,7 +39,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        PRNGFixes.apply()
+        HiddenApiBypass.addHiddenApiExemptions("L")
 
         // Observers
         viewModel.watchConnectAdb().observe(this) { isConnected ->

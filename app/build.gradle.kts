@@ -55,6 +55,10 @@ android {
     }
 }
 
+configurations.all {
+    exclude(group = "androidx.graphics", module = "graphics-path")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -73,8 +77,8 @@ dependencies {
     // libadb-android and its dependency
     implementation(libs.libadb.android)
     implementation(libs.sun.security.android)
-    // Required for ADB encryption
-    implementation(libs.conscrypt.android)
+    // Required to use native conscrypt
+    implementation(libs.hiddenapibypass)
 
     // Required for age encrypted export/share
     implementation(libs.kage)
