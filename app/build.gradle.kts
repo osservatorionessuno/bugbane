@@ -69,6 +69,7 @@ dependencies {
     implementation(libs.compose.material.icons.extended)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.snakeyaml)
+    implementation(libs.google.accompanist.permissions)
 
     // libadb-android and its dependency
     implementation(libs.libadb.android)
