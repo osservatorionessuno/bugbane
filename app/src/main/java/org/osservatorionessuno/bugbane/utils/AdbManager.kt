@@ -275,7 +275,6 @@ class AdbManager(applicationContext: Context) {
             return
         } else if (!adbConnectionManager.isConnected) {
             Log.i(TAG, "Need to reconnect first")
-            commandOutput.postValue("Reconnect adb first")
             _adbState.value = AdbState.Ready
             return
         }
