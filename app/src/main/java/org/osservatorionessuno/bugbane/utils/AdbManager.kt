@@ -70,6 +70,10 @@ class AdbManager(applicationContext: Context) {
                 Log.e(TAG, "Error unregistering adbBroadcastreceiver: $e")
             }
         }
+
+        // Cancel the notification, if it's still showing
+        val stopIntent = AdbPairingService.stopIntent(appContext)
+        appContext?.stopService(stopIntent)
     }
 
     internal fun startAdbPairingService() {
@@ -136,14 +140,13 @@ class AdbManager(applicationContext: Context) {
             } else {
                 // connection isn't null, isConnected (not yet established)
                 if (adbConnectionManager.adbConnection != null && adbConnectionManager.adbConnection!!.isConnected) {
-                    Log.d(TAG, "manager reports ready")
                     _adbState.value = AdbState.Ready
                 }
             }
         } catch (e: Exception) {
             Log.d(TAG, "Couldn't get adbState: ${e.message}")
         }
-        Log.d(TAG, "State is unknown")
+        Log.d(TAG, "AdbState is ${adbState.value}")
     }
 
     @WorkerThread

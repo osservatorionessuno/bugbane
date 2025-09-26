@@ -40,7 +40,7 @@ public class AdbPairingService extends Service {
         return new Intent(context, AdbPairingService.class).setAction(START_ACTION);
     }
 
-    private static Intent stopIntent(Context context) {
+    public static Intent stopIntent(Context context) {
         return new Intent(context, AdbPairingService.class).setAction(STOP_ACTION);
     }
 

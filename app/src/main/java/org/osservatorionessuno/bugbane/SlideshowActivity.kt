@@ -86,6 +86,14 @@ class SlideshowActivity : ComponentActivity() {
         startActivity(intent)
         finish()
     }
+
+    // If we leave the SlideShowActivity, stop the pairing service
+    override fun onDestroy() {
+        if (isFinishing) {
+            configViewModel.adbManager.stopAdbPairingService()
+        }
+        super.onDestroy()
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalPermissionsApi::class)
