@@ -61,11 +61,7 @@ class ConfigurationViewModel private constructor(
     // UI listeners collect AppState
     private val _configurationState = MutableStateFlow<AppState>(AppState.NeedWelcomeScreen)
     val configurationState: StateFlow<AppState> = _configurationState.asStateFlow()
-
-    // Some states take a while to broadcast a result; don't confuse the user while waiting
-    val _needsAsyncStateResult: MutableStateFlow<Boolean> = MutableStateFlow(false)
-    val needsAsyncStateResult: StateFlow<Boolean> = _needsAsyncStateResult.asStateFlow()
-
+    
     private val autoConnectAttempts = AtomicInt(0)
     private val _MAX_AUTOCONNECT_ATTEMPTS = 2
 
@@ -101,6 +97,11 @@ class ConfigurationViewModel private constructor(
                 SettingsState(notifications, devOpts, adbEnabled, wirelessDebug, wifiConnected) }
 
             combine(settingsFlow, adbManager.adbState, appManager.appProgress) { settings, adbState, appProgress ->
+                if (adbState == AdbState.RequisitesMissing) {
+                    // AdbPairingRequiredException, there's no point in autoconnecting til we fix it
+                    autoConnectAttempts.store(_MAX_AUTOCONNECT_ATTEMPTS)
+                }
+
                 checkState(
                     settings.notificationsEnabled,
                     settings.developerOptionsEnabled,
@@ -140,7 +141,10 @@ class ConfigurationViewModel private constructor(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return AppState.DeviceUnsupported
         if (!appProgress.hasSeenWelcomeScreen) return AppState.NeedWelcomeScreen
 
-        if (wirelessDebuggingEnabled && adbEnabled) {
+        // Wireless debug + usb debug were separate settings from Android 11-14
+        val needAdb = (!adbEnabled && Build.VERSION.SDK_INT > Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+
+        if (wirelessDebuggingEnabled && !needAdb) {
             if (adbState == AdbState.ConnectedIdle && !appProgress.hasCompletedOnboarding) return AppState.AdbConnectedFinishOnboarding
             if (adbState == AdbState.ConnectedIdle) return AppState.AdbConnected
             if (adbState == AdbState.ConnectedAcquiring) return AppState.AdbScanning
@@ -157,16 +161,16 @@ class ConfigurationViewModel private constructor(
         if (!notificationsEnabled) return AppState.NeedNotificationPermission
         if (!isConnectedToWifi) return AppState.NeedWifi
         if (!developerOptionsEnabled) return AppState.NeedDeveloperOptions
-        if ((!wirelessDebuggingEnabled || !adbEnabled) && !appProgress.hasCompletedOnboarding) return AppState.NeedWirelessDebuggingAndPair
+        if ((!wirelessDebuggingEnabled || needAdb) && !appProgress.hasCompletedOnboarding) return AppState.NeedWirelessDebuggingAndPair
 
-        if ((!wirelessDebuggingEnabled || !adbEnabled)) {
+        if ((!wirelessDebuggingEnabled || needAdb)) {
             // Wireless adb or adb are off, but we've connected before. Enable wireless adb. Then autoconnect will be attempted.
             Log.d(TAG, "Wireless adb is disabled, but we have previously connected successfully.")
             return AppState.NeedWirelessDebugging
         }
 
         // We don't have a past connection, but nothing else is wrong. We can try autoconnect.
-        if (autoConnectAttempts.load() < _MAX_AUTOCONNECT_ATTEMPTS) return AppState.TryAutoConnect
+        if (autoConnectAttempts.load() < _MAX_AUTOCONNECT_ATTEMPTS && adbState != AdbState.RequisitesMissing) return AppState.TryAutoConnect
 
         // We did not want to get here. That means no other conditions were met and autoconnect failed once.
         Log.w(TAG, "checkState: default to re-pairing and debug connection logic.")
@@ -180,8 +184,6 @@ class ConfigurationViewModel private constructor(
     private fun observeAppState() {
         viewModelScope.launch {
             configurationState.collect { appState ->
-                // Reset async waiting flag, since we received a new state
-                _needsAsyncStateResult.value = false
 
                 if (appState == AppState.TryAutoConnect && autoConnectAttempts.fetchAndAdd(1) < _MAX_AUTOCONNECT_ATTEMPTS) {
                     Log.d(TAG, "Auto-connect to ADB (attempt ${autoConnectAttempts.load()} / $_MAX_AUTOCONNECT_ATTEMPTS)")
@@ -213,7 +215,6 @@ class ConfigurationViewModel private constructor(
             AppState.NeedWifi,
             AppState.NeedNotificationPermission,
             AppState.NeedDeveloperOptions -> {
-                _needsAsyncStateResult.value = true
 
                 getIntentForAppState(currentState)?.let {
                     it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
@@ -222,8 +223,6 @@ class ConfigurationViewModel private constructor(
             }
 
             AppState.NeedWirelessDebuggingAndPair -> {
-                // transitory state
-                _needsAsyncStateResult.value = true
 
                 getIntentForAppState(currentState)?.let {
                     it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
@@ -232,8 +231,6 @@ class ConfigurationViewModel private constructor(
                 adbManager.startAdbPairingService()
             }
             AppState.NeedWirelessDebugging -> {
-                // transitory state
-                _needsAsyncStateResult.value = true
 
                 // Just open settings, don't launch a new pairing service.
                 // Once wireless debugging is re-enabled the state will be updated and autoconnect will be attempted
@@ -244,7 +241,6 @@ class ConfigurationViewModel private constructor(
             }
             AppState.AdbConnectedFinishOnboarding -> {
                 appManager.markHomepageAsSeen()
-                _needsAsyncStateResult.value = true
             }
 
             else -> {
@@ -299,10 +295,10 @@ class ConfigurationViewModel private constructor(
 
     fun refreshState() {
         viewModelScope.launch {
-            configurationManager.checkAll()
-            wifiConnectivityMonitor.checkCurrentWifiConnected()
             adbManager.checkState()
             appManager.checkState()
+            wifiConnectivityMonitor.checkCurrentWifiConnected()
+            configurationManager.checkAll()
         }
     }
 
