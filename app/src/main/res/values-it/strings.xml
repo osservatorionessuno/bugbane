@@ -28,6 +28,7 @@
     <string name="slideshow_ready_title">Pronto per iniziare</string>
     <string name="slideshow_ready_description">Tutto pronto. Ora puoi acquisire dati ed eseguire analisi, successivamente condividere i risultati con terze parti fidate.</string>
     <string name="slideshow_ready_button">Inizia</string>
+    <string name="button_working_adb_pairing">In attesa dell\'accoppiamento ADB…</string>
     <string name="home_checklist_title">Elenco di verifica forense</string>
     <string name="home_scan_button">Avvia acquisizione</string>
     <string name="home_scanning_button">Sto acquisendo…</string>

@@ -76,7 +76,7 @@ fun getSlideshowScreenContent(state: AppState): SlideshowPageData {
         AppState.TryAutoConnect, AppState.AdbConnecting, -> return SlideshowPageData(title = stringResource(R.string.notification_channel_adb_pairing), //todo
             description = stringResource(R.string.notification_adb_pairing_working_title),
             icon = Icons.Filled.Build,
-            buttonText = "please wait", //todo
+            buttonText = stringResource(R.string.button_working_adb_pairing)
         )
         AppState.NeedWirelessDebugging -> return SlideshowPageData(title = stringResource(R.string.slideshow_wireless_title),
             description = stringResource(R.string.slideshow_wireless_description),

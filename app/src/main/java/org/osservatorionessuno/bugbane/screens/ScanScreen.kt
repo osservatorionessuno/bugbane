@@ -365,7 +365,7 @@ fun ScanScreen() {
                         text = when (appState.value) {
                             AppState.AdbScanning -> stringResource(R.string.home_scanning_button)
                             AppState.AdbConnected -> stringResource(R.string.home_scan_button)
-                            AppState.TryAutoConnect, AppState.AdbConnecting -> stringResource(R.string.notification_adb_pairing_working_title)
+                            AppState.TryAutoConnect, AppState.AdbConnecting -> stringResource(R.string.button_working_adb_pairing)
                             else
                                 -> stringResource(R.string.home_permissions_button)
                         },
