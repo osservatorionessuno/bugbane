@@ -13,11 +13,13 @@
     The absence of detection from this app does not mean that your device is safe or secure.
     \n</string>
     <string name="slideshow_unsupported_version">Sorry, Bugbane is not supported on Android versions lower than 11 (API level 30). Please use AndroidQF or MVT from a trusted computer.</string>
+    <string name="slideshow_button_exit">Exit</string>
     <string name="slideshow_welcome_button">I understand</string>
 
     <string name="slideshow_wifi_title">Connect to a Trusted Wi-Fi Network</string>
     <string name="slideshow_wifi_description">To continue, connect your device to a protected Wi-Fi network, such as your home network or a personal hotspot.</string>
     <string name="slideshow_wifi_button">Open Wi-Fi Settings</string>
+    <string name="slideshow_button_continue">Continue</string>
 
     <string name="slideshow_notification_title">Enable Notification Permissions</string>
     <string name="slideshow_notification_description">To use this app, you need to enable notification permissions.
@@ -29,15 +31,20 @@
     <string name="slideshow_developer_description">To use this app, enable Developer Options in your device settings.
     \n\n
     The application acquires data using ADB Wireless Debugging, which is available only when Developer Options are enabled.</string>
-    <string name="slideshow_developer_button">Enable</string>
+    <string name="slideshow_button_text_enable">Enable</string>
 
-    <string name="slideshow_wireless_title">Enable Wireless Debugging and Pair</string>
-    <string name="slideshow_wireless_description">Connect to Wi-Fi, enable ADB Wireless Debugging, tap “Pair device with pairing code,” then enter the code in the Bugbane notification.</string>
-    <string name="slideshow_wireless_button">Pair</string>
+    <string name="slideshow_wireless_and_pair_title">Enable Wireless Debugging and Pair</string>
+    <string name="slideshow_wireless_and_pair_description">Connect to Wi-Fi, enable ADB Wireless Debugging, tap “Pair device with pairing code,” then enter the code in the Bugbane notification.</string>
+    <string name="slideshow_wireless_and_pair_button">Pair</string>
+
+    <string name="slideshow_wireless_title">Enable Wireless Debugging</string>
+    <string name="slideshow_wireless_description">Connect to Wi-Fi and enable ADB Wireless Debugging.</string>
 
     <string name="slideshow_ready_title">Ready to Start</string>
     <string name="slideshow_ready_description">You\'re all set. You can now acquire data and run analyses, then share results with trusted third parties.</string>
     <string name="slideshow_ready_button">Get Started</string>
+
+    <string name="button_working_adb_pairing">Waiting for ADB Pairing…</string>
 
     <!-- Home screen checklist strings -->
     <string name="home_checklist_title">Forensic Checklist</string>

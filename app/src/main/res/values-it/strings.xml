@@ -7,22 +7,28 @@
     <string name="slideshow_welcome_title">Benvenuto in Bugbane</string>
     <string name="slideshow_welcome_description">Questa applicazione aiuta con l\'analisi forense consensuale di dispositivi Android per identificare segnali di compromissione o sorveglianza.\n\nL\'assenza di rilevazioni da quest\'app tuttavia non significa che il tuo dispositivo è sicuro o protetto. \n</string>
     <string name="slideshow_unsupported_version">Ci dispiace, Bugbane non è supportato sulle versioni di Android inferiori a 11 (API level 30). Si consiglia l\'uso di AndroidQF o MVT da un computer fidato.</string>
+    <!-- TODO fix/review this translation -->
+    <string name="slideshow_button_exit">Chiudi</string>
     <string name="slideshow_welcome_button">Ho capito</string>
     <string name="slideshow_wifi_title">Connetti a una rete Wi-Fi fidata</string>
     <string name="slideshow_wifi_description">Per continuare, connetti il tuo dispositivo ad una rete Wi-Fi protetta, ad esempio alla tua rete casalinga o ad un hotspot personale.</string>
     <string name="slideshow_wifi_button">Apri impostazioni Wi-Fi</string>
+    <!-- TODO fix/review this translation -->
+    <string name="slideshow_button_continue">Continuare</string>
     <string name="slideshow_notification_title">Abilita autorizzazioni alle notifiche</string>
     <string name="slideshow_notification_description">Per utilizzare questa applicazione, è necessario abilitare l\'autorizzazione alle notifiche.\n\nBugbane visualizzerà una notifica dove puoi inserire il codice di abbinamento per l\' ADB Wireless Debugging.</string>
     <string name="slideshow_notification_button">Abilita</string>
     <string name="slideshow_developer_title">Abilita opzioni sviluppatore</string>
     <string name="slideshow_developer_description">Per utilizzare quesa applicazione, è necessario abilitare le opzioni sviluppatore.\n\nL\'applicazione acquisisce dati usando l\'ADB Wireless Debugging, che è disponibile solo quando le opzioni sviluppatore sono abilitate.</string>
-    <string name="slideshow_developer_button">Abilita</string>
-    <string name="slideshow_wireless_title">Abilita Wireless Debugging e accoppia</string>
-    <string name="slideshow_wireless_description">Connettiti ad una rete Wi-Fi, abilita l\'opzione ADB Wireless Debugging, premi \"Accoppia dispositivo con codice di accoppiamento\", poi inserirsci il codice visualizzato nella notifica di Bugbane.</string>
-    <string name="slideshow_wireless_button">Accoppia</string>
+    <string name="slideshow_button_text_enable">Abilita</string>
+    <string name="slideshow_wireless_and_pair_title">Abilita Wireless Debugging e accoppia</string>
+    <string name="slideshow_wireless_and_pair_description">Connettiti ad una rete Wi-Fi, abilita l\'opzione ADB Wireless Debugging, premi \"Accoppia dispositivo con codice di accoppiamento\", poi inserirsci il codice visualizzato nella notifica di Bugbane.</string>
+    <string name="slideshow_wireless_and_pair_button">Accoppia</string>
+    <string name="slideshow_wireless_description">Connettiti ad una rete Wi-Fi e abilita l\'opzione ADB Wireless Debugging.</string>
     <string name="slideshow_ready_title">Pronto per iniziare</string>
     <string name="slideshow_ready_description">Tutto pronto. Ora puoi acquisire dati ed eseguire analisi, successivamente condividere i risultati con terze parti fidate.</string>
     <string name="slideshow_ready_button">Inizia</string>
+    <string name="button_working_adb_pairing">In attesa dell\'accoppiamento ADB…</string>
     <string name="home_checklist_title">Elenco di verifica forense</string>
     <string name="home_scan_button">Avvia acquisizione</string>
     <string name="home_scanning_button">Sto acquisendo…</string>
@@ -86,4 +92,5 @@
     <string name="analysis_details_acquisition_uuid">UUID acquisizione: %1$s</string>
     <string name="analysis_details_acquisition_completed">Acquisizione completata: %1$s</string>
     <string name="analysis_details_analysis_completed">Analisi completata: %1$s</string>
+    <string name="slideshow_wireless_title">Abilita Wireless Debugging</string>
 </resources>
