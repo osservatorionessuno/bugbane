@@ -8,7 +8,7 @@
     <string name="slideshow_welcome_description">Questa applicazione aiuta con l\'analisi forense consensuale di dispositivi Android per identificare segnali di compromissione o sorveglianza.\n\nL\'assenza di rilevazioni da quest\'app tuttavia non significa che il tuo dispositivo è sicuro o protetto. \n</string>
     <string name="slideshow_unsupported_version">Ci dispiace, Bugbane non è supportato sulle versioni di Android inferiori a 11 (API level 30). Si consiglia l\'uso di AndroidQF o MVT da un computer fidato.</string>
     <!-- TODO fix/review this translation -->
-    <string name="slideshow_button_exit">Chiudi</string>
+    <string name="slideshow_button_exit">Esci</string>
     <string name="slideshow_welcome_button">Ho capito</string>
     <string name="slideshow_wifi_title">Connetti a una rete Wi-Fi fidata</string>
     <string name="slideshow_wifi_description">Per continuare, connetti il tuo dispositivo ad una rete Wi-Fi protetta, ad esempio alla tua rete casalinga o ad un hotspot personale.</string>
@@ -33,7 +33,7 @@
     <string name="home_scan_button">Avvia acquisizione</string>
     <string name="home_scanning_button">Sto acquisendo…</string>
     <string name="home_permissions_button">Abilita permessi</string>
-    <string name="scan_disable_dialog_title">Dopo ogni acquisizione si raccomanda di disabilitare le opzioni sviluppatore fino alla prossima sessione.</string>
+    <string name="scan_disable_dialog_title">Dopo ogni acquisizione, si raccomanda di disabilitare le opzioni sviluppatore fino alla prossima sessione.</string>
     <string name="scan_disable_dialog_button">Disabilita</string>
     <string name="scan_disable_dialog_close_button">Chiudi</string>
     <string name="scan_cancel_button">Ferma acquisizione</string>
