@@ -28,6 +28,7 @@ import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
 import org.osservatorionessuno.bugbane.AcquisitionActivity
+import org.osservatorionessuno.bugbane.components.LayeredProgressIndicator
 import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
 import org.osservatorionessuno.bugbane.utils.AdbState
 import org.osservatorionessuno.bugbane.utils.AppState
@@ -46,6 +47,8 @@ fun ScanScreen() {
     val appState = viewModel.configurationState.collectAsStateWithLifecycle()
     val adbManager = viewModel.adbManager
     val adbState = adbManager.adbState.collectAsStateWithLifecycle()
+    
+    var isCancelling by remember { mutableStateOf(false) }
 
     var showDisableDialog by remember { mutableStateOf(false) }
     var completedModules by remember { mutableStateOf(0) }
@@ -72,17 +75,12 @@ fun ScanScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                if (totalModules > 0) {
-                                    CircularProgressIndicator(
-                                        progress = {
-                                            (completedModules / totalModules.toFloat()).coerceIn(0f, 1f)
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("$completedModules / $totalModules")
-                                } else {
-                                    CircularProgressIndicator()
-                                }
+                                LayeredProgressIndicator(
+                                    totalModules = totalModules,
+                                    completedModules = completedModules,
+                                    size = 128.dp,
+                                    strokeWidth = 8.dp
+                                )
                             }
                         }
                         LazyColumn(
@@ -105,17 +103,12 @@ fun ScanScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                if (totalModules > 0) {
-                                    CircularProgressIndicator(
-                                        progress = {
-                                            (completedModules / totalModules.toFloat()).coerceIn(0f, 1f)
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("$completedModules / $totalModules")
-                                } else {
-                                    CircularProgressIndicator()
-                                }
+                                LayeredProgressIndicator(
+                                    totalModules = totalModules,
+                                    completedModules = completedModules,
+                                    size = 128.dp,
+                                    strokeWidth = 8.dp
+                                )
                             }
                         }
                         LazyColumn(
@@ -131,7 +124,13 @@ fun ScanScreen() {
                     }
                 }
                 Button(
-                    onClick = { adbManager.cancelQuickForensics() },
+                    onClick = { 
+                        if (!isCancelling) {
+                            isCancelling = true
+                            adbManager.cancelQuickForensics()
+                        }
+                    },
+                    enabled = !isCancelling,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
@@ -144,7 +143,7 @@ fun ScanScreen() {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = stringResource(R.string.scan_cancel_button),
+                        text = if (isCancelling) stringResource(R.string.scan_cancelling_button) else stringResource(R.string.scan_cancel_button),
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                     )
                 }
@@ -279,6 +278,7 @@ fun ScanScreen() {
                                 progressLogs.clear()
                                 moduleLogIndex.clear()
                                 moduleBytes.clear()
+                                isCancelling = false
                                 completedModules = 0
                                 totalModules = 0
                                 adbManager.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
@@ -325,6 +325,7 @@ fun ScanScreen() {
                                                     context.startActivity(intent)
                                                 }
                                                 showDisableDialog = true
+                                                isCancelling = false
                                             }
                                         }
                                     }

@@ -55,6 +55,7 @@
     <string name="scan_disable_dialog_button">Disable</string>
     <string name="scan_disable_dialog_close_button">Close</string>
     <string name="scan_cancel_button">Stop Acquisition</string>
+    <string name="scan_cancelling_button">Cancelling...</string>
 
     <!-- Settings screen strings -->
     <string name="settings_description">Configure your preferences and app settings here.</string>
@@ -107,6 +108,8 @@
     <string name="acquisition_details_export">Export</string>
     <string name="acquisition_details_share">Share</string>
     <string name="acquisition_details_rescan">Run Analysis</string>
+    <string name="analysis_in_progress">Analysis in progress...</string>
+    <string name="export_in_progress">Export in progress...</string>
 
     <!-- Messages for export/share passphrases -->
     <string name="acquisition_export_passphrase">The exported archive contains potentially private information and has been encrypted. The password will be shown only once:\n\n%1$s</string>
