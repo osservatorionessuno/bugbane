@@ -299,11 +299,14 @@ class AdbManager(applicationContext: Context) {
                 io.printStackTrace()
                 commandOutput.postValue("Error running QuickForensics: " + io.message)
                 _adbState.value = AdbState.Cancelled
+                // Set the flag otherwise we will be stuck
+                qfCancelled.set(true);
             }
             catch (e: java.lang.Exception) {
                 e.printStackTrace()
                 commandOutput.postValue("Error running QuickForensics: " + e.message)
                 _adbState.value = AdbState.ErrorAcquisition
+                qfCancelled.set(true);
             }
         })
     }
