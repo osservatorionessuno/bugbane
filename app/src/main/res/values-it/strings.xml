@@ -81,7 +81,6 @@
     <string name="acquisition_share_message">Archivio di acquisizione. Passphrase: %1$s</string>
     <string name="acquisition_passphrase_copy">Copia nella clipboard</string>
     <string name="acquisition_passphrase_close">Chiudi</string>
-    
     <!-- Scan details strings -->
     <string name="analysis_details_title">Dettagli analisi</string>
     <string name="analysis_details_artifact">Artefatto</string>
