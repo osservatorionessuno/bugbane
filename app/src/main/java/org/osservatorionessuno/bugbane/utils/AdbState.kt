@@ -10,10 +10,11 @@ enum class AdbState(val index: Int) {
     Connecting(2),
     ConnectedIdle(3), // AppStates >= AppState.AdbConnected
     ConnectedAcquiring(4),
-    Cancelled(5),
-    ErrorConnect(6),
-    ErrorAcquisition(7),
-    Initial(8); // Initializing state
+    Cancelling(5),
+    Cancelled(6),
+    ErrorConnect(7),
+    ErrorAcquisition(8),
+    Initial(9); // Initializing state
 
     companion object {
 

@@ -8,3 +8,4 @@ gradlew.bat
 local.properties
 *.class
 .DS_Store
+*.code-workspace

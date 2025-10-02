@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -52,7 +54,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     var scans by remember { mutableStateOf(listOf<ScanSummary>()) }
     val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
 
-    var processing by remember { mutableStateOf(false) }
+    var processing by remember { mutableStateOf(ProcessingState.OFF) }
     var passphrase by remember { mutableStateOf<String?>(null) }
     var showPassDialog by remember { mutableStateOf(false) }
     var showFilesDialog by remember { mutableStateOf(false) }
@@ -73,12 +75,12 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
         }
         scans = loadScans(acquisitionDir)
         if (scans.isEmpty()) {
-            processing = true
+            processing = ProcessingState.SCANNING
             withContext(Dispatchers.IO) {
                 AcquisitionScanner.scan(context, acquisitionDir)
             }
             scans = loadScans(acquisitionDir)
-            processing = false
+            processing = ProcessingState.OFF
         }
     }
 
@@ -97,20 +99,20 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
 
     fun startExport() {
         scope.launch {
-            processing = true
+            processing = ProcessingState.EXPORTING
             val (file, pass) = createEncryptedArchive(context, acquisitionDir)
             generatedFile = file
             passphrase = pass
-            processing = false
+            processing = ProcessingState.OFF
             exportLauncher.launch(file.name)
         }
     }
 
     fun startShare() {
         scope.launch {
-            processing = true
+            processing = ProcessingState.SHARING
             val (file, pass) = createEncryptedArchive(context, acquisitionDir)
-            processing = false
+            processing = ProcessingState.OFF
             val uri = FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.fileprovider",
@@ -131,12 +133,12 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
 
     fun startAnalysis() {
         scope.launch {
-            processing = true
+            processing = ProcessingState.SCANNING
             withContext(Dispatchers.IO) {
                 AcquisitionScanner.scan(context, acquisitionDir)
             }
             scans = loadScans(acquisitionDir)
-            processing = false
+            processing = ProcessingState.OFF
         }
     }
 
@@ -193,10 +195,18 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(onClick = { showFilesDialog = true }, modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = { showFilesDialog = true }, 
+                            modifier = Modifier.weight(1f),
+                            enabled = processing == ProcessingState.OFF
+                        ) {
                             Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_view_files))
                         }
-                        Button(onClick = { startAnalysis() }, modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = { startAnalysis() }, 
+                            modifier = Modifier.weight(1f),
+                            enabled = processing == ProcessingState.OFF
+                        ) {
                             Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan))
                         }
                     }
@@ -204,10 +214,18 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(onClick = { startExport() }, modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = { startExport() }, 
+                            modifier = Modifier.weight(1f),
+                            enabled = processing == ProcessingState.OFF
+                        ) {
                             Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_export))
                         }
-                        Button(onClick = { startShare() }, modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = { startShare() }, 
+                            modifier = Modifier.weight(1f),
+                            enabled = processing == ProcessingState.OFF
+                        ) {
                             Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_share))
                         }
                     }
@@ -226,6 +244,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                         acquisitionDir = acquisitionDir,
                         scans = scans,
                         dateFormat = dateFormat,
+                        processing = processing,
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
@@ -273,10 +292,18 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     )
                 }
 
-                Button(onClick = { showFilesDialog = true }, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { showFilesDialog = true }, 
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = processing == ProcessingState.OFF
+                ) {
                     Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_view_files))
                 }
-                Button(onClick = { startAnalysis() }, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { startAnalysis() }, 
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = processing == ProcessingState.OFF
+                ) {
                     Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan))
                 }
                 Text(
@@ -287,6 +314,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     acquisitionDir = acquisitionDir,
                     scans = scans,
                     dateFormat = dateFormat,
+                    processing = processing,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -295,23 +323,55 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(onClick = { startExport() }, modifier = Modifier.weight(1f)) {
+                    Button(
+                        onClick = { startExport() }, 
+                        modifier = Modifier.weight(1f),
+                        enabled = processing == ProcessingState.OFF
+                    ) {
                         Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_export))
                     }
-                    Button(onClick = { startShare() }, modifier = Modifier.weight(1f)) {
+                    Button(
+                        onClick = { startShare() }, 
+                        modifier = Modifier.weight(1f),
+                        enabled = processing == ProcessingState.OFF
+                    ) {
                         Text(stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_share))
                     }
                 }
             }
         }
 
-        if (processing) {
+        if (processing != ProcessingState.OFF) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .background(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    ),
                 contentAlignment = androidx.compose.ui.Alignment.Center
             ) {
-                CircularProgressIndicator()
+                Card(
+                    modifier = Modifier.padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = if (processing == ProcessingState.SCANNING) {
+                                    stringResource(org.osservatorionessuno.bugbane.R.string.analysis_in_progress)
+                                } else {
+                                    stringResource(org.osservatorionessuno.bugbane.R.string.export_in_progress)
+                                },
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
             }
         }
     }
@@ -370,6 +430,7 @@ private fun ScanList(
     acquisitionDir: File,
     scans: List<ScanSummary>,
     dateFormat: DateFormat,
+    processing: ProcessingState,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -402,6 +463,7 @@ private fun ScanList(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
+                            if (processing != ProcessingState.OFF) return@clickable
                             val intent = Intent(context, ScanDetailActivity::class.java).apply {
                                 putExtra(ScanDetailActivity.EXTRA_ACQUISITION_PATH, acquisitionDir.absolutePath)
                                 putExtra(ScanDetailActivity.EXTRA_SCAN_PATH, scan.file.absolutePath)
@@ -513,3 +575,9 @@ private fun generatePassphrase(): String {
     return (1..32).map { chars[rnd.nextInt(chars.length)] }.joinToString("")
 }
 
+enum class ProcessingState {
+    OFF,
+    EXPORTING,
+    SCANNING,
+    SHARING,
+}
