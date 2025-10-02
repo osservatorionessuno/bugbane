@@ -48,8 +48,6 @@ fun ScanScreen() {
     val adbManager = viewModel.adbManager
     val adbState = adbManager.adbState.collectAsStateWithLifecycle()
     
-    var isCancelling by remember { mutableStateOf(false) }
-
     var showDisableDialog by remember { mutableStateOf(false) }
     var completedModules by remember { mutableStateOf(0) }
     var totalModules by remember { mutableStateOf(0) }
@@ -64,7 +62,7 @@ fun ScanScreen() {
             .fillMaxSize()
             .padding(8.dp)
     ) {
-        if (adbState.value == AdbState.ConnectedAcquiring) {
+        if (adbState.value == AdbState.ConnectedAcquiring || adbState.value == AdbState.Cancelling) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (isLandscape) {
                     Row(modifier = Modifier.weight(1f)) {
@@ -125,12 +123,11 @@ fun ScanScreen() {
                 }
                 Button(
                     onClick = { 
-                        if (!isCancelling) {
-                            isCancelling = true
+                        if (adbState.value != AdbState.Cancelling) {
                             adbManager.cancelQuickForensics()
                         }
                     },
-                    enabled = !isCancelling,
+                    enabled = adbState.value != AdbState.Cancelling,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
@@ -143,7 +140,7 @@ fun ScanScreen() {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isCancelling) stringResource(R.string.scan_cancelling_button) else stringResource(R.string.scan_cancel_button),
+                        text = if (adbState.value == AdbState.Cancelling) stringResource(R.string.scan_cancelling_button) else stringResource(R.string.scan_cancel_button),
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                     )
                 }
@@ -278,7 +275,6 @@ fun ScanScreen() {
                                 progressLogs.clear()
                                 moduleLogIndex.clear()
                                 moduleBytes.clear()
-                                isCancelling = false
                                 completedModules = 0
                                 totalModules = 0
                                 adbManager.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
@@ -325,7 +321,6 @@ fun ScanScreen() {
                                                     context.startActivity(intent)
                                                 }
                                                 showDisableDialog = true
-                                                isCancelling = false
                                             }
                                         }
                                     }

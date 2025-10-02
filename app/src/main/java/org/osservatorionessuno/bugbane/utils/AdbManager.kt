@@ -120,7 +120,7 @@ class AdbManager(applicationContext: Context) {
 
     fun autoConnect() {
         val state = _adbState.value
-        if (state !in arrayOf(AdbState.ConnectedIdle, AdbState.ConnectedAcquiring, AdbState.Connecting)) {
+        if (state !in arrayOf(AdbState.ConnectedIdle, AdbState.ConnectedAcquiring, AdbState.Connecting, AdbState.Cancelling)) {
             executor.submit(Runnable { this.autoConnectInternal() })
         } else {
             Log.w("Bugbane", "autoConnect called but adbState is $state")
@@ -154,7 +154,7 @@ class AdbManager(applicationContext: Context) {
         try {
             if (adbConnectionManager.isConnected) {
                 Log.d(TAG, "already connected")
-                if (_adbState.value != AdbState.ConnectedAcquiring) {
+                if (_adbState.value != AdbState.ConnectedAcquiring && _adbState.value != AdbState.Cancelling) {
                     _adbState.value = AdbState.ConnectedIdle
                 }
                 return
@@ -246,7 +246,7 @@ class AdbManager(applicationContext: Context) {
                 }
             } catch (e: java.lang.Exception) {
                 e.printStackTrace()
-                Log.w(TAG, "adbShelLStream error ${e.message}")
+                Log.w(TAG, "adbShellStream error ${e.message}")
                 _adbState.value = AdbState.Cancelled
             }
         })
@@ -263,7 +263,7 @@ class AdbManager(applicationContext: Context) {
     @Synchronized
     fun cancelQuickForensics() {
         if (_adbState.value == AdbState.ConnectedAcquiring) {
-            _adbState.value = AdbState.ConnectedIdle
+            _adbState.value = AdbState.Cancelling
         }
         qfCancelled.set(true)
     }
@@ -289,7 +289,7 @@ class AdbManager(applicationContext: Context) {
                     .run(this.appContext!!, adbConnectionManager, baseDir, listener)
                 if (qfCancelled.get()) {
                     commandOutput.postValue("QuickForensics cancelled")
-                    _adbState.value = AdbState.Cancelled
+                    _adbState.value = AdbState.ConnectedIdle
                 } else {
                     commandOutput.postValue("QuickForensics completed: " + out.getAbsolutePath())
                     _adbState.value = AdbState.ConnectedIdle
