@@ -10,7 +10,6 @@ copyright notices and license terms:
   modified:
 
 	* AdbConnectionManager.java
-	* AdbViewModel.java
 
     Distributed under the GNU General Public License, version 3
 
@@ -22,3 +21,18 @@ copyright notices and license terms:
 
     Distributed under the Apache License 2.0
 	<https://github.com/RikkaApps/Shizuku/blob/master/LICENSE>
+
+Bugbane translations are possible thanks to volountaries contributions.
+Translations are licensed under GPL 3.0 terms.
+
+The complete list of translators is available at the following URL:
+<https://hosted.weblate.org/credits/bugbane/>
+
+  * English
+
+      * Davide TheZero (TheZ3ro) - 7
+
+  * Italian
+
+      * TheZ3ro (TheZ3ro) - 82
+      * Giulio B. (giulio) - 4

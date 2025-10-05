@@ -67,7 +67,7 @@
     <string name="settings_indicators_last_update">Last update: %1$s</string>
     <string name="settings_indicators_count">Indicator files: %1$d</string>
     <string name="settings_indicators_desc">The indicators of compromise (IoCs) are used to identify signs of infections or surveillance on Android devices. They are updated periodically to ensure the accuracy of the analysis.</string>
-    <string name="settings_about">About Us</string>
+    <string name="settings_about">About Us &amp; Credits</string>
     <string name="settings_about_desc">Bugbane is an open-source project made by Osservatorio Nessuno. Learn more about Osservatorio Nessuno</string>
     <string name="settings_version">Bugbane version: %1$s</string>
 
@@ -133,7 +133,6 @@
     <string name="analysis_details_analysis_completed">Analysis completed: %1$s</string>
 
     <!-- About screen strings -->
-    <string name="about_title">About Us</string>
     <string name="about_organization_title">Osservatorio Nessuno</string>
     <string name="about_organization_description">Osservatorio Nessuno OdV is a registered non-profit Italian organization, run entirely by volunteers. We are committed to defending the right to privacy, anonymity, freedom of information, expression, and communication, as well as digital rights more broadly.
     \n\n
@@ -142,4 +141,12 @@
     <string name="about_contact_url">https://osservatorionessuno.org/contacts/</string>
     <string name="about_donate_button">Donate</string>
     <string name="about_donate_url">https://osservatorionessuno.org/donate/</string>
+    <string name="about_credits_title">Credits</string>
+    <string name="about_credits_description">Bugbane has been developed by Osservatorio Nessuno OdV with the help of the following volunteers:</string>
+    <string name="credits">Giulio @lsd-cat (maintainer, italian translation)
+    Davide @thez3ro (maintainer, italian translation)
+    rocodes @rocodes (maintainer)
+    </string>
+    <string name="more_credits_button">Translators</string>
+    <string name="more_credits_url">https://hosted.weblate.org/credits/bugbane/</string>
 </resources>
