@@ -28,6 +28,7 @@ import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
 import org.osservatorionessuno.bugbane.AcquisitionActivity
+import org.osservatorionessuno.bugbane.components.LayeredProgressIndicator
 import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
 import org.osservatorionessuno.bugbane.utils.AdbState
 import org.osservatorionessuno.bugbane.utils.AppState
@@ -46,7 +47,7 @@ fun ScanScreen() {
     val appState = viewModel.configurationState.collectAsStateWithLifecycle()
     val adbManager = viewModel.adbManager
     val adbState = adbManager.adbState.collectAsStateWithLifecycle()
-
+    
     var showDisableDialog by remember { mutableStateOf(false) }
     var completedModules by remember { mutableStateOf(0) }
     var totalModules by remember { mutableStateOf(0) }
@@ -61,7 +62,7 @@ fun ScanScreen() {
             .fillMaxSize()
             .padding(8.dp)
     ) {
-        if (adbState.value == AdbState.ConnectedAcquiring) {
+        if (adbState.value == AdbState.ConnectedAcquiring || adbState.value == AdbState.Cancelling) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (isLandscape) {
                     Row(modifier = Modifier.weight(1f)) {
@@ -72,17 +73,12 @@ fun ScanScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                if (totalModules > 0) {
-                                    CircularProgressIndicator(
-                                        progress = {
-                                            (completedModules / totalModules.toFloat()).coerceIn(0f, 1f)
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("$completedModules / $totalModules")
-                                } else {
-                                    CircularProgressIndicator()
-                                }
+                                LayeredProgressIndicator(
+                                    totalModules = totalModules,
+                                    completedModules = completedModules,
+                                    size = 128.dp,
+                                    strokeWidth = 8.dp
+                                )
                             }
                         }
                         LazyColumn(
@@ -105,17 +101,12 @@ fun ScanScreen() {
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                if (totalModules > 0) {
-                                    CircularProgressIndicator(
-                                        progress = {
-                                            (completedModules / totalModules.toFloat()).coerceIn(0f, 1f)
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("$completedModules / $totalModules")
-                                } else {
-                                    CircularProgressIndicator()
-                                }
+                                LayeredProgressIndicator(
+                                    totalModules = totalModules,
+                                    completedModules = completedModules,
+                                    size = 128.dp,
+                                    strokeWidth = 8.dp
+                                )
                             }
                         }
                         LazyColumn(
@@ -131,7 +122,12 @@ fun ScanScreen() {
                     }
                 }
                 Button(
-                    onClick = { adbManager.cancelQuickForensics() },
+                    onClick = { 
+                        if (adbState.value != AdbState.Cancelling) {
+                            adbManager.cancelQuickForensics()
+                        }
+                    },
+                    enabled = adbState.value != AdbState.Cancelling,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
@@ -144,7 +140,7 @@ fun ScanScreen() {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = stringResource(R.string.scan_cancel_button),
+                        text = if (adbState.value == AdbState.Cancelling) stringResource(R.string.scan_cancelling_button) else stringResource(R.string.scan_cancel_button),
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                     )
                 }
