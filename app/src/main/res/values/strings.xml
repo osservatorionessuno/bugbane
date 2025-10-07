@@ -145,7 +145,7 @@
     <string name="about_credits_description">Bugbane has been developed by Osservatorio Nessuno OdV with the help of the following volunteers:</string>
     <string name="credits">Giulio @lsd-cat (maintainer, italian translation)
     Davide @thez3ro (maintainer, italian translation)
-    rocodes @rocodes (maintainer)
+    Rowen @rocodes (maintainer)
     </string>
     <string name="more_credits_button">Translators</string>
     <string name="more_credits_url">https://hosted.weblate.org/credits/bugbane/</string>
