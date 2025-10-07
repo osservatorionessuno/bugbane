@@ -68,7 +68,7 @@
     <string name="settings_indicators_count">Indicator files: %1$d</string>
     <string name="settings_indicators_desc">The indicators of compromise (IoCs) are used to identify signs of infections or surveillance on Android devices. They are updated periodically to ensure the accuracy of the analysis.</string>
     <string name="settings_about">About Us &amp; Credits</string>
-    <string name="settings_about_desc">Bugbane is an open-source project made by Osservatorio Nessuno. Learn more about Osservatorio Nessuno</string>
+    <string name="settings_about_desc">Bugbane is an open-source project developed by Osservatorio Nessuno OdV.</string>
     <string name="settings_version">Bugbane version: %1$s</string>
 
     <!-- Indicator update notification -->
@@ -134,9 +134,7 @@
 
     <!-- About screen strings -->
     <string name="about_organization_title">Osservatorio Nessuno</string>
-    <string name="about_organization_description">Osservatorio Nessuno OdV is a registered non-profit Italian organization, run entirely by volunteers. We are committed to defending the right to privacy, anonymity, freedom of information, expression, and communication, as well as digital rights more broadly.
-    \n\n
-    For years, many of our members have voluntarily offered support to activists affected by technological repression, providing self-defense tools, consultations, and assistance to individuals under prosecution.</string>
+    <string name="about_organization_description">Osservatorio Nessuno OdV is a registered non-profit Italian organization, run entirely by volunteers. We are committed to defending the right to privacy, anonymity, freedom of information, expression, and communication, as well as digital rights more broadly.</string>
     <string name="about_contact_button">Contact Us</string>
     <string name="about_contact_url">https://osservatorionessuno.org/contacts/</string>
     <string name="about_donate_button">Donate</string>
