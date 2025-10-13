@@ -46,7 +46,7 @@
     <string name="settings_general">Impostazioni generali</string>
     <string name="settings_developer_options">Disabilita opzioni sviluppatore</string>
     <string name="settings_developer_options_desc">Si raccomanda di disabilitare le opzioni sviluppatore dopo ogni sessione e ri-abilitarle solamente quando necessario.</string>
-    <string name="settings_indicators_title">Indicatori</string>
+    <string name="settings_indicators_title">Indicatori di Compromissione (IoCs)</string>
     <string name="settings_indicators_version">Versione: %1$s</string>
     <string name="settings_indicators_last_fetch">Ultimo download: %1$s</string>
     <string name="settings_indicators_last_update">Ultimo aggiornamento: %1$s</string>
@@ -103,4 +103,22 @@
     <string name="analysis_spyware_warning_title">In questa analisi sono stati trovati possibili indicatori di spyware. Per supporto, valuta di contattare una linea di aiuto fidata.</string>
     <string name="analysis_spyware_warning_button">Apri sito di supporto</string>
     <string name="slideshow_wireless_title">Abilita Wireless Debugging</string>
+    <string name="scan_cancelling_button">Cancellazione...</string>
+    <string name="settings_indicators_desc">Gli indicatori di compromissione (IoCs) sono utilizzati per identificare i segni di infezioni o sorveglianza sui dispositivi Android. Essi vengono aggiornati periodicamente per garantire l\'accuratezza dell\'analisi.</string>
+    <string name="settings_about">Informazioni su di noi &amp; Crediti</string>
+    <string name="settings_about_desc">Bugbane è un progetto open-source sviluppato da Osservatorio Nessuno OdV.</string>
+    <string name="settings_version">Bugbane versione: %1$s</string>
+    <string name="analysis_in_progress">Analisi in corso...</string>
+    <string name="export_in_progress">Esportazione in corso...</string>
+    <string name="about_organization_title">Osservatorio Nessuno</string>
+    <string name="about_organization_description">Osservatorio Nessuno OdV è un\'organizzazione italiana senza scopo di lucro, gestita interamente da volontari. Ci impegniamo a difendere il diritto alla privacy, all\'anonimato, alla libertà di informazione, espressione e comunicazione, nonché ai diritti digitali in modo più ampio.</string>
+    <string name="about_contact_button">Contattaci</string>
+    <string name="about_contact_url">https://osservatorionessuno.org/it/contatti/</string>
+    <string name="about_donate_button">Dona</string>
+    <string name="about_donate_url">https://osservatorionessuno.org/it/dona/</string>
+    <string name="about_credits_title">Crediti</string>
+    <string name="about_credits_description">Bugbane è stato sviluppato dall\'Osservatorio Nessuno OdV con l\'aiuto dei seguenti volontari:</string>
+    <string name="credits">Giulio @lsd-cat (maintainer, italian translation) Davide @thez3ro (maintainer, italian translation) Rowen @rocodes (maintainer)</string>
+    <string name="more_credits_button">Traduttori</string>
+    <string name="more_credits_url">https://hosted.weblate.org/credits/bugbane/</string>
 </resources>
