@@ -92,6 +92,14 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 
+rm "$TEMP_CFG_FILE"
+
+if [[ "$APK_PATH" = *.aab ]]; then
+  echo "... skipping verification step for AAB file."
+  echo "Android App Bundle signed successfully!"
+  exit 0
+fi
+
 java \
   $FLAGS \
   -jar "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/lib/apksigner.jar" \
@@ -104,6 +112,4 @@ if [[ $? -ne 0 ]]; then
   echo "Error: Failed to verify APK"
   exit 1
 fi
-
-rm "$TEMP_CFG_FILE"
-echo "APK signed and verified successfully"
+echo "APK signed and verified successfully!"
