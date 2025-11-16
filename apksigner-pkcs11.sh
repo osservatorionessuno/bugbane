@@ -2,6 +2,7 @@
 
 # This is a simple wrapper script to sign an APK with a PKCS11 token using OpenSC (Yubikey or Nitrokey for example)
 # References: 
+# - https://developers.yubico.com/PIV/Guides/Android_code_signing.html
 # - https://geoffreymetais.github.io/code/key-signing/
 # - https://medium.com/swlh/android-app-signing-with-a-yubikey-fdfc3d730965
 
