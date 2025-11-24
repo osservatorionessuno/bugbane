@@ -1,5 +1,6 @@
 package org.osservatorionessuno.bugbane.utils;
 
+import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -12,6 +13,8 @@ import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
+
 import android.util.Log;
 
 import java.net.InetAddress;
@@ -65,6 +68,8 @@ public class AdbPairingService extends Service {
         nm.createNotificationChannel(channel);
     }
 
+    // See docs below on ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE
+    @SuppressLint("InlinedApi")
     @Override
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
         Notification notification = null;
@@ -88,7 +93,14 @@ public class AdbPairingService extends Service {
         }
         if (notification != null) {
             try {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                // From https://developer.android.com/reference/android/content/pm/ServiceInfo:
+                // [E]ven though FOREGROUND_SERVICE_TYPE_SHORT_SERVICE was added on Android version
+                // Build.VERSION_CODES.UPSIDE_DOWN_CAKE, it can be also used on on prior android
+                // versions (just like other new foreground service types can be used).
+                // However, because Service.onTimeout(int) did not exist on prior versions, it will
+                // never called on such versions. Because of this, developers must make sure to stop
+                // the foreground service even if Service.onTimeout(int) is not called on such versions.
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE);
             } catch (Throwable th) {
                 Log.e(TAG, "startForeground failed", th);
                 getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, notification);
@@ -121,6 +133,13 @@ public class AdbPairingService extends Service {
     public void onDestroy() {
         super.onDestroy();
         stopSearch();
+    }
+
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @Override
+    public void onTimeout(int service) {
+        // Called by system if SHORT_SERVICE exceeds 3 minute lifespan
+        stopSelf();
     }
 
     private Notification onStart() {
