@@ -71,7 +71,9 @@ class AdbManager(applicationContext: Context) {
             }
         }
 
-        // Cancel the notification, if it's still showing
+        // Cancel the notification, if it's still showing.
+        // Note: keep this cleanup despite onTimeout() in AdbPairingService, because Android
+        // versions < 34 don't call onTimeout().
         val stopIntent = AdbPairingService.stopIntent(appContext)
         appContext?.stopService(stopIntent)
     }
