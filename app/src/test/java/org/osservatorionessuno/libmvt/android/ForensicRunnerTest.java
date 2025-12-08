@@ -10,7 +10,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class AndroidQFRunnerTest {
+public class ForensicRunnerTest {
 
     @Test
     public void testRunAllModules() throws Exception {
@@ -19,7 +19,7 @@ public class AndroidQFRunnerTest {
 
         Indicators ind = Indicators.loadFromDirectory(iocDir);
 
-        AndroidQFRunner runner = new AndroidQFRunner(dir);
+        ForensicRunner runner = new ForensicRunner(dir);
         runner.setIndicators(ind);
 
         Map<String, Artifact> res = runner.runAll();
@@ -38,7 +38,7 @@ public class AndroidQFRunnerTest {
     public void testRunSingleModule() throws Exception {
         File dir = Paths.get("src", "test", "resources", "androidqf").toFile();
 
-        AndroidQFRunner runner = new AndroidQFRunner(dir);
+        ForensicRunner runner = new ForensicRunner(dir);
         Artifact art = runner.runModule("getprop");
 
         assertNotNull(art);

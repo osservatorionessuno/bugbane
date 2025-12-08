@@ -19,7 +19,6 @@ class GetProp : Module {
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        if (!outDir.exists()) outDir.mkdirs()
         val shell = Shell(manager, progress = progress)
         shell.execToFile("getprop", File(outDir, "getprop.txt"))
     }

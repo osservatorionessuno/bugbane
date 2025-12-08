@@ -1,5 +1,7 @@
 package org.osservatorionessuno.libmvt.common;
 
+import android.util.Log;
+
 import org.ahocorasick.trie.Emit;
 import org.ahocorasick.trie.Trie;
 import org.json.JSONArray;
@@ -25,20 +27,13 @@ public class Indicators {
     private final Trie processTrie;   // kept for symmetry (not used in matching; list used instead)
     private final Trie appIdTrie;     // kept for symmetry (not used in matching; list used instead)
     private final Trie propertyTrie;  // kept for symmetry (not used in matching; list used instead)
-    private final List<String> processList;
-    private final List<String> appIdList;
-    private final List<String> propertyList;
 
-    private Indicators(Trie domainTrie, Trie urlTrie, Trie processTrie, Trie appIdTrie, Trie propertyTrie,
-                       List<String> processList, List<String> appIdList, List<String> propertyList) {
+    private Indicators(Trie domainTrie, Trie urlTrie, Trie processTrie, Trie appIdTrie, Trie propertyTrie) {
         this.domainTrie   = domainTrie;
         this.urlTrie      = urlTrie;
         this.processTrie  = processTrie;
         this.appIdTrie    = appIdTrie;
         this.propertyTrie = propertyTrie;
-        this.processList  = processList;
-        this.appIdList    = appIdList;
-        this.propertyList = propertyList;
     }
 
     /** Load indicators from a folder containing .json or .stix2 files. */
@@ -49,14 +44,9 @@ public class Indicators {
         Trie.TrieBuilder appIds     = Trie.builder().ignoreCase();
         Trie.TrieBuilder properties = Trie.builder().ignoreCase();
 
-        List<String> procList = new ArrayList<>();
-        List<String> appIdList = new ArrayList<>();
-        List<String> propList = new ArrayList<>();
-
         File[] files = (dir != null) ? dir.listFiles((d, name) -> name.endsWith(".json") || name.endsWith(".stix2")) : null;
         if (files == null) {
-            return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build(),
-                    procList, appIdList, propList);
+            return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build());
         }
 
         for (File f : files) {
@@ -71,8 +61,7 @@ public class Indicators {
                     if (node == null) continue;
                     if ("indicator".equals(node.optString("type", ""))) {
                         String pattern = node.optString("pattern", null);
-                        addPattern(domains, urls, processes, appIds, properties,
-                                procList, appIdList, propList, pattern);
+                        addPattern(domains, urls, processes, appIds, properties, pattern);
                     }
                 }
                 continue;
@@ -88,22 +77,20 @@ public class Indicators {
                     addField(domains,    coll, "domain-name:value",     null);
                     addField(domains,    coll, "ipv4-addr:value",       null);
                     addField(urls,       coll, "url:value",             null);
-                    addField(processes,  coll, "process:name",          procList);
-                    addField(appIds,     coll, "app:id",                appIdList);
-                    addField(properties, coll, "android-property:name", propList);
+                    addField(processes,  coll, "process:name",          null);
+                    addField(appIds,     coll, "app:id",                null);
+                    addField(properties, coll, "android-property:name", null);
                 }
             }
         }
 
-        return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build(),
-                procList, appIdList, propList);
+        return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build());
     }
 
     /** Parse a single STIX pattern like: "[domain-name:value = 'evil.com']" */
     private static void addPattern(Trie.TrieBuilder domains, Trie.TrieBuilder urls,
                                    Trie.TrieBuilder processes, Trie.TrieBuilder appIds,
                                    Trie.TrieBuilder properties,
-                                   List<String> procList, List<String> appIdList, List<String> propList,
                                    String pattern) {
         if (pattern == null) return;
         String p = pattern.trim();
@@ -133,15 +120,12 @@ public class Indicators {
                 break;
             case "process:name":
                 processes.addKeyword(vLower);
-                procList.add(vLower);
                 break;
             case "app:id":
                 appIds.addKeyword(vLower);
-                appIdList.add(vLower);
                 break;
             case "android-property:name":
                 properties.addKeyword(vLower);
-                propList.add(vLower);
                 break;
             default:
                 break;
@@ -192,37 +176,31 @@ public class Indicators {
         switch (type) {
             case DOMAIN: {
                 for (Emit e : domainTrie.parseText(lower)) {
-                    detections.add(new Detection(type, e.getKeyword(), s));
+                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
                 }
                 break;
             }
             case URL: {
                 for (Emit e : urlTrie.parseText(lower)) {
-                    detections.add(new Detection(type, e.getKeyword(), s));
+                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
                 }
                 break;
             }
             case PROCESS: {
-                for (String kw : processList) {
-                    if (kw.equals(lower) || (lower.length() == 16 && kw.startsWith(lower))) {
-                        detections.add(new Detection(type, kw, s));
-                    }
+                for (Emit e : processTrie.parseText(lower)) {
+                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
                 }
                 break;
             }
             case APP_ID: {
-                for (String kw : appIdList) {
-                    if (kw.equals(lower)) {
-                        detections.add(new Detection(type, kw, s));
-                    }
+                for (Emit e : appIdTrie.parseText(lower)) {
+                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
                 }
                 break;
             }
             case PROPERTY: {
-                for (String kw : propertyList) {
-                    if (kw.equals(lower)) {
-                        detections.add(new Detection(type, kw, s));
-                    }
+                for (Emit e : propertyTrie.parseText(lower)) {
+                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
                 }
                 break;
             }

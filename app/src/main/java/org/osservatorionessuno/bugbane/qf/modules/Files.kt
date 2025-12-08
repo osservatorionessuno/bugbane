@@ -19,7 +19,6 @@ class Files : Module {
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        outDir.mkdirs()
         val sh = Shell(manager, progress = progress)
 
         // Detect find -printf capability

@@ -19,7 +19,6 @@ class Processes : Module {
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        if (!outDir.exists()) outDir.mkdirs()
         val shell = Shell(manager, progress = progress)
         shell.execToFile("ps -A", File(outDir, "processes.txt"))
     }

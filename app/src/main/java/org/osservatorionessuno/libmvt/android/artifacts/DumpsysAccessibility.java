@@ -12,7 +12,7 @@ public class DumpsysAccessibility extends AndroidArtifact {
     public void parse(String input) {
         List<String> lines = Arrays.asList(input.split("\n"));
         Pattern legacyPattern = Pattern.compile("\\s*(\\d+) : (.+)");
-        Pattern v14Pattern = Pattern.compile("\\{\\{(.+?)}}", Pattern.DOTALL);
+        Pattern v14Pattern = Pattern.compile("\\{\\{(.+?)\\}\\}", Pattern.DOTALL);
 
         boolean legacy = false;
         boolean v14 = false;
@@ -58,6 +58,7 @@ public class DumpsysAccessibility extends AndroidArtifact {
     @Override
     public void checkIndicators() {
         if (indicators == null) return;
+        
         for (Object obj : results) {
             @SuppressWarnings("unchecked")
             Map<String, String> record = (Map<String, String>) obj;

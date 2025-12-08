@@ -19,7 +19,6 @@ class SELinux : Module {
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        if (!outDir.exists()) outDir.mkdirs()
         val shell = Shell(manager, progress = progress)
         shell.execToFile("getenforce", File(outDir, "selinux.txt"))
     }

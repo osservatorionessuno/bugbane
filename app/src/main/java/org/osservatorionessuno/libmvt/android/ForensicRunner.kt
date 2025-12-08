@@ -12,7 +12,7 @@ import java.util.LinkedHashMap
  * Simple helper to run the available AndroidQF artifact parsers on a folder
  * containing extracted androidqf data. Android 11+ safe (no Java 9/11 APIs).
  */
-class AndroidQFRunner(private val directory: File) {
+class ForensicRunner(private val directory: File) {
 
     private var indicators: Indicators? = null
 
@@ -46,8 +46,6 @@ class AndroidQFRunner(private val directory: File) {
             runDumpsysSection(dir, DumpsysAccessibility(), "DUMP OF SERVICE accessibility:")
             "dumpsys_activities" ->
             runDumpsysSection(dir, DumpsysPackageActivities(), "DUMP OF SERVICE package:")
-            "dumpsys_receivers" ->
-            runDumpsysSection(dir, DumpsysReceivers(), "DUMP OF SERVICE package:")
             "dumpsys_adb" ->
             runDumpsysSection(dir, DumpsysAdb(), "DUMP OF SERVICE adb:")
             "dumpsys_appops" ->
@@ -62,12 +60,24 @@ class AndroidQFRunner(private val directory: File) {
             runDumpsysSection(dir, DumpsysPackages(), "DUMP OF SERVICE package:")
             "dumpsys_platform_compat" ->
             runDumpsysSection(dir, DumpsysPlatformCompat(), "DUMP OF SERVICE platform_compat:")
-            "processes" ->
-            runSimpleFile(dir, "ps.txt", Processes())
-            "getprop" ->
+            "dumpsys_receivers" ->
+            runDumpsysSection(dir, DumpsysReceivers(), "DUMP OF SERVICE package:")
+            "aqf_packages" ->
+            runSimpleFile(dir, "packages.json", Packages())
+            "aqf_processes" ->
+            runSimpleFile(dir, "processes.txt", Processes())
+            "aqf_getprop" ->
             runSimpleFile(dir, "getprop.txt", GetProp())
-            "settings" ->
+            "aqf_settings" ->
             runSettings(dir)
+            "aqf_files" ->
+            runSimpleFile(dir, "files.json", Files())
+            "sms" ->
+            runSimpleFile(dir, "sms.txt", SMS())
+            "root_binaries" ->
+            runSimpleFile(dir, "root_binaries.json", RootBinaries())
+            "mounts" ->
+            runSimpleFile(dir, "mounts.json", Mounts())
             else -> throw IllegalArgumentException("Unknown module: $moduleName")
         }
     }
@@ -156,9 +166,9 @@ class AndroidQFRunner(private val directory: File) {
         /** List of all module names understood by the runner. */
         @JvmField
         val AVAILABLE_MODULES: List<String> = listOf(
+                // Bugreport modules
                 "dumpsys_accessibility",
                 "dumpsys_activities",
-                "dumpsys_receivers",
                 "dumpsys_adb",
                 "dumpsys_appops",
                 "dumpsys_battery_daily",
@@ -166,9 +176,16 @@ class AndroidQFRunner(private val directory: File) {
                 "dumpsys_dbinfo",
                 "dumpsys_packages",
                 "dumpsys_platform_compat",
-                "processes",
-                "getprop",
-                "settings"
+                "dumpsys_receivers",
+                // AndroidQF modules
+                "aqf_packages",
+                "aqf_processes",
+                "aqf_getprop",
+                "aqf_settings",
+                "aqf_files",
+                "sms",
+                "root_binaries",
+                "mounts",
         )
     }
 }
