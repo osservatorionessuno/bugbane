@@ -60,7 +60,9 @@ public class Processes extends AndroidArtifact {
             @SuppressWarnings("unchecked")
             Map<String, Object> map = (Map<String, Object>) obj;
             String name = (String) map.get("proc_name");
+            // We skip this process because of false positives.
             if ("gatekeeperd".equals(name)) continue;
+            
             detected.addAll(indicators.matchString(name, IndicatorType.APP_ID));
             detected.addAll(indicators.matchString(name, IndicatorType.PROCESS));
         }

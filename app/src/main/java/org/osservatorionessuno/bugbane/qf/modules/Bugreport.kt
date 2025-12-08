@@ -23,8 +23,6 @@ class Bugreport : Module {
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        if (!outDir.exists()) outDir.mkdirs()
-
         // Shell progress is NOT file progress; leave it null.
         val shell = Shell(
             manager = manager,

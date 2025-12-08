@@ -1,5 +1,6 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
+import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.IndicatorType;
 import org.osservatorionessuno.libmvt.common.Detection;
 
@@ -97,6 +98,7 @@ public class DumpsysAppops extends AndroidArtifact {
             Map<String, Object> map = (Map<String, Object>) obj;
             String pkgName = (String) map.get("package_name");
             detected.addAll(indicators.matchString(pkgName, IndicatorType.APP_ID));
+            
             boolean riskyPkg = RISKY_PACKAGES.contains(pkgName);
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> perms = (List<Map<String, Object>>) map.get("permissions");
@@ -104,7 +106,7 @@ public class DumpsysAppops extends AndroidArtifact {
             for (Map<String, Object> perm : perms) {
                 String permName = (String) perm.get("name");
                 if (RISKY_PERMISSIONS.contains(permName) || riskyPkg) {
-                    detected.add(new Detection(IndicatorType.PROCESS, permName, pkgName));
+                    detected.add(new Detection(AlertLevel.MEDIUM, IndicatorType.PROCESS, permName, pkgName));
                 }
             }
         }

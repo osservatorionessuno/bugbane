@@ -41,7 +41,7 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
                 for (i in 0 until arr.length()) {
                     val o = arr.getJSONObject(i)
                     tmp += ScanResult(
-                        o.optString("file"),
+                        o.optString("level"),
                         o.optString("type"),
                         o.optString("ioc"),
                         o.optString("context")
@@ -104,7 +104,7 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
 }
 
 data class ScanResult(
-    val file: String,
+    val level: String,
     val type: String,
     val ioc: String,
     val context: String,
@@ -147,7 +147,7 @@ private fun ResultList(
                         .fillMaxWidth()
                         .clickable { onSelect(r) }
                 ) {
-                    Text(r.file, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(r.level, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(r.type, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(r.ioc, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }

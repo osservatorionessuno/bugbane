@@ -19,6 +19,7 @@ class Shell(
     }
 
     fun exec(command: String): String {
+        // TODO: implement command-injection checks!
         val output = ByteArrayOutputStream()
         execInternal(command, output)
         return output.toString(StandardCharsets.UTF_8.name())

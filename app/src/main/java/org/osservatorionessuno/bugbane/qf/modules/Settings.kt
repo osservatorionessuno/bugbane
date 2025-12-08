@@ -19,7 +19,6 @@ class Settings : Module {
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        if (!outDir.exists()) outDir.mkdirs()
         val namespaces = listOf("system", "secure", "global")
         val shell = Shell(manager, progress = progress)
         for (ns in namespaces) {

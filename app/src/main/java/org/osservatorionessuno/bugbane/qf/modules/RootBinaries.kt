@@ -6,6 +6,7 @@ import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import org.json.JSONArray
 import org.osservatorionessuno.bugbane.qf.Module
 import org.osservatorionessuno.bugbane.qf.Shell
+import org.osservatorionessuno.bugbane.utils.Utils
 import java.io.File
 
 /**
@@ -36,8 +37,6 @@ class RootBinaries : Module {
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        if (!outDir.exists()) outDir.mkdirs()
-
         // Shell output bytes aren't meaningful progress here; keep null.
         val shell = Shell(manager, tag = "ShellQF", progress = null)
 
@@ -67,9 +66,6 @@ class RootBinaries : Module {
 
         val unique = found.distinct()
         Log.i(TAG, "Found ${unique.size} root-related binaries")
-        val json = JSONArray()
-        unique.forEach { json.put(it) }
-
-        File(outDir, "root_binaries.json").writeText(json.toString(1))
+        File(outDir, "root_binaries.json").writeText(Utils.toJsonString(JSONArray(unique)))
     }
 }

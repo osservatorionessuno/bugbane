@@ -1,5 +1,6 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
+import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.Detection;
 import org.osservatorionessuno.libmvt.common.IndicatorType;
 
@@ -13,7 +14,7 @@ public class Settings extends AndroidArtifact {
         String description;
     }
 
-    private static final List<DangerousSetting> DANGEROUS_SETTINGS = new ArrayList<>();
+    private static final HashMap<String, DangerousSetting> DANGEROUS_SETTINGS = new HashMap<>();
 
     static {
         add("verifier_verify_adb_installs", "1", "disabled Google Play Services apps verification");
@@ -31,7 +32,7 @@ public class Settings extends AndroidArtifact {
     private static void add(String key, String safeVal, String desc) {
         DangerousSetting ds = new DangerousSetting();
         ds.key = key; ds.safeValue = safeVal; ds.description = desc;
-        DANGEROUS_SETTINGS.add(ds);
+        DANGEROUS_SETTINGS.put(key, ds);
     }
 
     @Override
@@ -55,13 +56,13 @@ public class Settings extends AndroidArtifact {
         @SuppressWarnings("unchecked")
         Map<String, String> settings = (Map<String, String>) results.get(0);
         for (Map.Entry<String, String> entry : settings.entrySet()) {
-            for (DangerousSetting ds : DANGEROUS_SETTINGS) {
-                if (ds.key.equals(entry.getKey()) && !ds.safeValue.equals(entry.getValue())) {
-                    // In this simplified implementation we just record a detection with description
-                    detected.add(new Detection(
-                            IndicatorType.PROCESS, ds.description, entry.getKey() + "=" + entry.getValue()));
-                    break;
-                }
+            DangerousSetting ds = DANGEROUS_SETTINGS.get(entry.getKey());
+            if (ds != null &&
+                !ds.safeValue.equals(entry.getValue())) {
+                detected.add(new Detection(
+                        AlertLevel.INFORMATIONAL, IndicatorType.OTHER,
+                        ds.description,
+                        entry.getKey() + "=" + entry.getValue()));
             }
         }
     }

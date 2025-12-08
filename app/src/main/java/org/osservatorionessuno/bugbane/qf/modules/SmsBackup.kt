@@ -22,7 +22,6 @@ class SmsBackup : Module {
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        if (!outDir.exists()) outDir.mkdirs()
         val dest = File(outDir, "sms_backup.ab")
         val temp = File(outDir, "sms_backup.ab.part").apply { delete() }
 

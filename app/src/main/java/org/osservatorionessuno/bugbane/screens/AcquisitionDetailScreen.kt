@@ -32,15 +32,14 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.security.MessageDigest
 import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import java.security.SecureRandom
 import kage.Age
 import kage.crypto.scrypt.ScryptRecipient
+import org.osservatorionessuno.bugbane.utils.Utils
 
 @Composable
 fun AcquisitionDetailScreen(acquisitionDir: File) {
@@ -61,7 +60,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     var generatedFile by remember { mutableStateOf<File?>(null) }
 
     LaunchedEffect(acquisitionDir) {
-        size = calculateSize(acquisitionDir)
+        size = Utils.calculateSize(acquisitionDir)
         files = acquisitionDir.walkTopDown()
             .filter { it.isFile }
             .map { it.relativeTo(acquisitionDir).path to it.length() }
@@ -156,7 +155,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, formatBytes(size)),
+                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, Utils.formatBytes(size)),
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                     )
                     meta?.let {
@@ -259,7 +258,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, formatBytes(size)),
+                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, Utils.formatBytes(size)),
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                 )
                 meta?.let {
@@ -389,7 +388,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 Box(modifier = Modifier.heightIn(max = 300.dp)) {
                     LazyColumn {
                         items(files) { (name, fsize) ->
-                            Text("$name - ${formatBytes(fsize)}")
+                            Text("$name - ${Utils.formatBytes(fsize)}")
                         }
                     }
                 }
@@ -512,7 +511,7 @@ private fun loadScans(acquisitionDir: File): List<ScanSummary> {
                     }
                 }
                 hashes.sort()
-                sha256(hashes.joinToString(""))
+                Utils.sha256(hashes.joinToString(""))
             }
             val results = obj.optJSONArray("results")?.length() ?: 0
             ScanSummary(file, started, hash, results)
@@ -522,30 +521,9 @@ private fun loadScans(acquisitionDir: File): List<ScanSummary> {
     }?.sortedByDescending { it.started } ?: emptyList()
 }
 
-private fun sha256(data: String): String {
-    val md = MessageDigest.getInstance("SHA-256")
-    md.update(data.toByteArray())
-    return md.digest().joinToString("") { "%02x".format(it) }
-}
-
-private fun calculateSize(file: File): Long {
-    return if (file.isFile) file.length() else file.listFiles()?.sumOf { calculateSize(it) } ?: 0L
-}
-
-private fun formatBytes(bytes: Long): String {
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    var value = bytes.toDouble()
-    var idx = 0
-    while (value >= 1024 && idx < units.lastIndex) {
-        value /= 1024
-        idx++
-    }
-    return String.format("%.1f %s", value, units[idx])
-}
-
 private suspend fun createEncryptedArchive(context: Context, sourceDir: File): Pair<File, String> {
     return withContext(Dispatchers.IO) {
-        val pass = generatePassphrase()
+        val pass = Utils.generatePassphrase()
         val dest = File.createTempFile("acquisition", ".zip.age", context.cacheDir)
         val plainZip = File.createTempFile("acquisition", ".zip", context.cacheDir)
         // 256MB goes OOM
@@ -567,12 +545,6 @@ private suspend fun createEncryptedArchive(context: Context, sourceDir: File): P
         plainZip.delete()
         dest to pass
     }
-}
-
-private fun generatePassphrase(): String {
-    val chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-    val rnd = SecureRandom()
-    return (1..32).map { chars[rnd.nextInt(chars.length)] }.joinToString("")
 }
 
 enum class ProcessingState {

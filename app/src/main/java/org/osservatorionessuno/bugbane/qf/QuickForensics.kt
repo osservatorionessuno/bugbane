@@ -9,6 +9,7 @@ import java.util.UUID
 import org.json.JSONObject
 import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import org.osservatorionessuno.bugbane.BuildConfig
+import org.osservatorionessuno.bugbane.utils.Utils
 import org.osservatorionessuno.bugbane.qf.modules.Env
 import org.osservatorionessuno.bugbane.qf.modules.Dumpsys
 import org.osservatorionessuno.bugbane.qf.modules.Files
@@ -19,7 +20,11 @@ import org.osservatorionessuno.bugbane.qf.modules.SELinux
 import org.osservatorionessuno.bugbane.qf.modules.Services
 import org.osservatorionessuno.bugbane.qf.modules.Settings
 import org.osservatorionessuno.bugbane.qf.modules.Bugreport
+import org.osservatorionessuno.bugbane.qf.modules.Logs
+import org.osservatorionessuno.bugbane.qf.modules.Mounts
+import org.osservatorionessuno.bugbane.qf.modules.Packages
 import org.osservatorionessuno.bugbane.qf.modules.RootBinaries
+import org.osservatorionessuno.bugbane.qf.modules.Temp
 
 private const val TAG = "QuickForensics"
 
@@ -39,13 +44,17 @@ class QuickForensics(
         Dumpsys(),
         Files(),
         Bugreport(),
+        Logs(),
         Logcat(),
         GetProp(),
+        Mounts(),
+        Packages(),
         Processes(),
         RootBinaries(),
         Services(),
         Settings(),
-        SELinux()
+        SELinux(),
+        Temp()
     )
 ) {
 
@@ -121,6 +130,7 @@ class QuickForensics(
             Log.i(TAG, "Running module ${module.name}")
             listener?.onModuleStart(module.name, completedCount, total)
             try {
+                if (!acquisitionDir.exists()) acquisitionDir.mkdirs()
                 module.run(context, manager, acquisitionDir, progressCb)
                 Log.i(TAG, "Module ${module.name} finished")
             } catch (t: Throwable) {
@@ -133,21 +143,17 @@ class QuickForensics(
         val completed = Instant.now()
         val metadata = JSONObject().apply {
             put("uuid", acquisitionDir.name)
+            // TODO: here we should use a better key, for exampple "bugbane_version"
             put("androidqf_version", BuildConfig.VERSION_NAME)
             put("storage_path", acquisitionDir.absolutePath)
             put("started", started.toString())
             put("completed", completed.toString())
-            put("collector", JSONObject().apply {
-                put("ExePath", tmpDir + "collector")
-                put("Installed", false)
-                put("Adb", JSONObject().apply { put("ExePath", "") })
-                put("Architecture", cpu)
-            })
             put("tmp_dir", tmpDir)
             put("sdcard", sdCard)
             put("cpu", cpu)
+            put("streaming_mode", false)
         }
-        File(acquisitionDir, "acquisition.json").writeText(metadata.toString(1))
+        File(acquisitionDir, "acquisition.json").writeText(Utils.toJsonString(metadata))
 
         Log.i(TAG, "Acquisition complete in ${acquisitionDir.absolutePath}")
         listener?.onFinished(false)
