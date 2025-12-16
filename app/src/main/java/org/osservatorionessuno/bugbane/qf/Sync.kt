@@ -105,4 +105,122 @@ class Sync(
             remaining -= read
         }
     }
+
+    /**
+     * List remote files in a directory.
+     *
+     * @param remoteDir Path on the device to list from.
+     * @return List of file info maps: [ { "path": ..., "mode": ..., "size": ..., "mtime": ... }, ... ]
+     */
+    @Throws(IOException::class)
+    fun list(remoteDir: String): List<Map<String, Any>> {
+        val entries = mutableListOf<Map<String, Any>>()
+
+        manager.openStream(LocalServices.SYNC).use { stream ->
+            val out = stream.openOutputStream()
+            val input = stream.openInputStream()
+
+            // Send LIST request
+            val remoteBytes = remoteDir.toByteArray(StandardCharsets.UTF_8)
+            val payloadLen = remoteBytes.size
+            val cmd = "LIST"
+            val header = ByteBuffer.allocate(8)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .put(cmd.toByteArray(StandardCharsets.US_ASCII))
+                .putInt(payloadLen)
+                .array()
+            out.write(header)
+            out.write(remoteBytes)
+            out.flush()
+
+            val nameBuf = ByteArray(1024)
+            val lenBuf = ByteArray(4)
+
+            while (true) {
+                // Read 4-byte command header
+                readFully(input, nameBuf, 0, 4)
+                val respCmd = String(nameBuf, 0, 4, StandardCharsets.US_ASCII)
+
+                when (respCmd) {
+                    "DENT" -> {
+                        // Read 8 bytes for mode (uint32), size (uint64 not supported in V1: still uint32), mtime (uint32)
+                        readFully(input, lenBuf, 0, 4)
+                        val mode = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+                        readFully(input, lenBuf, 0, 4)
+                        val size = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+                        readFully(input, lenBuf, 0, 4)
+                        val mtime = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+                        // Next 4 is name length, then name data
+                        readFully(input, lenBuf, 0, 4)
+                        val nameLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+                        val nameBytes = ByteArray(nameLen)
+                        readFully(input, nameBytes, 0, nameLen)
+                        val name = String(nameBytes, StandardCharsets.UTF_8)
+
+                        val entry = mapOf(
+                            "path" to name,
+                            "mode" to mode,
+                            "size" to size,
+                            "mtime" to mtime
+                        )
+                        entries.add(entry)
+                    }
+
+                    "DONE" -> {
+                        // No payload, end of list
+                        break
+                    }
+
+                    "FAIL" -> {
+                        // 4-byte length, then error string
+                        readFully(input, lenBuf, 0, 4)
+                        val msgLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+                        val msgBytes = ByteArray(msgLen)
+                        readFully(input, msgBytes, 0, msgLen)
+                        val msg = String(msgBytes, StandardCharsets.UTF_8)
+                        throw IOException("List failed: $msg")
+                    }
+
+                    else -> {
+                        throw IOException("Unexpected list response: $respCmd")
+                    }
+                }
+            }
+        }
+        return entries
+    }
+
+    /**
+     * Pull a remote folder to a local destination.
+     *
+     * @param remoteDir Path on the device to pull from.
+     * @param localDest Local folder to write to.
+     */
+    @Throws(IOException::class)
+    fun pullFolder(remoteDir: String, localDest: File) {
+        assert(remoteDir.endsWith("/"))
+
+        val entries = list(remoteDir)
+        for (entry in entries) {
+            val path = entry["path"] as String
+            val mode = entry["mode"] as Int
+            val mtime = entry["mtime"] as Int
+
+            if (path == "." || path == "..") continue
+
+            val localPath = File(localDest, path)
+            localPath.parentFile?.mkdirs()
+
+            if (mode and 0x4000 != 0) {
+                pullFolder(remoteDir + path, localPath)
+            } else {
+                pull(remoteDir + path, localPath)
+                // set last modified time accordingly
+                localPath.setLastModified(mtime.toLong() * 1000)
+            }
+        }
+    }
 }

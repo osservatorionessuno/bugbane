@@ -65,6 +65,7 @@ public class GetProp extends AndroidArtifact {
             if (INTERESTING_PROPERTIES.contains(name)) {
                 detected.add(new Detection(AlertLevel.LOG, IndicatorType.OTHER, map.get("value"), name));
             }
+            // TODO: Check for model and manufacturer
         }
 
         if (indicators == null) return;
