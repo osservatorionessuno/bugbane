@@ -38,7 +38,11 @@ class Logs : Module {
 
         runCatching {
             for (target in targets) {
-                sync.pull(target, dest)
+                if (target.endsWith("/")) {
+                    sync.pullFolder(target, dest)
+                } else {
+                    sync.pull(target, dest)
+                }
             }
             Log.i(TAG, "Pulled logs to: ${dest.absolutePath}")
         }

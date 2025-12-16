@@ -26,7 +26,7 @@ class Temp : Module {
         dest.mkdirs()
 
         try {
-            sync.pull("/data/local/tmp/", dest)
+            sync.pullFolder("/data/local/tmp/", dest)
             Log.i(TAG, "Pulled temp to: ${dest.absolutePath}")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to pull temp", e)
