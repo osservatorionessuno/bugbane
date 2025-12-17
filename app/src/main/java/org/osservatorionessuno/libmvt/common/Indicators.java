@@ -26,17 +26,19 @@ import java.util.List;
 public class Indicators {
     private final Trie domainTrie;
     private final Trie urlTrie;
-    private final Trie processTrie;   // kept for symmetry (not used in matching; list used instead)
-    private final Trie appIdTrie;     // kept for symmetry (not used in matching; list used instead)
-    private final Trie propertyTrie;  // kept for symmetry (not used in matching; list used instead)
+    private final Trie processTrie;
+    private final Trie appIdTrie;
+    private final Trie propertyTrie;
+    private final Trie filePathTrie;
     private Context context;
 
-    private Indicators(Trie domainTrie, Trie urlTrie, Trie processTrie, Trie appIdTrie, Trie propertyTrie) {
+    private Indicators(Trie domainTrie, Trie urlTrie, Trie processTrie, Trie appIdTrie, Trie propertyTrie, Trie filePathTrie) {
         this.domainTrie   = domainTrie;
         this.urlTrie      = urlTrie;
         this.processTrie  = processTrie;
         this.appIdTrie    = appIdTrie;
         this.propertyTrie = propertyTrie;
+        this.filePathTrie = filePathTrie;
     }
 
     /**
@@ -53,10 +55,11 @@ public class Indicators {
         Trie.TrieBuilder processes  = Trie.builder().ignoreCase();
         Trie.TrieBuilder appIds     = Trie.builder().ignoreCase();
         Trie.TrieBuilder properties = Trie.builder().ignoreCase();
+        Trie.TrieBuilder filePath   = Trie.builder().ignoreCase();
 
         File[] files = (dir != null) ? dir.listFiles((d, name) -> name.endsWith(".json") || name.endsWith(".stix2")) : null;
         if (files == null) {
-            return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build());
+            return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build(), filePath.build());
         }
 
         for (File f : files) {
@@ -71,7 +74,7 @@ public class Indicators {
                     if (node == null) continue;
                     if ("indicator".equals(node.optString("type", ""))) {
                         String pattern = node.optString("pattern", null);
-                        addPattern(domains, urls, processes, appIds, properties, pattern);
+                        addPattern(domains, urls, processes, appIds, properties, filePath, pattern);
                     }
                 }
                 continue;
@@ -90,17 +93,18 @@ public class Indicators {
                     addField(processes,  coll, "process:name",          null);
                     addField(appIds,     coll, "app:id",                null);
                     addField(properties, coll, "android-property:name", null);
+                    addField(filePath,   coll, "file:path",             null);
                 }
             }
         }
 
-        return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build());
+        return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build(), filePath.build());
     }
 
     /** Parse a single STIX pattern like: "[domain-name:value = 'evil.com']" */
     private static void addPattern(Trie.TrieBuilder domains, Trie.TrieBuilder urls,
                                    Trie.TrieBuilder processes, Trie.TrieBuilder appIds,
-                                   Trie.TrieBuilder properties,
+                                   Trie.TrieBuilder properties, Trie.TrieBuilder filePath,
                                    String pattern) {
         if (pattern == null) return;
         String p = pattern.trim();
@@ -135,6 +139,9 @@ public class Indicators {
                 break;
             case "android-property:name":
                 properties.addKeyword(vLower);
+                break;
+            case "file:path":
+                filePath.addKeyword(vLower);
                 break;
             default:
                 break;
@@ -220,6 +227,14 @@ public class Indicators {
                     detections.add(new Detection(AlertLevel.CRITICAL, 
                         context.getString(R.string.mvt_ioc_title),
                         String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
+                }
+                break;
+            }
+            case FILE_PATH: {
+                for (Emit e : filePathTrie.parseText(lower)) {
+                    detections.add(new Detection(AlertLevel.CRITICAL,
+                            context.getString(R.string.mvt_ioc_title),
+                            String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
                 }
                 break;
             }

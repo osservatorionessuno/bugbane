@@ -51,6 +51,7 @@
     <string name="acquisitions_rename">Rinomina</string>
     <string name="acquisitions_delete">Elimina</string>
     <string name="acquisitions_delete_message">Eliminazione di %1$s…</string>
+    <string name="acquisitions_deleted_message">%1$s eliminato</string>
     <string name="acquisitions_undo">Annulla</string>
     <string name="acquisitions_empty_message">Nessuna acquisizione presente. Effettuane una per vederla qui.</string>
     <string name="acquisitions_rename_invalid">Nome non valido</string>
@@ -93,5 +94,7 @@
     <string name="analysis_details_acquisition_uuid">UUID acquisizione: %1$s</string>
     <string name="analysis_details_acquisition_completed">Acquisizione completata: %1$s</string>
     <string name="analysis_details_analysis_completed">Analisi completata: %1$s</string>
+    <string name="analysis_spyware_warning_title">In questa analisi sono stati trovati possibili indicatori di spyware. Per supporto, valuta di contattare una linea di aiuto fidata.</string>
+    <string name="analysis_spyware_warning_button">Apri sito di supporto</string>
     <string name="slideshow_wireless_title">Abilita Wireless Debugging</string>
 </resources>
