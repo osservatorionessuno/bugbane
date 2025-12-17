@@ -69,12 +69,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-
-        configViewModel.adbManager.watchCommandOutput().observe(this) { output ->
-            // TODO
-            Toast.makeText(applicationContext, output, Toast.LENGTH_SHORT).show()
-            Log.d(TAG, "Command output: $output")
-        }
     }
 
     private fun setupIndicatorsUpdates() {

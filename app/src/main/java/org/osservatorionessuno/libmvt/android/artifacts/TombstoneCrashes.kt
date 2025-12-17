@@ -1,5 +1,6 @@
 package org.osservatorionessuno.libmvt.android.artifacts
 
+import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.libmvt.common.AlertLevel
 import org.osservatorionessuno.libmvt.common.Detection
 import org.osservatorionessuno.libmvt.common.IndicatorType
@@ -152,7 +153,11 @@ class TombstoneCrashes : AndroidArtifact() {
                 else -> null
             }
             if (uid != null && (uid == 0 || uid == 1000 || uid == 2000)) {
-                detected.add(Detection(AlertLevel.MEDIUM, IndicatorType.PROCESS, "uid$uid", proc ?: ""))
+                detected.add(Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_tombstone_crashes_uid_title),
+                    String.format(
+                        context.getString(R.string.mvt_tombstone_crashes_uid_message),
+                        uid, proc ?: ""
+                    )));
             }
         }
     }

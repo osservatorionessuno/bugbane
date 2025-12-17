@@ -51,8 +51,7 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
                     val o = arr.getJSONObject(i)
                     tmp += ScanResult(
                         o.optString("level"),
-                        o.optString("type"),
-                        o.optString("ioc"),
+                        o.optString("title"),
                         o.optString("context")
                     )
                 }
@@ -101,9 +100,7 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
             }
         }
         
-        Spacer(modifier = Modifier.height(2.dp))
         Divider()
-        Spacer(modifier = Modifier.height(2.dp))
         
         ResultList(
             results = results
@@ -128,8 +125,7 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
 
 data class ScanResult(
     val level: String,
-    val type: String,
-    val ioc: String,
+    val title: String,
     val context: String,
 )
 
@@ -200,7 +196,7 @@ private fun ExpandableResultItem(result: ScanResult) {
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = result.ioc,
+                        text = result.title,
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }

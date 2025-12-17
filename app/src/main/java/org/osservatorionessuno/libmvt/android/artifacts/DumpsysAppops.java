@@ -1,5 +1,6 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
+import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.IndicatorType;
 import org.osservatorionessuno.libmvt.common.Detection;
@@ -103,10 +104,15 @@ public class DumpsysAppops extends AndroidArtifact {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> perms = (List<Map<String, Object>>) map.get("permissions");
             if (perms == null) continue;
+            
             for (Map<String, Object> perm : perms) {
                 String permName = (String) perm.get("name");
                 if (RISKY_PERMISSIONS.contains(permName) || riskyPkg) {
-                    detected.add(new Detection(AlertLevel.MEDIUM, IndicatorType.PROCESS, permName, pkgName));
+                    detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_appops_risky_permission_title),
+                        String.format(
+                            context.getString(R.string.mvt_appops_risky_permission_message), 
+                            pkgName, permName, perm.get("access"), perm.get("timestamp")
+                        )));
                 }
             }
         }

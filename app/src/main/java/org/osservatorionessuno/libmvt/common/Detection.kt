@@ -11,11 +11,10 @@ enum class AlertLevel(val level: Int) {
 
 data class Detection(
         val level: AlertLevel,
-        val type: IndicatorType,
-        val ioc: String,
+        val title: String,
         val context: String
 ) {
     override fun toString(): String {
-        return "Detection(level=$level, type=$type, ioc='$ioc', context='$context')"
+        return "Detection(level=$level, title='$title', context='$context')"
     }
 }
