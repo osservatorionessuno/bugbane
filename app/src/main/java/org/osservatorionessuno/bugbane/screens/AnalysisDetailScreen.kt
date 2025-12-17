@@ -126,12 +126,7 @@ private fun ResultList(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         stringResource(R.string.analysis_details_artifact),
-                        modifier = Modifier.weight(1f),
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        stringResource(R.string.analysis_details_type),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(0.3f),
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
@@ -147,8 +142,7 @@ private fun ResultList(
                         .fillMaxWidth()
                         .clickable { onSelect(r) }
                 ) {
-                    Text(r.level, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(r.type, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(r.level, modifier = Modifier.weight(0.3f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(r.ioc, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }

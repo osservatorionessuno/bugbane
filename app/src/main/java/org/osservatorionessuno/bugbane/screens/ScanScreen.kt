@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import android.content.res.Configuration
-import android.util.Log
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -277,7 +276,7 @@ fun ScanScreen() {
                                 moduleBytes.clear()
                                 completedModules = 0
                                 totalModules = 0
-                                adbManager.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.QuickForensics.ProgressListener {
+                                adbManager.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.AcquisitionRunner.ProgressListener {
                                     override fun onModuleStart(name: String, completed: Int, total: Int) {
                                         coroutineScope.launch {
                                             totalModules = total

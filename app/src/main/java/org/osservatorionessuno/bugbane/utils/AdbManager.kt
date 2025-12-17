@@ -13,7 +13,7 @@ import io.github.muntashirakon.adb.LocalServices
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.osservatorionessuno.bugbane.qf.QuickForensics
+import org.osservatorionessuno.bugbane.qf.AcquisitionRunner
 import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
@@ -272,7 +272,7 @@ class AdbManager(applicationContext: Context) {
 
     fun runQuickForensics(
         baseDir: File,
-        listener: QuickForensics.ProgressListener
+        listener: AcquisitionRunner.ProgressListener
     ) {
         if (this.isQuickForensicsRunning) {
             Log.d(TAG, "QuickForensics already running")
@@ -287,7 +287,7 @@ class AdbManager(applicationContext: Context) {
         _adbState.value = AdbState.ConnectedAcquiring
         qfFuture = executor.submit(Runnable {
             try {
-                val out = QuickForensics()
+                val out = AcquisitionRunner()
                     .run(this.appContext!!, adbConnectionManager, baseDir, listener)
                 if (qfCancelled.get()) {
                     commandOutput.postValue("QuickForensics cancelled")

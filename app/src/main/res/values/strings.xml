@@ -123,7 +123,7 @@
 
     <!-- Scan details strings -->
     <string name="analysis_details_title">Analysis Details</string>
-    <string name="analysis_details_artifact">Artifact</string>
+    <string name="analysis_details_artifact">Level</string>
     <string name="analysis_details_type">Type</string>
     <string name="analysis_details_ioc">IOC</string>
     <string name="analysis_details_context_dialog_title">Context</string>

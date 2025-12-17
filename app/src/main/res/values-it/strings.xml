@@ -83,7 +83,7 @@
     <string name="acquisition_passphrase_close">Chiudi</string>
     <!-- Scan details strings -->
     <string name="analysis_details_title">Dettagli analisi</string>
-    <string name="analysis_details_artifact">Artefatto</string>
+    <string name="analysis_details_artifact">Livello</string>
     <string name="analysis_details_type">Tipo</string>
     <string name="analysis_details_ioc">IOC</string>
     <string name="analysis_details_context_dialog_title">Contesto</string>
