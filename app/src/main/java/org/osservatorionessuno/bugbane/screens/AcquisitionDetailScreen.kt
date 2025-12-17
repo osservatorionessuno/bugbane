@@ -26,7 +26,7 @@ import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.osservatorionessuno.bugbane.analysis.AcquisitionScanner
+import org.osservatorionessuno.qf.AcquisitionScanner
 import org.osservatorionessuno.bugbane.ScanDetailActivity
 import org.json.JSONObject
 import java.io.File

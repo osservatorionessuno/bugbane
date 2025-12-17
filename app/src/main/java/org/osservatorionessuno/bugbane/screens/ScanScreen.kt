@@ -29,7 +29,7 @@ import org.osservatorionessuno.bugbane.SlideshowActivity
 import org.osservatorionessuno.bugbane.AcquisitionActivity
 import org.osservatorionessuno.bugbane.components.LayeredProgressIndicator
 import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
-import org.osservatorionessuno.bugbane.utils.AdbState
+import org.osservatorionessuno.cadb.AdbState
 import org.osservatorionessuno.bugbane.utils.AppState
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
 import java.io.File

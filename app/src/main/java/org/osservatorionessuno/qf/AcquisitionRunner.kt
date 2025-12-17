@@ -1,4 +1,4 @@
-package org.osservatorionessuno.bugbane.qf
+package org.osservatorionessuno.qf
 
 import android.content.Context
 import android.util.Log
@@ -25,6 +25,7 @@ import org.osservatorionessuno.bugbane.qf.modules.Mounts
 import org.osservatorionessuno.bugbane.qf.modules.Packages
 import org.osservatorionessuno.bugbane.qf.modules.RootBinaries
 import org.osservatorionessuno.bugbane.qf.modules.Temp
+import org.osservatorionessuno.cadb.Shell
 
 private const val TAG = "AcquisitionRunner"
 

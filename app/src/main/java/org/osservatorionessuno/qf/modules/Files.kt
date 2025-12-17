@@ -1,4 +1,4 @@
-package org.osservatorionessuno.bugbane.qf.modules
+package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.os.Environment

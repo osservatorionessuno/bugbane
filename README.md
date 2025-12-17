@@ -36,3 +36,11 @@ Bugbane uses the pairing logic from [Shizuku](https://github.com/RikkaApps/Shizu
  - The generated ADB RSA certificate is authorized for debugging and stored encrypted at rest, using StrongBox-backed credentials when available.
 
 Export and sharing logic are currently in progress. Documentation will be expanded as development continues.
+
+## Project Structure
+
+Bugbane is divided in 4 main coponents:
+- the Bugbane UI components and activities (`org.osservatorionessuno.bugbane.*`)
+- **cabd**, a Kotlin implementation of a minimal ADB client (`org.osservatorionessuno.cadb.*`)
+- **QF**, a Kotlin implementation of [AndroidQF](https://github.com/mvt-project/androidqf/) acquisition modules (`org.osservatorionessuno.qf.*`)
+- **LibMVT**, a Java implementation of [MVT](https://github.com/mvt-project/mvt/) IOC analysis engine (`org.osservatorionessuno.libmvt.*`)
