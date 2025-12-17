@@ -149,4 +149,28 @@
     </string>
     <string name="more_credits_button">Translators</string>
     <string name="more_credits_url">https://hosted.weblate.org/credits/bugbane/</string>
+
+    <!-- MVT strings -->
+    <string name="mvt_ioc_title">Indicator of Compromise Found</string>
+    <string name="mvt_ioc_message">%1$s: %2$s found in %3$s</string>
+    <string name="mvt_adb_fingerprint_title">ADB Fingerprint</string>
+    <string name="mvt_adb_fingerprint_message">Found an ADB fingerprint for user %1$s: %2$s</string>
+    <string name="mvt_appops_risky_permission_title">Risky Permission</string>
+    <string name="mvt_appops_risky_permission_message">Package %1$s had risky permission %2$s set to %3$s at %4$s</string>
+    <string name="mvt_packages_root_package_title">Root Package</string>
+    <string name="mvt_packages_root_package_message">Found an installed root package: %1$s</string>
+    <string name="mvt_getprop_security_patch_title">Security Patch</string>
+    <string name="mvt_getprop_security_patch_message">This phone has not received security updates for more than six months (last update: %1$s).</string>
+    <string name="mvt_mounts_root_title">Root Detected</string>
+    <string name="mvt_mounts_root_message">Root detected /system partition is mounted as read-write (rw)</string>
+    <string name="mvt_mounts_system_title">System Partition Mounted as Read-Write</string>
+    <string name="mvt_mounts_system_message">System partition %1$s is mounted as read-write (rw). This may indicate system modifications.</string>
+    <string name="mvt_mounts_suspicious_title">Suspicious Mount Options</string>
+    <string name="mvt_mounts_suspicious_message">Suspicious mount options found for %1$s: %2$s</string>
+    <string name="mvt_mounts_data_title">Data Partition</string>
+    <string name="mvt_mounts_data_message">Data partition %1$s mounted as %2$s with options: %3$s</string>
+    <string name="mvt_dangerous_settings_title">Dangerous Settings</string>
+    <string name="mvt_dangerous_settings_message">%1$s is set to %2$s</string>
+    <string name="mvt_tombstone_crashes_uid_title">Potentially Suspicious Crash</string>
+    <string name="mvt_tombstone_crashes_uid_message">Potentially suspicious crash in process %1$s running as UID %2$s</string>
 </resources>

@@ -1,5 +1,6 @@
 package org.osservatorionessuno.libmvt.android
 
+import android.content.Context
 import org.osservatorionessuno.libmvt.android.artifacts.*
 import org.osservatorionessuno.libmvt.common.Artifact
 import org.osservatorionessuno.libmvt.common.Indicators
@@ -12,13 +13,14 @@ import java.util.LinkedHashMap
  * Simple helper to run the available AndroidQF artifact parsers on a folder
  * containing extracted androidqf data. Android 11+ safe (no Java 9/11 APIs).
  */
-class ForensicRunner(private val directory: File) {
+class ForensicRunner(private val directory: File, private val context: Context? = null) {
 
     private var indicators: Indicators? = null
 
     /** Assign indicators to use for IOC matching. */
     fun setIndicators(indicators: Indicators?) {
         this.indicators = indicators
+        indicators?.setContext(context)
     }
 
     /** Run all known modules on the provided directory. */
@@ -83,6 +85,7 @@ class ForensicRunner(private val directory: File) {
     }
 
     private fun finalizeArtifact(art: AndroidArtifact): Artifact {
+        context?.let { art.setContext(it) }
         indicators?.let {
             art.setIndicators(it)
             art.checkIndicators()

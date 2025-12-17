@@ -15,10 +15,10 @@ import kotlin.collections.iterator
 object AcquisitionScanner {
     fun scan(context: Context, acquisitionDir: File): File {
         val indicatorsDir = IndicatorsUpdates(context.filesDir.toPath(), null).getIndicatorsFolder().toFile()
-        return scanWithIndicators(acquisitionDir, indicatorsDir)
+        return scanWithIndicators(context, acquisitionDir, indicatorsDir)
     }
 
-    private fun scanWithIndicators(acquisitionDir: File, indicatorsDir: File): File {
+    private fun scanWithIndicators(context: Context, acquisitionDir: File, indicatorsDir: File): File {
         val started = Instant.now()
         val indicators = Indicators.loadFromDirectory(indicatorsDir)
 
@@ -33,7 +33,7 @@ object AcquisitionScanner {
             indicatorHashes += hash
         }
 
-        val runner = ForensicRunner(acquisitionDir);
+        val runner = ForensicRunner(acquisitionDir, context);
         runner.setIndicators(indicators);
         val detections = runner.runAll();
 
@@ -42,8 +42,7 @@ object AcquisitionScanner {
             for (detected in value.getDetected()) {
                 val obj = JSONObject()
                 obj.put("level", detected.level.name)
-                obj.put("type", detected.type.name)
-                obj.put("ioc", detected.ioc)
+                obj.put("title", detected.title)
                 obj.put("context", detected.context)
                 results.put(obj)
             }

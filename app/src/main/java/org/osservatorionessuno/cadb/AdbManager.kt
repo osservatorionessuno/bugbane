@@ -5,7 +5,6 @@ import android.content.IntentFilter
 import android.os.Build
 import android.util.Log
 import androidx.annotation.WorkerThread
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import io.github.muntashirakon.adb.AdbPairingRequiredException
 import io.github.muntashirakon.adb.AdbStream
@@ -55,10 +54,6 @@ class AdbManager(applicationContext: Context) {
     private var adbConnectionManager: AdbConnectionManager
 
     private var adbShellStream: AdbStream? = null
-
-    fun watchCommandOutput(): LiveData<CharSequence?> {
-       return commandOutput
-    }
 
     internal fun stopAdbPairingService() {
         adbPairingReceiver.let { it ->

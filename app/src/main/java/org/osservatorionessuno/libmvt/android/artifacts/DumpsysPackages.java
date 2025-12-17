@@ -1,5 +1,6 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
+import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.IndicatorType;
 import org.osservatorionessuno.libmvt.common.Detection;
@@ -199,7 +200,11 @@ public class DumpsysPackages extends AndroidArtifact {
             Map<String, Object> record = (Map<String, Object>) obj;
             String pkg = (String) record.get("package_name");
             if (ROOT_PACKAGES.contains(pkg)) {
-                detected.add(new Detection(AlertLevel.MEDIUM, IndicatorType.PROCESS, pkg, "root_package"));
+                detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_packages_root_package_title),
+                    String.format(
+                        context.getString(R.string.mvt_packages_root_package_message), 
+                        pkg
+                    )));
                 continue;
             }
             if (indicators != null) {

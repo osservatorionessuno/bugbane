@@ -1,5 +1,6 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
+import android.content.Context;
 import org.osservatorionessuno.libmvt.common.Artifact;
 
 /**
@@ -7,6 +8,14 @@ import org.osservatorionessuno.libmvt.common.Artifact;
  * Still pure Java, only operates on Strings.
  */
 public abstract class AndroidArtifact extends Artifact {
+    protected Context context;
+
+    /**
+     * Set the Android Context for accessing resources (e.g., string resources).
+     */
+    public void setContext(Context context) {
+        this.context = context;
+    }
 
     /**
      * Extract a section from a dumpsys string by a separator, stopping at a line starting with '---'.

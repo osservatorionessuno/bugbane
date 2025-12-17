@@ -1,5 +1,6 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
+import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.Detection;
 import org.osservatorionessuno.libmvt.common.IndicatorType;
@@ -54,17 +55,20 @@ public class GetProp extends AndroidArtifact {
             if (Objects.equals(name, "ro.build.version.security_patch")) {
                 String patchLevel = map.get("value");
                 if (daysSinceSecurityPatchLevel(patchLevel) > 180) {
-                    String warningMessage = String.format(
-                        "This phone has not received security updates for more than six months (last update: %s).",
-                        patchLevel
-                    );
-                    detected.add(new Detection(AlertLevel.MEDIUM, IndicatorType.OTHER, warningMessage, name));
+                    detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_getprop_security_patch_title),
+                        String.format(
+                            context.getString(R.string.mvt_getprop_security_patch_message), 
+                            patchLevel
+                        )));
                 }
                 continue;
             }
+            /*
+            // MVT prints interesting properties as LOG level, we don't really need to report them
             if (INTERESTING_PROPERTIES.contains(name)) {
-                detected.add(new Detection(AlertLevel.LOG, IndicatorType.OTHER, map.get("value"), name));
+                detected.add(...);
             }
+            */
             // TODO: Check for model and manufacturer
         }
 

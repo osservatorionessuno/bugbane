@@ -1,5 +1,7 @@
 package org.osservatorionessuno.libmvt.common;
 
+import org.osservatorionessuno.bugbane.R;
+import android.content.Context;
 import android.util.Log;
 
 import org.ahocorasick.trie.Emit;
@@ -27,6 +29,7 @@ public class Indicators {
     private final Trie processTrie;   // kept for symmetry (not used in matching; list used instead)
     private final Trie appIdTrie;     // kept for symmetry (not used in matching; list used instead)
     private final Trie propertyTrie;  // kept for symmetry (not used in matching; list used instead)
+    private Context context;
 
     private Indicators(Trie domainTrie, Trie urlTrie, Trie processTrie, Trie appIdTrie, Trie propertyTrie) {
         this.domainTrie   = domainTrie;
@@ -34,6 +37,13 @@ public class Indicators {
         this.processTrie  = processTrie;
         this.appIdTrie    = appIdTrie;
         this.propertyTrie = propertyTrie;
+    }
+
+    /**
+     * Set the Android Context for accessing resources (e.g., string resources).
+     */
+    public void setContext(Context context) {
+        this.context = context;
     }
 
     /** Load indicators from a folder containing .json or .stix2 files. */
@@ -175,31 +185,41 @@ public class Indicators {
         switch (type) {
             case DOMAIN: {
                 for (Emit e : domainTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
+                    detections.add(new Detection(AlertLevel.CRITICAL, 
+                        context.getString(R.string.mvt_ioc_title),
+                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
                 }
                 break;
             }
             case URL: {
                 for (Emit e : urlTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
+                    detections.add(new Detection(AlertLevel.CRITICAL, 
+                        context.getString(R.string.mvt_ioc_title),
+                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
                 }
                 break;
             }
             case PROCESS: {
                 for (Emit e : processTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
+                    detections.add(new Detection(AlertLevel.CRITICAL, 
+                        context.getString(R.string.mvt_ioc_title),
+                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
                 }
                 break;
             }
             case APP_ID: {
                 for (Emit e : appIdTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
+                    detections.add(new Detection(AlertLevel.CRITICAL, 
+                        context.getString(R.string.mvt_ioc_title),
+                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
                 }
                 break;
             }
             case PROPERTY: {
                 for (Emit e : propertyTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, type, e.getKeyword(), s));
+                    detections.add(new Detection(AlertLevel.CRITICAL, 
+                        context.getString(R.string.mvt_ioc_title),
+                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
                 }
                 break;
             }
