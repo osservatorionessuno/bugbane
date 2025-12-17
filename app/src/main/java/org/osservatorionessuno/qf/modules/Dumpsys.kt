@@ -1,4 +1,4 @@
-package org.osservatorionessuno.bugbane.qf.modules
+package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import org.osservatorionessuno.bugbane.qf.Module
@@ -7,11 +7,10 @@ import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import java.io.File
 
 /**
- * Collects SELinux status via `getenforce`.
- * Output: selinux.txt
+ * Sample module that runs `dumpsys` and stores the output.
  */
-class SELinux : Module {
-    override val name: String = "selinux"
+class Dumpsys : Module {
+    override val name: String = "dumpsys"
 
     override fun run(
         context: Context,
@@ -20,6 +19,6 @@ class SELinux : Module {
         progress: ((Long) -> Unit)?
     ) {
         val shell = Shell(manager, progress = progress)
-        shell.execToFile("getenforce", File(outDir, "selinux.txt"))
+        shell.execToFile("dumpsys", File(outDir, "dumpsys.txt"))
     }
 }

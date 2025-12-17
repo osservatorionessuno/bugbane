@@ -1,4 +1,4 @@
-package org.osservatorionessuno.bugbane.utils;
+package org.osservatorionessuno.cadb;
 
 import android.content.pm.PackageManager;
 import android.content.Context;

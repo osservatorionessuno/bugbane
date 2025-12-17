@@ -1,4 +1,4 @@
-package org.osservatorionessuno.bugbane.qf.modules
+package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import org.osservatorionessuno.bugbane.qf.Module
@@ -7,11 +7,11 @@ import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import java.io.File
 
 /**
- * Collects the list of running processes using `ps -A`.
- * Saves to processes.txt.
+ * Collects SELinux status via `getenforce`.
+ * Output: selinux.txt
  */
-class Processes : Module {
-    override val name: String = "processes"
+class SELinux : Module {
+    override val name: String = "selinux"
 
     override fun run(
         context: Context,
@@ -20,6 +20,6 @@ class Processes : Module {
         progress: ((Long) -> Unit)?
     ) {
         val shell = Shell(manager, progress = progress)
-        shell.execToFile("ps -A", File(outDir, "processes.txt"))
+        shell.execToFile("getenforce", File(outDir, "selinux.txt"))
     }
 }

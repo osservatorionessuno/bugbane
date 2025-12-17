@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.MainActivity
+import org.osservatorionessuno.cadb.AdbManager
+import org.osservatorionessuno.cadb.AdbState
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 

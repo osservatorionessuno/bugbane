@@ -1,7 +1,6 @@
-package org.osservatorionessuno.bugbane.analysis
+package org.osservatorionessuno.qf
 
 import android.content.Context
-import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import org.osservatorionessuno.bugbane.utils.Utils
@@ -11,6 +10,7 @@ import org.osservatorionessuno.libmvt.common.IndicatorsUpdates
 import java.io.File
 import java.time.Instant
 import java.util.UUID
+import kotlin.collections.iterator
 
 object AcquisitionScanner {
     fun scan(context: Context, acquisitionDir: File): File {
@@ -25,7 +25,7 @@ object AcquisitionScanner {
         val indicatorsArr = JSONArray()
         val indicatorHashes = mutableListOf<String>()
         indicatorsDir.listFiles { file -> file.isFile }?.forEach { file ->
-            val hash = Utils.sha256(file)
+            val hash = Utils.Companion.sha256(file)
             val obj = JSONObject()
             obj.put("file", file.name)
             obj.put("sha256", hash)
@@ -61,7 +61,7 @@ object AcquisitionScanner {
         root.put("uuid", uuid)
         root.put("started", started.toString())
         root.put("completed", completed.toString())
-        root.put("indicatorsHash", Utils.sha256(indicatorHashes.joinToString("")))
+        root.put("indicatorsHash", Utils.Companion.sha256(indicatorHashes.joinToString("")))
         root.put("indicators", indicatorsArr)
         root.put("results", results)
 
@@ -69,4 +69,3 @@ object AcquisitionScanner {
         return outFile
     }
 }
-

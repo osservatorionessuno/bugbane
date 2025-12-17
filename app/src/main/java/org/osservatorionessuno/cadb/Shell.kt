@@ -1,4 +1,4 @@
-package org.osservatorionessuno.bugbane.qf
+package org.osservatorionessuno.cadb
 
 import android.util.Log
 import io.github.muntashirakon.adb.AbsAdbConnectionManager

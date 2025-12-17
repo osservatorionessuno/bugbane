@@ -1,4 +1,4 @@
-package org.osservatorionessuno.bugbane.qf.modules
+package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import org.osservatorionessuno.bugbane.qf.Module
@@ -7,10 +7,11 @@ import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import java.io.File
 
 /**
- * Sample module that runs `dumpsys` and stores the output.
+ * Collects the list of running processes using `ps -A`.
+ * Saves to processes.txt.
  */
-class Dumpsys : Module {
-    override val name: String = "dumpsys"
+class Processes : Module {
+    override val name: String = "processes"
 
     override fun run(
         context: Context,
@@ -19,6 +20,6 @@ class Dumpsys : Module {
         progress: ((Long) -> Unit)?
     ) {
         val shell = Shell(manager, progress = progress)
-        shell.execToFile("dumpsys", File(outDir, "dumpsys.txt"))
+        shell.execToFile("ps -A", File(outDir, "processes.txt"))
     }
 }

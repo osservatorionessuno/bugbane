@@ -1,4 +1,4 @@
-package org.osservatorionessuno.bugbane.utils
+package org.osservatorionessuno.cadb
 
 // AdbStates represent the adb connection status.
 // AdbManager emits a flow of AdbStates. Other components can listen for
