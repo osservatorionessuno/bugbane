@@ -107,7 +107,6 @@ public class Indicators {
         }
         String vLower = value.toLowerCase();
 
-        // Java-11 classic switch
         switch (key) {
             case "domain-name:value":
                 domains.addKeyword(vLower);

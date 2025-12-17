@@ -26,7 +26,7 @@ import org.osservatorionessuno.bugbane.qf.modules.Packages
 import org.osservatorionessuno.bugbane.qf.modules.RootBinaries
 import org.osservatorionessuno.bugbane.qf.modules.Temp
 
-private const val TAG = "QuickForensics"
+private const val TAG = "AcquisitionRunner"
 
 /**
  * Entry point used by the UI layer to trigger an AndroidQF-compatible dump.
@@ -38,7 +38,7 @@ private const val TAG = "QuickForensics"
  * At this stage only the scaffolding is provided – concrete modules still need
  * to be implemented.
  */
-class QuickForensics(
+class AcquisitionRunner(
     private val modules: List<Module> = listOf(
         Env(),
         Dumpsys(),
