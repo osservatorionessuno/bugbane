@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,6 +33,8 @@ import org.osservatorionessuno.libmvt.common.AlertLevel
 @Composable
 fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
     val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
+    val uriHandler = LocalUriHandler.current
+    val supportUrl = stringResource(R.string.spyware_support_url)
     var acquisitionMeta by remember { mutableStateOf<JSONObject?>(null) }
     var scanMeta by remember { mutableStateOf<JSONObject?>(null) }
     var results by remember { mutableStateOf(listOf<ScanResult>()) }
@@ -58,6 +61,14 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
             }
             results = tmp
         } catch (_: Exception) {
+        }
+    }
+
+    val hasCritical = results.any {
+        try {
+            AlertLevel.valueOf(it.level.uppercase()) == AlertLevel.CRITICAL
+        } catch (_: IllegalArgumentException) {
+            false
         }
     }
 
@@ -99,7 +110,39 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
                 )
             }
         }
-        
+
+        if (hasCritical) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.analysis_spyware_warning_title),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            uriHandler.openUri(supportUrl)
+                        }
+                    ) {
+                        Text(stringResource(R.string.analysis_spyware_warning_button))
+                    }
+                }
+            }
+        }
+
         Divider()
         
         ResultList(

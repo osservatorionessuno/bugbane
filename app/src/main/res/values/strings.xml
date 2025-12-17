@@ -80,6 +80,7 @@
     <string name="acquisitions_rename">Rename</string>
     <string name="acquisitions_delete">Delete</string>
     <string name="acquisitions_delete_message">Deleting %1$s…</string>
+    <string name="acquisitions_deleted_message">%1$s deleted</string>
     <string name="acquisitions_undo">Undo</string>
     <string name="acquisitions_empty_message">No acquisitions yet. Perform one to see it here.</string>
     <string name="acquisitions_rename_invalid">Invalid name</string>
@@ -133,6 +134,8 @@
     <string name="analysis_details_acquisition_uuid">Acquisition UUID: %1$s</string>
     <string name="analysis_details_acquisition_completed">Acquisition completed: %1$s</string>
     <string name="analysis_details_analysis_completed">Analysis completed: %1$s</string>
+    <string name="analysis_spyware_warning_title">Potential spyware indicators were found in this analysis. For help and support, consider contacting a trusted helpline.</string>
+    <string name="analysis_spyware_warning_button">Contact support</string>
 
     <!-- About screen strings -->
     <string name="about_organization_title">Osservatorio Nessuno</string>
@@ -149,6 +152,8 @@
     </string>
     <string name="more_credits_button">Translators</string>
     <string name="more_credits_url">https://hosted.weblate.org/credits/bugbane/</string>
+    
+    <string name="spyware_support_url">https://bugbane.org/support/</string>
 
     <!-- MVT strings -->
     <string name="mvt_ioc_title">Indicator of Compromise Found</string>
@@ -173,4 +178,6 @@
     <string name="mvt_dangerous_settings_message">%1$s is set to %2$s</string>
     <string name="mvt_tombstone_crashes_uid_title">Potentially Suspicious Crash</string>
     <string name="mvt_tombstone_crashes_uid_message">Potentially suspicious crash in process %1$s running as UID %2$s</string>
+    <string name="mvt_files_suspicious_path_title">Suspicious Path</string>
+    <string name="mvt_files_suspicious_path_message">Found %1$sfile at suspicious path \"%2$s\"</string>
 </resources>

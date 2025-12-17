@@ -6,5 +6,6 @@ public enum IndicatorType {
     URL,
     PROCESS,
     APP_ID,
-    PROPERTY
+    PROPERTY,
+    FILE_PATH
 }

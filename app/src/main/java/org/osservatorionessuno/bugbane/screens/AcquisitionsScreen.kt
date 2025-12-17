@@ -2,6 +2,8 @@ package org.osservatorionessuno.bugbane.screens
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -67,6 +69,15 @@ fun AcquisitionsScreen() {
         item.dir.deleteRecursively()
         loadAcquisitions()
         pendingDeletion = null
+        
+        // Show "deleted" snackbar without undo button
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                message = context.getString(R.string.acquisitions_deleted_message, item.name),
+                duration = SnackbarDuration.Short,
+                withDismissAction = false
+            )
+        }
     }
 
     fun handleDelete(item: AcquisitionItem) {
@@ -100,16 +111,18 @@ fun AcquisitionsScreen() {
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) { snackbarData ->
                 Snackbar(
-                    action = {
-                        TextButton(
-                            onClick = {
-                                snackbarData.dismiss()
-                                handleUndo()
+                    action = if (snackbarData.visuals.withDismissAction) {
+                        {
+                            TextButton(
+                                onClick = {
+                                    snackbarData.dismiss()
+                                    handleUndo()
+                                }
+                            ) {
+                                Text(stringResource(R.string.acquisitions_undo))
                             }
-                        ) {
-                            Text(stringResource(R.string.acquisitions_undo))
                         }
-                    }
+                    } else null
                 ) {
                     Text(snackbarData.visuals.message)
                 }
@@ -152,41 +165,52 @@ fun AcquisitionsScreen() {
                 verticalArrangement = Arrangement.spacedBy(1.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                items(acquisitionItems) { item ->
-                    AcquisitionItemRow(
-                        item = item,
-                        onClick = {
-                            val intent = Intent(context, AcquisitionActivity::class.java).apply {
-                                putExtra(AcquisitionActivity.EXTRA_PATH, item.dir.absolutePath)
-                            }
-                            context.startActivity(intent)
-                        },
-                        onRename = { newName ->
-                            val invalid = newName.contains('/') || newName.contains("\\") ||
-                                newName == "." || newName == ".."
-                            if (invalid) {
-                                Toast.makeText(
-                                    context,
-                                    R.string.acquisitions_rename_invalid,
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } else {
-                                val newDir = File(item.dir.parentFile, newName)
-                                if (!newDir.exists() && item.dir.renameTo(newDir)) {
-                                    loadAcquisitions()
-                                } else {
+                items(
+                    items = acquisitionItems,
+                    key = { it.dir.absolutePath }
+                ) { item ->
+                    AnimatedVisibility(
+                        visible = item != pendingDeletion,
+                        exit = fadeOut(animationSpec = tween(300)) + 
+                               shrinkVertically(animationSpec = tween(300)),
+                        enter = fadeIn(animationSpec = tween(300)) + 
+                               expandVertically(animationSpec = tween(300))
+                    ) {
+                        AcquisitionItemRow(
+                            item = item,
+                            onClick = {
+                                val intent = Intent(context, AcquisitionActivity::class.java).apply {
+                                    putExtra(AcquisitionActivity.EXTRA_PATH, item.dir.absolutePath)
+                                }
+                                context.startActivity(intent)
+                            },
+                            onRename = { newName ->
+                                val invalid = newName.contains('/') || newName.contains("\\") ||
+                                    newName == "." || newName == ".."
+                                if (invalid) {
                                     Toast.makeText(
                                         context,
-                                        R.string.acquisitions_rename_failed,
+                                        R.string.acquisitions_rename_invalid,
                                         Toast.LENGTH_SHORT
                                     ).show()
+                                } else {
+                                    val newDir = File(item.dir.parentFile, newName)
+                                    if (!newDir.exists() && item.dir.renameTo(newDir)) {
+                                        loadAcquisitions()
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            R.string.acquisitions_rename_failed,
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
+                            },
+                            onDelete = {
+                                handleDelete(item)
                             }
-                        },
-                        onDelete = {
-                            handleDelete(item)
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
