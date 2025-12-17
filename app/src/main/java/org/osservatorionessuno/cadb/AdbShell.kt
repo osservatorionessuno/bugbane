@@ -1,15 +1,14 @@
 package org.osservatorionessuno.cadb
 
 import android.util.Log
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import java.io.*
 import java.nio.charset.StandardCharsets
 import java.util.*
 import java.util.concurrent.*
 
-class Shell(
-    private val manager: AbsAdbConnectionManager,
-    private val tag: String = "ShellQF",
+class AdbShell(
+    private val manager: AdbConnectionManager,
+    private val tag: String = "AdbShell",
     private val progress: ((Long) -> Unit)? = null,
     private val timeoutMs: Long = 30_000L,
     private val inactivityMs: Long = 5_000L

@@ -79,6 +79,8 @@
     <string name="acquisitions_title">Acquisitions</string>
     <string name="acquisitions_rename">Rename</string>
     <string name="acquisitions_delete">Delete</string>
+    <string name="acquisitions_delete_message">Deleting %1$s…</string>
+    <string name="acquisitions_undo">Undo</string>
     <string name="acquisitions_empty_message">No acquisitions yet. Perform one to see it here.</string>
     <string name="acquisitions_rename_invalid">Invalid name</string>
     <string name="acquisitions_rename_failed">Unable to rename acquisition</string>

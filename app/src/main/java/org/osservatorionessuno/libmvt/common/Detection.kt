@@ -1,12 +1,12 @@
 package org.osservatorionessuno.libmvt.common
 
-enum class AlertLevel {
-    LOG, // Something to report but not a real alert
-    INFORMATIONAL,
-    LOW,
-    MEDIUM,
-    HIGH,
-    CRITICAL
+enum class AlertLevel(val level: Int) {
+    LOG(5), // Something to report but not a real alert
+    INFO(4),
+    LOW(3),
+    MEDIUM(2),
+    HIGH(1),
+    CRITICAL(0)
 }
 
 data class Detection(

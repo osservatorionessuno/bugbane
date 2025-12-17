@@ -2,10 +2,10 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.util.Log
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
-import org.osservatorionessuno.bugbane.qf.Module
-import org.osservatorionessuno.bugbane.qf.Shell
-import org.osservatorionessuno.bugbane.qf.Sync
+import org.osservatorionessuno.cadb.AdbConnectionManager
+import org.osservatorionessuno.qf.Module
+import org.osservatorionessuno.cadb.AdbShell
+import org.osservatorionessuno.cadb.AdbSync
 import java.io.File
 import java.io.IOException
 
@@ -19,12 +19,12 @@ class Bugreport : Module {
 
     override fun run(
         context: Context,
-        manager: AbsAdbConnectionManager,
+        manager: AdbConnectionManager,
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
         // Shell progress is NOT file progress; leave it null.
-        val shell = Shell(
+        val shell = AdbShell(
             manager = manager,
             tag = "ShellQF",
             progress = null,
@@ -33,7 +33,7 @@ class Bugreport : Module {
         )
 
         // Sync progress is the one we want to surface.
-        val sync = Sync(manager, progress)
+        val sync = AdbSync(manager, progress)
 
         val dest = File(outDir, "bugreport.zip")
         var remotePath: String? = null
@@ -61,7 +61,7 @@ class Bugreport : Module {
      * Prefer modern bugreportz; if we miss the OK line due to quiet output,
      * find the newest ZIP in the shell bugreports directory. Then fall back to legacy.
      */
-    private fun discoverBugreportPath(shell: Shell): String {
+    private fun discoverBugreportPath(shell: AdbShell): String {
         // A) Modern bugreportz (-p then plain)
         runCatching {
             val outP = shell.exec("bugreportz -p").trim()
@@ -124,7 +124,7 @@ class Bugreport : Module {
     /**
      * Find the newest ZIP where bugreportz typically writes on modern Android.
      */
-    private fun findNewestShellBugreport(shell: Shell): String? {
+    private fun findNewestShellBugreport(shell: AdbShell): String? {
         val candidateDirs = listOf(
             "/data/user_de/0/com.android.shell/files/bugreports",
             "/data/user/0/com.android.shell/files/bugreports"

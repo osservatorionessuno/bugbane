@@ -1,13 +1,13 @@
 package org.osservatorionessuno.qf.modules
 
 import android.content.Context
-import org.osservatorionessuno.bugbane.qf.Module
-import org.osservatorionessuno.bugbane.qf.Shell
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
+import org.osservatorionessuno.qf.Module
+import org.osservatorionessuno.qf.Utils
+import org.osservatorionessuno.cadb.AdbShell
+import org.osservatorionessuno.cadb.AdbConnectionManager
 import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
-import org.osservatorionessuno.bugbane.utils.Utils
 
 /**
  * Collects the list of installed packages using `pm list packages`.
@@ -68,7 +68,7 @@ class Packages : Module {
         return Triple(packageName, installer, uid)
     }
 
-    fun getPackageFiles(shell: Shell, packageName: String): List<PackageFile> {
+    fun getPackageFiles(shell: AdbShell, packageName: String): List<PackageFile> {
         val files = mutableListOf<PackageFile>()
         val output = try {
             shell.exec("pm path $packageName")
@@ -113,11 +113,11 @@ class Packages : Module {
 
     override fun run(
         context: Context,
-        manager: AbsAdbConnectionManager,
+        manager: AdbConnectionManager,
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        val shell = Shell(manager, progress = progress)
+        val shell = AdbShell(manager, progress = progress)
 
         var withInstaller = true
 

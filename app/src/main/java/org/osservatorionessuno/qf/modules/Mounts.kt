@@ -3,10 +3,10 @@ package org.osservatorionessuno.qf.modules
 import android.content.Context
 import android.util.Log
 import org.json.JSONArray
-import org.osservatorionessuno.bugbane.qf.Module
-import org.osservatorionessuno.bugbane.qf.Shell
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
-import org.osservatorionessuno.bugbane.utils.Utils
+import org.osservatorionessuno.qf.Module
+import org.osservatorionessuno.cadb.AdbShell
+import org.osservatorionessuno.cadb.AdbConnectionManager
+import org.osservatorionessuno.qf.Utils
 import java.io.File
 
 /**
@@ -18,13 +18,13 @@ class Mounts : Module {
 
     override fun run(
         context: Context,
-        manager: AbsAdbConnectionManager,
+        manager: AdbConnectionManager,
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
         Log.i(TAG, "Collecting mount information")
 
-        val shell = Shell(manager, progress = progress)
+        val shell = AdbShell(manager, progress = progress)
         val mountsData = mutableListOf<String>()
 
         Log.d(TAG, "Running: mount")

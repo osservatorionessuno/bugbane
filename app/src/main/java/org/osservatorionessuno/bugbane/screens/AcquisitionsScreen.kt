@@ -21,6 +21,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.DateFormat
 import java.time.Instant
@@ -38,7 +40,11 @@ data class AcquisitionItem(
 @Composable
 fun AcquisitionsScreen() {
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     var acquisitionItems by remember { mutableStateOf(listOf<AcquisitionItem>()) }
+    var pendingDeletion by remember { mutableStateOf<AcquisitionItem?>(null) }
+    var isUndoClicked by remember { mutableStateOf(false) }
 
     fun loadAcquisitions() {
         val baseDir = File(context.filesDir, "acquisitions")
@@ -57,13 +63,64 @@ fun AcquisitionsScreen() {
         }?.sortedByDescending { it.completed } ?: emptyList()
     }
 
+    fun deleteItem(item: AcquisitionItem) {
+        item.dir.deleteRecursively()
+        loadAcquisitions()
+        pendingDeletion = null
+    }
+
+    fun handleDelete(item: AcquisitionItem) {
+        // Reset undo flag and set pending deletion
+        isUndoClicked = false
+        pendingDeletion = item
+        
+        // Show snackbar and handle deletion based on result
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = context.getString(R.string.acquisitions_delete_message, item.name),
+                duration = SnackbarDuration.Short,
+                withDismissAction = true
+            )
+            
+            // Only delete if snackbar was dismissed by timeout and undo was not clicked
+            if (result == SnackbarResult.Dismissed && !isUndoClicked && pendingDeletion == item) {
+                deleteItem(item)
+            }
+        }
+    }
+
+    fun handleUndo() {
+        isUndoClicked = true
+        pendingDeletion = null
+    }
+
     LaunchedEffect(Unit) { loadAcquisitions() }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(8.dp)
-    ) {
+    Scaffold(
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { snackbarData ->
+                Snackbar(
+                    action = {
+                        TextButton(
+                            onClick = {
+                                snackbarData.dismiss()
+                                handleUndo()
+                            }
+                        ) {
+                            Text(stringResource(R.string.acquisitions_undo))
+                        }
+                    }
+                ) {
+                    Text(snackbarData.visuals.message)
+                }
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp)
+        ) {
         if (acquisitionItems.isEmpty()) {
             // No acquisitions, place a logo and a message as placeholder
             Box(
@@ -127,12 +184,12 @@ fun AcquisitionsScreen() {
                             }
                         },
                         onDelete = {
-                            item.dir.deleteRecursively()
-                            loadAcquisitions()
+                            handleDelete(item)
                         }
                     )
                 }
             }
+        }
         }
     }
 }
@@ -212,19 +269,18 @@ fun AcquisitionItemRow(
                 )
             }
 
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.width(180.dp)
+            ) {
                 DropdownMenuItem(
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource(R.string.acquisitions_rename))
-                        }
+                    text = { Text(stringResource(R.string.acquisitions_rename)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null
+                        )
                     },
                     onClick = {
                         expanded = false
@@ -234,19 +290,17 @@ fun AcquisitionItemRow(
 
                 DropdownMenuItem(
                     text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                stringResource(R.string.acquisitions_delete),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
+                        Text(
+                            stringResource(R.string.acquisitions_delete),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
                     },
                     onClick = {
                         expanded = false

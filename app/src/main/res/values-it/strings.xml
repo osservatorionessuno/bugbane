@@ -50,6 +50,8 @@
     <string name="acquisitions_title">Acquisizioni</string>
     <string name="acquisitions_rename">Rinomina</string>
     <string name="acquisitions_delete">Elimina</string>
+    <string name="acquisitions_delete_message">Eliminazione di %1$s…</string>
+    <string name="acquisitions_undo">Annulla</string>
     <string name="acquisitions_empty_message">Nessuna acquisizione presente. Effettuane una per vederla qui.</string>
     <string name="acquisitions_rename_invalid">Nome non valido</string>
     <string name="acquisitions_rename_failed">Impossibile rinominare l\'acquisizione</string>

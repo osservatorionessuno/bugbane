@@ -2,10 +2,10 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.util.Log
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import io.github.muntashirakon.adb.AdbStream
-import org.osservatorionessuno.bugbane.qf.Module
-import org.osservatorionessuno.bugbane.qf.Shell
+import org.osservatorionessuno.cadb.AdbConnectionManager
+import org.osservatorionessuno.qf.Module
+import org.osservatorionessuno.cadb.AdbShell
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -18,7 +18,7 @@ class SmsBackup : Module {
 
     override fun run(
         context: Context,
-        manager: AbsAdbConnectionManager,
+        manager: AdbConnectionManager,
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
@@ -27,7 +27,7 @@ class SmsBackup : Module {
 
         // Optional preflight: if allowBackup=false, likely no data.
         runCatching {
-            val shell = Shell(manager, "ShellQF", progress = null, timeoutMs = 30_000, inactivityMs = 10_000)
+            val shell = AdbShell(manager, "ShellQF", progress = null, timeoutMs = 30_000, inactivityMs = 10_000)
             val hint = shell.exec("""dumpsys package $TELEPHONY_PKG | grep -i allowBackup || true""").trim()
             if (hint.contains("allowBackup=false", ignoreCase = true)) {
                 Log.w(TAG, "Telephony has allowBackup=false; ADB backup may be empty.")
@@ -39,6 +39,7 @@ class SmsBackup : Module {
         Log.i(TAG, "Opening ADB service: $service")
         Log.i(TAG, "Unlock device and CONFIRM the on-screen backup prompt.")
 
+        // TODO: remove AdbStream
         var stream: AdbStream? = null
         var total = 0L
         var sawAnyBytes = false

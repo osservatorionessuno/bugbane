@@ -1,9 +1,9 @@
 package org.osservatorionessuno.qf.modules
 
 import android.content.Context
-import org.osservatorionessuno.bugbane.qf.Module
-import org.osservatorionessuno.bugbane.qf.Shell
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
+import org.osservatorionessuno.qf.Module
+import org.osservatorionessuno.cadb.AdbShell
+import org.osservatorionessuno.cadb.AdbConnectionManager
 import java.io.File
 
 /**
@@ -15,11 +15,11 @@ class Services : Module {
 
     override fun run(
         context: Context,
-        manager: AbsAdbConnectionManager,
+        manager: AdbConnectionManager,
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        val shell = Shell(manager, progress = progress)
+        val shell = AdbShell(manager, progress = progress)
         shell.execToFile("service list", File(outDir, "services.txt"))
     }
 }
