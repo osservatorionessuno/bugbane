@@ -1,6 +1,5 @@
 package org.osservatorionessuno.cadb
 
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import io.github.muntashirakon.adb.LocalServices
 import java.io.EOFException
 import java.io.File
@@ -15,8 +14,8 @@ import kotlin.math.min
 /**
  * Minimal ADB sync implementation supporting file pulls.
  */
-class Sync(
-    private val manager: AbsAdbConnectionManager,
+class AdbSync(
+    private val manager: AdbConnectionManager,
     private val progress: ((Long) -> Unit)? = null,
 ) {
     /**
@@ -39,7 +38,7 @@ class Sync(
             // Send RECV request
             val pathBytes = remotePath.toByteArray(StandardCharsets.UTF_8)
             val req = ByteBuffer.allocate(8 + pathBytes.size).order(ByteOrder.LITTLE_ENDIAN)
-            req.put("RECV".toByteArray(StandardCharsets.US_ASCII))
+            req.put(AdbConstants.RECV.toByteArray(StandardCharsets.US_ASCII))
             req.putInt(pathBytes.size)
             req.put(pathBytes)
             out.write(req.array())
@@ -55,7 +54,7 @@ class Sync(
                     val cmd = String(header, StandardCharsets.US_ASCII)
 
                     when (cmd) {
-                        "DATA" -> {
+                        AdbConstants.DATA -> {
                             // DATA <len> <payload>
                             readFully(input, lenBuf, 0, 4)
                             var remaining = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
@@ -69,13 +68,13 @@ class Sync(
                             }
                         }
 
-                        "DONE" -> {
+                        AdbConstants.DONE -> {
                             // DONE is followed by a 4-byte mtime (uint32). Ignore contents.
                             readFully(input, lenBuf, 0, 4)
                             break
                         }
 
-                        "FAIL" -> {
+                        AdbConstants.FAIL -> {
                             readFully(input, lenBuf, 0, 4)
                             val msgLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
                             val msgBytes = ByteArray(msgLen)
@@ -123,10 +122,9 @@ class Sync(
             // Send LIST request
             val remoteBytes = remoteDir.toByteArray(StandardCharsets.UTF_8)
             val payloadLen = remoteBytes.size
-            val cmd = "LIST"
             val header = ByteBuffer.allocate(8)
                 .order(ByteOrder.LITTLE_ENDIAN)
-                .put(cmd.toByteArray(StandardCharsets.US_ASCII))
+                .put(AdbConstants.LIST.toByteArray(StandardCharsets.US_ASCII))
                 .putInt(payloadLen)
                 .array()
             out.write(header)
@@ -142,7 +140,7 @@ class Sync(
                 val respCmd = String(nameBuf, 0, 4, StandardCharsets.US_ASCII)
 
                 when (respCmd) {
-                    "DENT" -> {
+                    AdbConstants.DENT -> {
                         // Read 8 bytes for mode (uint32), size (uint64 not supported in V1: still uint32), mtime (uint32)
                         readFully(input, lenBuf, 0, 4)
                         val mode = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
@@ -169,12 +167,12 @@ class Sync(
                         entries.add(entry)
                     }
 
-                    "DONE" -> {
+                    AdbConstants.DONE -> {
                         // No payload, end of list
                         break
                     }
 
-                    "FAIL" -> {
+                    AdbConstants.FAIL -> {
                         // 4-byte length, then error string
                         readFully(input, lenBuf, 0, 4)
                         val msgLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int

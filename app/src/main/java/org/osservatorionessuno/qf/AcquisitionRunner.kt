@@ -7,25 +7,24 @@ import java.io.IOException
 import java.time.Instant
 import java.util.UUID
 import org.json.JSONObject
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import org.osservatorionessuno.bugbane.BuildConfig
-import org.osservatorionessuno.bugbane.utils.Utils
-import org.osservatorionessuno.bugbane.qf.modules.Env
-import org.osservatorionessuno.bugbane.qf.modules.Dumpsys
-import org.osservatorionessuno.bugbane.qf.modules.Files
-import org.osservatorionessuno.bugbane.qf.modules.Logcat
-import org.osservatorionessuno.bugbane.qf.modules.GetProp
-import org.osservatorionessuno.bugbane.qf.modules.Processes
-import org.osservatorionessuno.bugbane.qf.modules.SELinux
-import org.osservatorionessuno.bugbane.qf.modules.Services
-import org.osservatorionessuno.bugbane.qf.modules.Settings
-import org.osservatorionessuno.bugbane.qf.modules.Bugreport
-import org.osservatorionessuno.bugbane.qf.modules.Logs
-import org.osservatorionessuno.bugbane.qf.modules.Mounts
-import org.osservatorionessuno.bugbane.qf.modules.Packages
-import org.osservatorionessuno.bugbane.qf.modules.RootBinaries
-import org.osservatorionessuno.bugbane.qf.modules.Temp
-import org.osservatorionessuno.cadb.Shell
+import org.osservatorionessuno.cadb.AdbConnectionManager
+import org.osservatorionessuno.qf.modules.Env
+import org.osservatorionessuno.qf.modules.Dumpsys
+import org.osservatorionessuno.qf.modules.Files
+import org.osservatorionessuno.qf.modules.Logcat
+import org.osservatorionessuno.qf.modules.GetProp
+import org.osservatorionessuno.qf.modules.Processes
+import org.osservatorionessuno.qf.modules.SELinux
+import org.osservatorionessuno.qf.modules.Services
+import org.osservatorionessuno.qf.modules.Settings
+import org.osservatorionessuno.qf.modules.Bugreport
+import org.osservatorionessuno.qf.modules.Logs
+import org.osservatorionessuno.qf.modules.Mounts
+import org.osservatorionessuno.qf.modules.Packages
+import org.osservatorionessuno.qf.modules.RootBinaries
+import org.osservatorionessuno.qf.modules.Temp
+import org.osservatorionessuno.cadb.AdbShell
 
 private const val TAG = "AcquisitionRunner"
 
@@ -82,7 +81,7 @@ class AcquisitionRunner(
     @Throws(IOException::class)
     fun run(
         context: Context,
-        manager: AbsAdbConnectionManager,
+        manager: AdbConnectionManager,
         baseOutputDir: File,
         listener: ProgressListener? = null
     ): File {
@@ -98,7 +97,7 @@ class AcquisitionRunner(
         }
         Log.i(TAG, "Starting acquisition in ${acquisitionDir.absolutePath}")
 
-        val shell = Shell(manager)
+        val shell = AdbShell(manager)
         val cpu = shell.exec("getprop ro.product.cpu.abi").trim()
         var tmpDir = "/data/local/tmp/"
         var sdCard = "/sdcard/"

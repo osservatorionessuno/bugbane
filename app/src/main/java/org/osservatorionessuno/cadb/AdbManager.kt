@@ -13,7 +13,7 @@ import io.github.muntashirakon.adb.LocalServices
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.osservatorionessuno.bugbane.qf.AcquisitionRunner
+import org.osservatorionessuno.qf.AcquisitionRunner
 import java.io.BufferedReader
 import java.io.File
 import java.io.IOException

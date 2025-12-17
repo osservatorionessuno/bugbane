@@ -2,9 +2,9 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.util.Log
-import org.osservatorionessuno.bugbane.qf.Module
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
-import org.osservatorionessuno.bugbane.qf.Sync
+import org.osservatorionessuno.qf.Module
+import org.osservatorionessuno.cadb.AdbConnectionManager
+import org.osservatorionessuno.cadb.AdbSync
 import java.io.File
 
 /**
@@ -27,11 +27,11 @@ class Logs : Module {
 
     override fun run(
         context: Context,
-        manager: AbsAdbConnectionManager,
+        manager: AdbConnectionManager,
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        val sync = Sync(manager, progress)
+        val sync = AdbSync(manager, progress)
 
         val dest = File(outDir, "logs")
         dest.mkdirs()

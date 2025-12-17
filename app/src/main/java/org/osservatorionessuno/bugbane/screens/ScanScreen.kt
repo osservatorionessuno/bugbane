@@ -32,6 +32,7 @@ import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
 import org.osservatorionessuno.cadb.AdbState
 import org.osservatorionessuno.bugbane.utils.AppState
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
+import org.osservatorionessuno.qf.AcquisitionRunner
 import java.io.File
 
 private const val TAG = "ScanScreen"
@@ -276,7 +277,7 @@ fun ScanScreen() {
                                 moduleBytes.clear()
                                 completedModules = 0
                                 totalModules = 0
-                                adbManager.runQuickForensics(baseDir, object : org.osservatorionessuno.bugbane.qf.AcquisitionRunner.ProgressListener {
+                                adbManager.runQuickForensics(baseDir, object : AcquisitionRunner.ProgressListener {
                                     override fun onModuleStart(name: String, completed: Int, total: Int) {
                                         coroutineScope.launch {
                                             totalModules = total

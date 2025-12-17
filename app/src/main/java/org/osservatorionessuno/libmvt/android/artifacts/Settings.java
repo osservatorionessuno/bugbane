@@ -60,7 +60,7 @@ public class Settings extends AndroidArtifact {
             if (ds != null &&
                 !ds.safeValue.equals(entry.getValue())) {
                 detected.add(new Detection(
-                        AlertLevel.INFORMATIONAL, IndicatorType.OTHER,
+                        AlertLevel.INFO, IndicatorType.OTHER,
                         ds.description,
                         entry.getKey() + "=" + entry.getValue()));
             }

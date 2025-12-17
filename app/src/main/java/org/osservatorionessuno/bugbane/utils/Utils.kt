@@ -1,15 +1,8 @@
 package org.osservatorionessuno.bugbane.utils
 
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.time.Instant
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-
-private val ISO = DateTimeFormatter.ISO_INSTANT
 
 class Utils {
     companion object {
@@ -51,16 +44,6 @@ class Utils {
             val chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
             val rnd = SecureRandom()
             return (1..32).map { chars[rnd.nextInt(chars.length)] }.joinToString("")
-        }
-
-        fun toJsonString(data: Any): String {
-            if (data is JSONObject) {
-                return data.toString(1).replace("\\/", "/")
-            }
-            if (data is JSONArray) {
-                return data.toString(1).replace("\\/", "/")
-            }
-            return data.toString()
         }
     }
 }

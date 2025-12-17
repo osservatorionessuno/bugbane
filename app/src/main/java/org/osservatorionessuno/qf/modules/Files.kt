@@ -3,9 +3,9 @@ package org.osservatorionessuno.qf.modules
 import android.content.Context
 import android.os.Environment
 import android.util.JsonWriter
-import org.osservatorionessuno.bugbane.qf.Module
-import org.osservatorionessuno.bugbane.qf.Shell
-import io.github.muntashirakon.adb.AbsAdbConnectionManager
+import org.osservatorionessuno.qf.Module
+import org.osservatorionessuno.cadb.AdbShell
+import org.osservatorionessuno.cadb.AdbConnectionManager
 import java.io.BufferedWriter
 import java.io.File
 import java.io.OutputStreamWriter
@@ -15,11 +15,11 @@ class Files : Module {
 
     override fun run(
         context: Context,
-        manager: AbsAdbConnectionManager,
+        manager: AdbConnectionManager,
         outDir: File,
         progress: ((Long) -> Unit)?
     ) {
-        val sh = Shell(manager, progress = progress)
+        val sh = AdbShell(manager, progress = progress)
 
         // Detect find -printf capability
         val supportsPrintf = runCatching {
