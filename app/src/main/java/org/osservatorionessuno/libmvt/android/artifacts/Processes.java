@@ -2,6 +2,7 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 
 import org.osservatorionessuno.libmvt.common.IndicatorType;
 
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
 
