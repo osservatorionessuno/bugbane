@@ -40,10 +40,10 @@ public class Processes extends AndroidArtifact {
             }
             Map<String, Object> rec = new HashMap<>();
             rec.put("user", parts[0]);
-            rec.put("pid", Integer.parseInt(parts[1]));
-            rec.put("ppid", Integer.parseInt(parts[2]));
-            rec.put("virtual_memory_size", Integer.parseInt(parts[3]));
-            rec.put("resident_set_size", Integer.parseInt(parts[4]));
+            rec.put("pid", new BigInteger(parts[1]));
+            rec.put("ppid", new BigInteger(parts[2]));
+            rec.put("virtual_memory_size", new BigInteger(parts[3]));
+            rec.put("resident_set_size", new BigInteger(parts[4]));
             rec.put("wchan", parts[5]);
             rec.put("aprocress", parts[6]);
             rec.put("stat", parts[7]);
