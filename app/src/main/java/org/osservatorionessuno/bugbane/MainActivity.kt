@@ -181,7 +181,7 @@ fun MainContent() {
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
                 // Temporary: Block swipe while scan is being performed
-                userInputEnabled = !isScanning
+                userScrollEnabled = !isScanning
             ) { pageIndex ->
                 when (pageIndex) {
                     0 -> ScanScreen()

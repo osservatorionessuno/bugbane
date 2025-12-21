@@ -431,7 +431,7 @@ private fun FloatingActionDock(
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.tertiaryContainer,
         tonalElevation = 3.dp,
-        shadowElevation = 6.dp
+        shadowElevation = 3.dp
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
