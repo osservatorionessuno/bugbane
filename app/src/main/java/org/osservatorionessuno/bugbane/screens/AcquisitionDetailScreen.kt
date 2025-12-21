@@ -67,14 +67,10 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             }
         }
         scans = loadScans(acquisitionDir)
-        if (scans.isEmpty()) {
-            processing = ProcessingState.SCANNING
-            withContext(Dispatchers.IO) {
-                AcquisitionScanner.scan(context, acquisitionDir)
-            }
-            scans = loadScans(acquisitionDir)
-            processing = ProcessingState.OFF
-        }
+        // Temporary disabled: scan only when user requests it
+        //if (scans.isEmpty()) {
+        //    startAnalysis()
+        //}
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
