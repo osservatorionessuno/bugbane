@@ -64,7 +64,8 @@ fun AppTopBar(
 fun MergedTopBar(
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    isAcquisitionsTabDisabled: Boolean = false // Temporary: Disable acquisitions tab while scanning
 ) {
     TopAppBar(
         title = {
@@ -93,7 +94,8 @@ fun MergedTopBar(
                 NavigationTabs(
                     selectedTabIndex = selectedTabIndex,
                     onTabSelected = onTabSelected,
-                    isLandscape = true
+                    isLandscape = true,
+                    isAcquisitionsTabDisabled = isAcquisitionsTabDisabled
                 )
                 IconButton(onClick = onSettingsClick) {
                     Icon(

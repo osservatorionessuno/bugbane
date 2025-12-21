@@ -32,6 +32,7 @@ import org.osservatorionessuno.bugbane.utils.AppState
 import org.osservatorionessuno.bugbane.utils.ConfigurationViewModel
 import org.osservatorionessuno.bugbane.utils.SlideshowManager
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
+import org.osservatorionessuno.cadb.AdbState
 
 private const val TAG = "MainActivity"
 class MainActivity : ComponentActivity() {
@@ -116,6 +117,14 @@ fun MainContent() {
     // Detect if we're in landscape mode
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     
+    // Get adbState to check if scan is in progress
+    val application = context.applicationContext as android.app.Application
+    val viewModel = remember { ViewModelFactory.get(application) }
+    val adbState = viewModel.adbManager.adbState.collectAsStateWithLifecycle()
+    
+    // Temporary: Block swipe and acquisition tab while scan is being performed
+    val isScanning = adbState.value == AdbState.ConnectedAcquiring || adbState.value == AdbState.Cancelling
+    
     // Sync tab selection with pager
     val selectedTabIndex by remember { derivedStateOf { pagerState.currentPage } }
     
@@ -126,6 +135,8 @@ fun MainContent() {
                 MergedTopBar(
                     selectedTabIndex = selectedTabIndex,
                     onTabSelected = { tabIndex ->
+                        // Temporary: Block switching to acquisitions tab while scanning
+                        if (isScanning && tabIndex == 1) return@MergedTopBar
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(tabIndex)
                         }
@@ -133,7 +144,8 @@ fun MainContent() {
                     onSettingsClick = {
                         val intent = Intent(context, SettingsActivity::class.java)
                         context.startActivity(intent)
-                    }
+                    },
+                    isAcquisitionsTabDisabled = isScanning
                 )
             } else {
                 // Portrait mode: separate top bar and navigation tabs
@@ -147,10 +159,13 @@ fun MainContent() {
                     NavigationTabs(
                         selectedTabIndex = selectedTabIndex,
                         onTabSelected = { tabIndex ->
+                            // Temporary: Block switching to acquisitions tab while scanning
+                            if (isScanning && tabIndex == 1) return@NavigationTabs
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(tabIndex)
                             }
-                        }
+                        },
+                        isAcquisitionsTabDisabled = isScanning
                     )
                 }
             }
@@ -164,7 +179,9 @@ fun MainContent() {
         ) {
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                // Temporary: Block swipe while scan is being performed
+                userInputEnabled = !isScanning
             ) { pageIndex ->
                 when (pageIndex) {
                     0 -> ScanScreen()

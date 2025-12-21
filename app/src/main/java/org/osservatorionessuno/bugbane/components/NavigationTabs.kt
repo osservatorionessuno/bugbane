@@ -31,7 +31,8 @@ data class TabItem(val title: String, val icon: ImageVector)
 fun NavigationTabs(
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    isAcquisitionsTabDisabled: Boolean = false // Temporary: Disable acquisitions tab while scanning
 ) {
     val tabs = listOf(
         TabItem(stringResource(R.string.main_nav_scan), Icons.Default.Search),
@@ -46,6 +47,7 @@ fun NavigationTabs(
         ) {
             tabs.forEachIndexed { index, tab ->
                 val isSelected = selectedTabIndex == index
+                val isDisabled = index == 1 && isAcquisitionsTabDisabled // Temporary: Disable acquisitions tab (index 1)
                 Column(
                     horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -55,13 +57,13 @@ fun NavigationTabs(
                             else androidx.compose.ui.graphics.Color.Transparent
                         )
                         .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .clickable { onTabSelected(index) }
+                        .clickable(enabled = !isDisabled) { onTabSelected(index) }
                 ) {
                     Icon(
                         imageVector = tab.icon,
                         contentDescription = tab.title,
                         modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary
+                        tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (isDisabled) 0.4f else 1f)
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -69,7 +71,7 @@ fun NavigationTabs(
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         ),
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (isDisabled) 0.4f else 1f)
                     )
                 }
             }
@@ -97,9 +99,11 @@ fun NavigationTabs(
             }
         ) {
             tabs.forEachIndexed { index, tab ->
+                val isDisabled = index == 1 && isAcquisitionsTabDisabled // Temporary: Disable acquisitions tab (index 1)
                 Tab(
                     selected = selectedTabIndex == index,
                     onClick = { onTabSelected(index) },
+                    enabled = !isDisabled,
                     text = { 
                         Text(
                             text = tab.title,
