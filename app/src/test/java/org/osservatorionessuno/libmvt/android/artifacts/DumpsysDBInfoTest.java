@@ -44,7 +44,8 @@ public class DumpsysDBInfoTest {
         String data = readResource("android_data/dumpsys_dbinfo.txt");
         dbi.parse(data);
 
-        Indicators ind = Indicators.loadFromDirectory(
+        Indicators ind = new Indicators();
+        ind.loadFromDirectory(
                 Paths.get("src", "test", "resources", "iocs").toFile()
         );
         dbi.setIndicators(ind);

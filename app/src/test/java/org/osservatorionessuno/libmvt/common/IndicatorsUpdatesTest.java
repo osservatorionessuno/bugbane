@@ -37,7 +37,8 @@ public class IndicatorsUpdatesTest {
                 .replaceAll("[/\\\\]", "_");
         assertTrue(Files.exists(indicatorsDir.resolve(fileName)));
 
-        Indicators indicators = Indicators.loadFromDirectory(indicatorsDir.toFile());
+        Indicators indicators = new Indicators();
+        indicators.loadFromDirectory(indicatorsDir.toFile());
         assertFalse(indicators.matchString("shortenurls.me", IndicatorType.DOMAIN).isEmpty());
     }
 }

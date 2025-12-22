@@ -61,7 +61,8 @@ public class DumpsysAppopsTest {
         String data = readResource("android_data/dumpsys_appops.txt");
         da.parse(data);
 
-        Indicators indicators = Indicators.loadFromDirectory(
+        Indicators indicators = new Indicators();
+        indicators.loadFromDirectory(
                 Paths.get("src", "test", "resources", "iocs").toFile()
         );
         da.setIndicators(indicators);

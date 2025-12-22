@@ -17,7 +17,8 @@ public class ForensicRunnerTest {
         File dir = Paths.get("src", "test", "resources", "androidqf").toFile();
         File iocDir = Paths.get("src", "test", "resources", "iocs").toFile();
 
-        Indicators ind = Indicators.loadFromDirectory(iocDir);
+        Indicators ind = new Indicators();
+        ind.loadFromDirectory(iocDir);
 
         ForensicRunner runner = new ForensicRunner(dir);
         runner.setIndicators(ind);

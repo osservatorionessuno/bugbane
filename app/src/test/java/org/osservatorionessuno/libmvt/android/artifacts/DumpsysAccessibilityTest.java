@@ -78,7 +78,8 @@ public class DumpsysAccessibilityTest {
             bw.write("{\"indicators\":[{\"app:id\":[\"com.sec.android.app.camera\"]}]}");
         }
 
-        Indicators indicators = Indicators.loadFromDirectory(temp.toFile());
+        Indicators indicators = new Indicators();
+        indicators.loadFromDirectory(temp.toFile());
         da.setIndicators(indicators);
         da.checkIndicators();
 

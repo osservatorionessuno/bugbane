@@ -45,7 +45,8 @@ public class DumpsysPackagesTest {
         String data = readResource("android_data/dumpsys_packages.txt");
         dpa.parse(data);
 
-        Indicators indicators = Indicators.loadFromDirectory(
+        Indicators indicators = new Indicators();
+        indicators.loadFromDirectory(
                 Paths.get("src", "test", "resources", "iocs").toFile()
         );
         dpa.setIndicators(indicators);

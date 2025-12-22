@@ -41,7 +41,8 @@ public class ProcessesTest {
         String data = readResource("android_data/ps.txt");
         p.parse(data);
 
-        Indicators indicators = Indicators.loadFromDirectory(
+        Indicators indicators = new Indicators();
+        indicators.loadFromDirectory(
                 Paths.get("src", "test", "resources", "iocs").toFile()
         );
         p.setIndicators(indicators);
@@ -57,7 +58,8 @@ public class ProcessesTest {
                 "root 50 2 0 0 0 0 S com.bad.actor.ma\n";
         p.parse(data);
 
-        Indicators indicators = Indicators.loadFromDirectory(
+        Indicators indicators = new Indicators();
+        indicators.loadFromDirectory(
                 Paths.get("src", "test", "resources", "iocs").toFile()
         );
         p.setIndicators(indicators);

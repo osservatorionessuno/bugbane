@@ -42,7 +42,8 @@ public class GetPropTest {
         String data = readResource("android_data/getprop.txt");
         gp.parse(data);
 
-        Indicators indicators = Indicators.loadFromDirectory(
+        Indicators indicators = new Indicators();
+        indicators.loadFromDirectory(
                 Paths.get("src", "test", "resources", "iocs").toFile()
         );
         gp.setIndicators(indicators);
