@@ -42,7 +42,8 @@ public class DumpsysReceiversTest {
         String data = readResource("android_data/dumpsys_packages.txt");
         dr.parse(data);
 
-        Indicators ind = Indicators.loadFromDirectory(
+        Indicators ind = new Indicators();
+        ind.loadFromDirectory(
                 Paths.get("src", "test", "resources", "iocs").toFile()
         );
         dr.setIndicators(ind);

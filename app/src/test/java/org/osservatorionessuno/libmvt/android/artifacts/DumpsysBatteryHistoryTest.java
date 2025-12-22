@@ -59,7 +59,8 @@ public class DumpsysBatteryHistoryTest {
         String data = readResource("android_data/dumpsys_battery.txt");
         bh.parse(data);
 
-        Indicators ind = Indicators.loadFromDirectory(
+        Indicators ind = new Indicators();
+        ind.loadFromDirectory(
                 Paths.get("src", "test", "resources", "iocs").toFile()
         );
         bh.setIndicators(ind);

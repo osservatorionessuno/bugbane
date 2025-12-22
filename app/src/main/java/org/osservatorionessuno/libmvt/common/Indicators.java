@@ -2,7 +2,6 @@ package org.osservatorionessuno.libmvt.common;
 
 import org.osservatorionessuno.bugbane.R;
 import android.content.Context;
-import android.util.Log;
 
 import org.ahocorasick.trie.Emit;
 import org.ahocorasick.trie.Trie;
@@ -16,29 +15,44 @@ import java.io.FileInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Loads indicators from .json and .stix2 (JSON) files and matches strings.
  * JSON parsing is done with Android's built-in org.json (no extra deps).
- * Keyword matching for DOMAIN/URL uses Aho-Corasick tries.
+ * Keyword matching uses Aho-Corasick tries for efficient pattern matching.
  */
 public class Indicators {
-    private final Trie domainTrie;
-    private final Trie urlTrie;
-    private final Trie processTrie;
-    private final Trie appIdTrie;
-    private final Trie propertyTrie;
-    private final Trie filePathTrie;
+    /**
+     * Configuration mapping indicator types to their JSON field keys and STIX pattern keys.
+     * This makes it easy to add new indicator types without modifying the core logic.
+     */
+    private static final Map<IndicatorType, Set<String>> INDICATOR_CONFIG = new EnumMap<>(IndicatorType.class);
+    
+    static {
+        INDICATOR_CONFIG.put(IndicatorType.DOMAIN, Set.of("domain-name:value", "ipv4-addr:value"));
+        INDICATOR_CONFIG.put(IndicatorType.URL, Set.of("url:value"));
+        INDICATOR_CONFIG.put(IndicatorType.PROCESS, Set.of("process:name"));
+        INDICATOR_CONFIG.put(IndicatorType.APP_ID, Set.of("app:id"));
+        INDICATOR_CONFIG.put(IndicatorType.PROPERTY, Set.of("android-property:name"));
+        INDICATOR_CONFIG.put(IndicatorType.FILE_PATH, Set.of("file:path"));
+    }
+
+    private final Map<IndicatorType, Trie.TrieBuilder> trieBuilders;
+    private final Map<IndicatorType, Trie> tries;
     private Context context;
 
-    private Indicators(Trie domainTrie, Trie urlTrie, Trie processTrie, Trie appIdTrie, Trie propertyTrie, Trie filePathTrie) {
-        this.domainTrie   = domainTrie;
-        this.urlTrie      = urlTrie;
-        this.processTrie  = processTrie;
-        this.appIdTrie    = appIdTrie;
-        this.propertyTrie = propertyTrie;
-        this.filePathTrie = filePathTrie;
+    public Indicators() {
+        this.trieBuilders = new EnumMap<>(IndicatorType.class);
+        this.tries = new EnumMap<>(IndicatorType.class);
+        
+        // Initialize builders for all configured indicator types
+        for (IndicatorType type : INDICATOR_CONFIG.keySet()) {
+            trieBuilders.put(type, Trie.builder().ignoreCase());
+        }
     }
 
     /**
@@ -49,17 +63,10 @@ public class Indicators {
     }
 
     /** Load indicators from a folder containing .json or .stix2 files. */
-    public static Indicators loadFromDirectory(File dir) {
-        Trie.TrieBuilder domains    = Trie.builder().ignoreCase();
-        Trie.TrieBuilder urls       = Trie.builder().ignoreCase();
-        Trie.TrieBuilder processes  = Trie.builder().ignoreCase();
-        Trie.TrieBuilder appIds     = Trie.builder().ignoreCase();
-        Trie.TrieBuilder properties = Trie.builder().ignoreCase();
-        Trie.TrieBuilder filePath   = Trie.builder().ignoreCase();
-
+    public void loadFromDirectory(File dir) {
         File[] files = (dir != null) ? dir.listFiles((d, name) -> name.endsWith(".json") || name.endsWith(".stix2")) : null;
         if (files == null) {
-            return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build(), filePath.build());
+            throw new IllegalArgumentException("IOC directory is null or does not exist");
         }
 
         for (File f : files) {
@@ -74,7 +81,7 @@ public class Indicators {
                     if (node == null) continue;
                     if ("indicator".equals(node.optString("type", ""))) {
                         String pattern = node.optString("pattern", null);
-                        addPattern(domains, urls, processes, appIds, properties, filePath, pattern);
+                        addPattern(pattern);
                     }
                 }
                 continue;
@@ -87,25 +94,32 @@ public class Indicators {
                     JSONObject coll = arr.optJSONObject(i);
                     if (coll == null) continue;
 
-                    addField(domains,    coll, "domain-name:value",     null);
-                    addField(domains,    coll, "ipv4-addr:value",       null);
-                    addField(urls,       coll, "url:value",             null);
-                    addField(processes,  coll, "process:name",          null);
-                    addField(appIds,     coll, "app:id",                null);
-                    addField(properties, coll, "android-property:name", null);
-                    addField(filePath,   coll, "file:path",             null);
+                    // Process all configured indicator types
+                    for (Map.Entry<IndicatorType, Set<String>> entry : INDICATOR_CONFIG.entrySet()) {
+                        IndicatorType type = entry.getKey();
+                        Set<String> keys = entry.getValue();
+                        Trie.TrieBuilder builder = trieBuilders.get(type);
+                        if (builder != null) {
+                            for (String key : keys) {
+                                addField(builder, coll, key, null);
+                            }
+                        }
+                    }
                 }
             }
         }
+        buildTries();
+    }
 
-        return new Indicators(domains.build(), urls.build(), processes.build(), appIds.build(), properties.build(), filePath.build());
+    /** Build the Aho-Corasick tries from the builders. */
+    private void buildTries() {
+        for (Map.Entry<IndicatorType, Trie.TrieBuilder> entry : trieBuilders.entrySet()) {
+            tries.put(entry.getKey(), entry.getValue().build());
+        }
     }
 
     /** Parse a single STIX pattern like: "[domain-name:value = 'evil.com']" */
-    private static void addPattern(Trie.TrieBuilder domains, Trie.TrieBuilder urls,
-                                   Trie.TrieBuilder processes, Trie.TrieBuilder appIds,
-                                   Trie.TrieBuilder properties, Trie.TrieBuilder filePath,
-                                   String pattern) {
+    private void addPattern(String pattern) {
         if (pattern == null) return;
         String p = pattern.trim();
         if (p.startsWith("[") && p.endsWith("]")) {
@@ -121,35 +135,21 @@ public class Indicators {
         }
         String vLower = value.toLowerCase();
 
-        switch (key) {
-            case "domain-name:value":
-                domains.addKeyword(vLower);
-                break;
-            case "ipv4-addr:value":
-                domains.addKeyword(vLower);
-                break;
-            case "url:value":
-                urls.addKeyword(vLower);
-                break;
-            case "process:name":
-                processes.addKeyword(vLower);
-                break;
-            case "app:id":
-                appIds.addKeyword(vLower);
-                break;
-            case "android-property:name":
-                properties.addKeyword(vLower);
-                break;
-            case "file:path":
-                filePath.addKeyword(vLower);
-                break;
-            default:
-                break;
+        // Find which indicator type this STIX pattern key belongs to
+        for (Map.Entry<IndicatorType, Set<String>> entry : INDICATOR_CONFIG.entrySet()) {
+            Set<String> keys = entry.getValue();
+            if (keys.contains(key)) {
+                Trie.TrieBuilder builder = trieBuilders.get(entry.getKey());
+                if (builder != null) {
+                    builder.addKeyword(vLower);
+                }
+                return;
+            }
         }
     }
 
     /** Add values from indicators JSON (each key can be a single string or an array). */
-    private static void addField(Trie.TrieBuilder builder, JSONObject coll, String key, List<String> store) {
+    private void addField(Trie.TrieBuilder builder, JSONObject coll, String key, List<String> store) {
         if (coll == null) return;
 
         Object node = coll.opt(key);
@@ -185,62 +185,22 @@ public class Indicators {
 
     /** Match string against loaded indicators. */
     public List<Detection> matchString(String s, IndicatorType type) {
-        if (s == null) return Collections.emptyList();
+        if (s == null || context == null) return Collections.emptyList();
+        
+        Trie trie = tries.get(type);
+        if (trie == null) return Collections.emptyList();
+        
         String lower = s.toLowerCase();
         List<Detection> detections = new ArrayList<>();
 
-        switch (type) {
-            case DOMAIN: {
-                for (Emit e : domainTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, 
-                        context.getString(R.string.mvt_ioc_title),
-                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
-                }
-                break;
-            }
-            case URL: {
-                for (Emit e : urlTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, 
-                        context.getString(R.string.mvt_ioc_title),
-                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
-                }
-                break;
-            }
-            case PROCESS: {
-                for (Emit e : processTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, 
-                        context.getString(R.string.mvt_ioc_title),
-                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
-                }
-                break;
-            }
-            case APP_ID: {
-                for (Emit e : appIdTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, 
-                        context.getString(R.string.mvt_ioc_title),
-                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
-                }
-                break;
-            }
-            case PROPERTY: {
-                for (Emit e : propertyTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL, 
-                        context.getString(R.string.mvt_ioc_title),
-                        String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
-                }
-                break;
-            }
-            case FILE_PATH: {
-                for (Emit e : filePathTrie.parseText(lower)) {
-                    detections.add(new Detection(AlertLevel.CRITICAL,
-                            context.getString(R.string.mvt_ioc_title),
-                            String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)));
-                }
-                break;
-            }
-            default:
-                break;
+        for (Emit e : trie.parseText(lower)) {
+            detections.add(new Detection(
+                AlertLevel.CRITICAL,
+                context.getString(R.string.mvt_ioc_title),
+                String.format(context.getString(R.string.mvt_ioc_message), type.name(), e.getKeyword(), s)
+            ));
         }
+        
         return detections;
     }
 

@@ -20,7 +20,8 @@ object AcquisitionScanner {
 
     private fun scanWithIndicators(context: Context, acquisitionDir: File, indicatorsDir: File): File {
         val started = Instant.now()
-        val indicators = Indicators.loadFromDirectory(indicatorsDir)
+        val indicators = Indicators();
+        indicators.loadFromDirectory(indicatorsDir)
 
         val indicatorsArr = JSONArray()
         val indicatorHashes = mutableListOf<String>()
