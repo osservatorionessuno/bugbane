@@ -15,7 +15,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * TODO
+ * Parser for the list of all the files available on the devices
  */
 public class Files extends AndroidArtifact {
     private static final Set<String> SUSPICIOUS_PATHS = Set.of(
@@ -103,22 +103,13 @@ public class Files extends AndroidArtifact {
                     detected.add(new Detection(AlertLevel.HIGH, context.getString(R.string.mvt_files_suspicious_path_title), msg));
                 }
             }
-
-            /*
+ 
             Object sha256Obj = file.get("sha256");
             String sha256 = (sha256Obj != null) ? sha256Obj.toString() : "";
             if (sha256.isEmpty()) continue;
 
             // Check if file hash matches any indicator
-            // (Python: ioc_match = self.indicators.check_file_hash(result.get("sha256")))
-            var hashMatches = indicators.matchFileHash(sha256, IndicatorType.HASH);
-            if (!hashMatches.isEmpty()) {
-                for (Detection det : hashMatches) {
-                    det.level = AlertLevel.CRITICAL;
-                    det.relatedObject = file;
-                    detected.add(det);
-                }
-            }*/
+            detected.addAll(indicators.matchString(sha256, IndicatorType.FILE_HASH_SHA256));
 
             // TODO: add SHA1 and MD5 check when available
         }

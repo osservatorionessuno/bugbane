@@ -156,6 +156,7 @@ public class DumpsysAdb extends AndroidArtifact {
         for (Object obj : results) {
             @SuppressWarnings("unchecked")
             Map<String, Object> map = (Map<String, Object>) obj;
+            @SuppressWarnings("unchecked")
             List<Map<String, String>> userKeys = (List<Map<String, String>>) map.get("user_keys");
             if (userKeys != null) {
                 for (Map<String, String> userKey : userKeys) {
