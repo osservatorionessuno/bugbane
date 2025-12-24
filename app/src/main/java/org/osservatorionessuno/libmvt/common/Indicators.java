@@ -2,6 +2,7 @@ package org.osservatorionessuno.libmvt.common;
 
 import org.osservatorionessuno.bugbane.R;
 import android.content.Context;
+import android.util.Log;
 
 import org.ahocorasick.trie.Emit;
 import org.ahocorasick.trie.Trie;
@@ -26,6 +27,8 @@ import java.util.Set;
  * Keyword matching uses Aho-Corasick tries for efficient pattern matching.
  */
 public class Indicators {
+    private static final String TAG = "Indicators";
+
     /**
      * Configuration mapping indicator types to their JSON field keys and STIX pattern keys.
      * This makes it easy to add new indicator types without modifying the core logic.
@@ -36,9 +39,18 @@ public class Indicators {
         INDICATOR_CONFIG.put(IndicatorType.DOMAIN, Set.of("domain-name:value", "ipv4-addr:value"));
         INDICATOR_CONFIG.put(IndicatorType.URL, Set.of("url:value"));
         INDICATOR_CONFIG.put(IndicatorType.PROCESS, Set.of("process:name"));
+        INDICATOR_CONFIG.put(IndicatorType.EMAIL, Set.of("email-addr:value"));
         INDICATOR_CONFIG.put(IndicatorType.APP_ID, Set.of("app:id"));
         INDICATOR_CONFIG.put(IndicatorType.PROPERTY, Set.of("android-property:name"));
         INDICATOR_CONFIG.put(IndicatorType.FILE_PATH, Set.of("file:path"));
+        INDICATOR_CONFIG.put(IndicatorType.FILE_NAME, Set.of("file:name"));
+        INDICATOR_CONFIG.put(IndicatorType.FILE_HASH_MD5, Set.of("file:hashes.md5"));
+        INDICATOR_CONFIG.put(IndicatorType.FILE_HASH_SHA1, Set.of("file:hashes.sha1"));
+        INDICATOR_CONFIG.put(IndicatorType.FILE_HASH_SHA256, Set.of("file:hashes.sha256"));
+        INDICATOR_CONFIG.put(IndicatorType.APP_CERT_HASH_MD5, Set.of("app:cert.md5"));
+        INDICATOR_CONFIG.put(IndicatorType.APP_CERT_HASH_SHA1, Set.of("app:cert.sha1"));
+        INDICATOR_CONFIG.put(IndicatorType.APP_CERT_HASH_SHA256, Set.of("app:cert.sha256"));
+        INDICATOR_CONFIG.put(IndicatorType.IOS_PROFILE_ID, Set.of("configuration-profile:id"));
     }
 
     private final Map<IndicatorType, Trie.TrieBuilder> trieBuilders;
@@ -142,6 +154,8 @@ public class Indicators {
                 Trie.TrieBuilder builder = trieBuilders.get(entry.getKey());
                 if (builder != null) {
                     builder.addKeyword(vLower);
+                } else {
+                    Log.d(TAG, "Indicator type not supported: " + entry.getKey());
                 }
                 return;
             }
