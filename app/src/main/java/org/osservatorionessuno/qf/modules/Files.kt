@@ -51,9 +51,9 @@ class Files : Module {
 
             for (folder in folders) {
                 val cmd = if (supportsPrintf)
-                    """find ${shQuote(folder)} -printf '%T@ %m %s %u %g %p\n' 2>/dev/null"""
+                    """find ${shQuote(folder)} -type f -printf '%T@ %m %s %u %g %p\n' 2>/dev/null"""
                 else
-                    """find ${shQuote(folder)} -print 2>/dev/null"""
+                    """find ${shQuote(folder)} -type f -print 2>/dev/null"""
 
                 val out = runCatching { sh.exec(cmd) }.getOrDefault("")
                 if (out.isBlank()) continue
