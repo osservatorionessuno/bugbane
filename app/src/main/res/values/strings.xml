@@ -180,4 +180,14 @@
     <string name="mvt_tombstone_crashes_uid_message">Potentially suspicious crash in process %1$s running as UID %2$s</string>
     <string name="mvt_files_suspicious_path_title">Suspicious Path</string>
     <string name="mvt_files_suspicious_path_message">Found %1$sfile at suspicious path \"%2$s\"</string>
+    <string name="mvt_packages_non_system_package_title">Package installed via adb or insecure method</string>
+    <string name="mvt_packages_non_system_package_message">Found a non-system package installed via adb or another method: %1$s</string>
+    <string name="mvt_packages_third_party_store_package_title">Package installed via a third party store</string>
+    <string name="mvt_packages_third_party_store_package_message">Found a package installed via a third party store (installer=\"%1$s\"): %2$s</string>
+    <string name="mvt_packages_browser_package_title">Package installed via a browser</string>
+    <string name="mvt_packages_browser_package_message">Found a package installed via a browser (installer=\"%1$s\"): %2$s</string>
+    <string name="mvt_packages_security_package_title">Security package disabled</string>
+    <string name="mvt_packages_security_package_message">Found a security package disabled: %1$s</string>
+    <string name="mvt_packages_system_update_package_title">System OTA update package disabled</string>
+    <string name="mvt_packages_system_update_package_message">Found a system OTA update package disabled: %1$s</string>
 </resources>
