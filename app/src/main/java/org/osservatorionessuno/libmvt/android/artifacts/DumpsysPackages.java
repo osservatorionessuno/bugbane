@@ -3,6 +3,7 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Utils;
 import org.osservatorionessuno.libmvt.common.Detection;
 
 import java.util.*;
@@ -13,34 +14,6 @@ import java.util.regex.Pattern;
  * Parser for dumpsys package information.
  */
 public class DumpsysPackages extends AndroidArtifact {
-    private static final Set<String> ROOT_PACKAGES = Set.of(
-            "com.noshufou.android.su",
-            "com.noshufou.android.su.elite",
-            "eu.chainfire.supersu",
-            "com.koushikdutta.superuser",
-            "com.thirdparty.superuser",
-            "com.yellowes.su",
-            "com.koushikdutta.rommanager",
-            "com.koushikdutta.rommanager.license",
-            "com.dimonvideo.luckypatcher",
-            "com.chelpus.lackypatch",
-            "com.ramdroid.appquarantine",
-            "com.ramdroid.appquarantinepro",
-            "com.devadvance.rootcloak",
-            "com.devadvance.rootcloakplus",
-            "de.robv.android.xposed.installer",
-            "com.saurik.substrate",
-            "com.zachspong.temprootremovejb",
-            "com.amphoras.hidemyroot",
-            "com.amphoras.hidemyrootadfree",
-            "com.formyhm.hiderootPremium",
-            "com.formyhm.hideroot",
-            "me.phh.superuser",
-            "eu.chainfire.supersu.pro",
-            "com.kingouser.com",
-            "com.topjohnwu.magisk"
-    );
-
     private static class PackageDetails {
         String packageName = "";
         String uid = "";
@@ -199,7 +172,7 @@ public class DumpsysPackages extends AndroidArtifact {
             @SuppressWarnings("unchecked")
             Map<String, Object> record = (Map<String, Object>) obj;
             String pkg = (String) record.get("package_name");
-            if (ROOT_PACKAGES.contains(pkg)) {
+            if (Utils.ROOT_PACKAGES.contains(pkg)) {
                 detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_packages_root_package_title),
                     String.format(
                         context.getString(R.string.mvt_packages_root_package_message), 
