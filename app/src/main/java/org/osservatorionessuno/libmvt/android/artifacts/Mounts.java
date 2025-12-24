@@ -3,6 +3,7 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.Detection;
+import org.osservatorionessuno.libmvt.common.IndicatorType;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,7 +14,7 @@ import java.util.function.Predicate;
 import org.json.JSONArray;
 
 /**
- * TODO
+ * Parser for the output of the `mount` command.
  */
 public class Mounts extends AndroidArtifact {
     private static final Set<String> SUSPICIOUS_MOUNT_POINTS = Set.of("/system", "/vendor", "/product", "/system_ext");
@@ -173,31 +174,17 @@ public class Mounts extends AndroidArtifact {
             return;
         }
 
-        return;
-
-        /*for (Object obj : this.results) {
+        for (Object obj : this.results) {
             @SuppressWarnings("unchecked")
             Map<String, Object> mount = (Map<String, Object>) obj;
-            String mp = (String) mount.get("mount_point");
-            String dev = (String) mount.get("device");
 
             // Check if any mount points match indicators
-            List<Detection> mountPointMatches = this.indicators.matchFilePath(mp, IndicatorType.PATH);
-            for (Detection d : mountPointMatches) {
-                d.level = AlertLevel.CRITICAL;
-                d.details = String.format("Mount point matches indicator: %s", mp);
-                d.relatedObject = mount;
-                detected.add(d);
-            }
+            String mp = (String) mount.get("mount_point");
+            detected.addAll(this.indicators.matchString(mp, IndicatorType.FILE_PATH));
 
             // Check device paths for indicators
-            List<Detection> devMatches = this.indicators.matchFilePath(dev, IndicatorType.PATH);
-            for (Detection d : devMatches) {
-                d.level = AlertLevel.CRITICAL;
-                d.details = String.format("Device path matches indicator: %s", dev);
-                d.relatedObject = mount;
-                detected.add(d);
-            }
-        }*/
+            String dev = (String) mount.get("device");
+            detected.addAll(this.indicators.matchString(dev, IndicatorType.FILE_PATH));
+        }
     }
 }
