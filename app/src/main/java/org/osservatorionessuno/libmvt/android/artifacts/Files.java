@@ -89,13 +89,13 @@ public class Files extends AndroidArtifact {
                         mode = ((Number) modeVal).longValue();
                     } else if (modeVal instanceof String) {
                         try {
-                            mode = Long.decode((String) modeVal);
+                            mode = Long.decode("0" + (String) modeVal);
                         } catch (NumberFormatException nfe) {
                             // ignore
                         }
                     }
                     // executable for owner, group, or others (octal 0100, 0010, 0001)
-                    if ((mode & 0x49) != 0) { // (S_IXUSR | S_IXGRP | S_IXOTH)
+                    if ((mode & 0111) != 0) { // (S_IXUSR | S_IXGRP | S_IXOTH)
                         fileType = "executable ";
                     }
 
