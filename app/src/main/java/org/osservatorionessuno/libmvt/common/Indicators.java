@@ -110,11 +110,8 @@ public class Indicators {
                     for (Map.Entry<IndicatorType, Set<String>> entry : INDICATOR_CONFIG.entrySet()) {
                         IndicatorType type = entry.getKey();
                         Set<String> keys = entry.getValue();
-                        Trie.TrieBuilder builder = trieBuilders.get(type);
-                        if (builder != null) {
-                            for (String key : keys) {
-                                addField(builder, coll, key, null);
-                            }
+                        for (String key : keys) {
+                            addField(type, coll, key);
                         }
                     }
                 }
@@ -163,8 +160,10 @@ public class Indicators {
     }
 
     /** Add values from indicators JSON (each key can be a single string or an array). */
-    private void addField(Trie.TrieBuilder builder, JSONObject coll, String key, List<String> store) {
+    private void addField(IndicatorType type, JSONObject coll, String key) {
         if (coll == null) return;
+        Trie.TrieBuilder builder = trieBuilders.get(type);
+        if (builder == null) return;
 
         Object node = coll.opt(key);
         if (node == null) return;
@@ -176,7 +175,6 @@ public class Indicators {
                 if (s != null) {
                     String lower = s.toLowerCase();
                     builder.addKeyword(lower);
-                    if (store != null) store.add(lower);
                 }
             }
         } else {
@@ -184,7 +182,6 @@ public class Indicators {
             if (s != null) {
                 String lower = s.toLowerCase();
                 builder.addKeyword(lower);
-                if (store != null) store.add(lower);
             }
         }
     }
