@@ -2,40 +2,21 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.osservatorionessuno.libmvt.android.TestResourceLoader;
 
-import java.io.BufferedReader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.util.Map;
+import java.io.File;
+import java.nio.file.Files;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TombstoneCrashesTest {
 
-    private byte[] readBytes(String name) throws Exception {
-        Path path = Paths.get("src", "test", "resources", name);
-        byte[] bytes = Files.readAllBytes(path);
-        System.out.printf("Read binary file: %s (%d bytes)%n", path, bytes.length);
-        return bytes;
-    }
-
-    private String readText(String name) throws Exception {
-        Path path = Paths.get("src", "test", "resources", name);
-        StringBuilder sb = new StringBuilder(8192);
-        try (BufferedReader br = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            char[] buf = new char[4096];
-            int n;
-            while ((n = br.read(buf)) >= 0) sb.append(buf, 0, n);
-        }
-        System.out.printf("Read text file: %s (%d chars)%n", path, sb.length());
-        return sb.toString();
-    }
-
     @Test
     public void testParsing() throws Exception {
         TombstoneCrashes tc = new TombstoneCrashes();
-        String data = readText("android_data/tombstone_process.txt");
+        String data = TestResourceLoader.readText("android_data/tombstone_process.txt");
         tc.parse(data);
 
         System.out.printf("Parsed text tombstone, results: %d%n", tc.getResults().size());
@@ -58,7 +39,8 @@ public class TombstoneCrashesTest {
     @Test
     public void testParseProtobuf() throws Exception {
         TombstoneCrashes tc = new TombstoneCrashes();
-        byte[] data = readBytes("android_data/tombstone_process.pb");
+        File protoFile = TestResourceLoader.extractFile("android_data/tombstone_process.pb");
+        byte[] data = Files.readAllBytes(protoFile.toPath());
         tc.parseProtobuf(data);
 
         System.out.printf("Parsed protobuf tombstone, results: %d%n", tc.getResults().size());

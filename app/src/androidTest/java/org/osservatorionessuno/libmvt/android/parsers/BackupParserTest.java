@@ -1,6 +1,7 @@
 package org.osservatorionessuno.libmvt.android.parsers;
 
 import org.junit.jupiter.api.Test;
+import org.osservatorionessuno.libmvt.android.TestResourceLoader;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class BackupParserTest {
     private byte[] readBytes(String name) throws IOException {
-        Path path = Path.of("src","test","resources",name);
+        Path path = TestResourceLoader.extractFile(name).toPath();
         return Files.readAllBytes(path);
     }
 

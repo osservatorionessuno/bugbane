@@ -1,6 +1,7 @@
 package org.osservatorionessuno.libmvt.common;
 
 import org.junit.jupiter.api.Test;
+import org.osservatorionessuno.libmvt.android.TestResourceLoader;
 
 import java.io.BufferedWriter;
 import java.nio.charset.StandardCharsets;
@@ -14,7 +15,7 @@ public class IndicatorsUpdatesTest {
     public void testUpdateLocal() throws Exception {
         Path temp = Files.createTempDirectory("mvt");
 
-        Path stix = Paths.get("src", "test", "resources", "stix2", "cytrox.stix2");
+        Path stix = TestResourceLoader.extractFile("stix2/cytrox.stix2").toPath();
         String index =
                 "indicators:\n" +
                         "  - name: local\n" +
