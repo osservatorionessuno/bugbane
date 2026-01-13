@@ -79,6 +79,8 @@
     <string name="acquisitions_title">Acquisitions</string>
     <string name="acquisitions_rename">Rename</string>
     <string name="acquisitions_delete">Delete</string>
+    <string name="acquisitions_delete_confirm_title">Delete Acquisition</string>
+    <string name="acquisitions_delete_confirm_message">Are you sure you want to delete %1$s? This action cannot be undone.</string>
     <string name="acquisitions_delete_message">Deleting %1$s…</string>
     <string name="acquisitions_deleted_message">%1$s deleted</string>
     <string name="acquisitions_undo">Undo</string>
@@ -103,15 +105,13 @@
     <!-- Acquisition details strings -->
     <string name="acquisition_details_title">Acquisition Details</string>
     <string name="acquisition_details_size">Size: %1$s</string>
-    <string name="acquisition_details_uuid">UUID: %1$s</string>
-    <string name="acquisition_details_started">Started: %1$s</string>
+    <string name="acquisition_details_name">Name: %1$s</string>
     <string name="acquisition_details_completed">Completed: %1$s</string>
     <string name="acquisition_details_files">Files</string>
     <string name="acquisition_details_view_files">View files</string>
-    <string name="acquisition_details_analyses">Analyses</string>
-    <string name="acquisition_analyses_date">Date</string>
-    <string name="acquisition_analyses_indicators">Indicators</string>
-    <string name="acquisition_analyses_matches">Matches</string>
+    <string name="acquisition_analyses_date">Analysis Date</string>
+    <string name="acquisition_analyses_indicators">Indicator Version</string>
+    <string name="acquisition_analyses_level">Level</string>
     <string name="acquisition_details_export">Export</string>
     <string name="acquisition_details_share">Share</string>
     <string name="acquisition_details_rescan">Run Analysis</string>
@@ -130,10 +130,11 @@
     <string name="analysis_details_type">Type</string>
     <string name="analysis_details_ioc">IOC</string>
     <string name="analysis_details_context_dialog_title">Context</string>
-    <string name="analysis_details_acquisition_name">Acquisition name: %1$s</string>
-    <string name="analysis_details_acquisition_uuid">Acquisition UUID: %1$s</string>
-    <string name="analysis_details_acquisition_completed">Acquisition completed: %1$s</string>
-    <string name="analysis_details_analysis_completed">Analysis completed: %1$s</string>
+    <string name="analysis_details_acquisition_completed">Acquisition date: %1$s</string>
+    <string name="analysis_details_analysis_completed">Analysis date: %1$s</string>
+    <string name="analysis_delete">Delete Analysis</string>
+    <string name="analysis_delete_confirm_title">Delete Analysis</string>
+    <string name="analysis_delete_confirm_message">Are you sure you want to delete this analysis? This action cannot be undone.</string>
     <string name="analysis_spyware_warning_title">Potential spyware indicators were found in this analysis. For help and support, consider contacting a trusted helpline.</string>
     <string name="analysis_spyware_warning_button">Contact support</string>
 
@@ -157,7 +158,7 @@
 
     <!-- MVT strings -->
     <string name="mvt_ioc_title">Indicator of Compromise Found</string>
-    <string name="mvt_ioc_message">%1$s: %2$s found in %3$s</string>
+    <string name="mvt_ioc_message">Indicator of type "%1$s" found in %3$s matching %2$s</string>
     <string name="mvt_adb_fingerprint_title">ADB Fingerprint</string>
     <string name="mvt_adb_fingerprint_message">Found an ADB fingerprint for user %1$s: %2$s</string>
     <string name="mvt_appops_risky_permission_title">Risky Permission</string>

@@ -47,6 +47,7 @@ fun AcquisitionsScreen() {
     var acquisitionItems by remember { mutableStateOf(listOf<AcquisitionItem>()) }
     var pendingDeletion by remember { mutableStateOf<AcquisitionItem?>(null) }
     var isUndoClicked by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf<AcquisitionItem?>(null) }
 
     fun loadAcquisitions() {
         val baseDir = File(context.filesDir, "acquisitions")
@@ -81,6 +82,12 @@ fun AcquisitionsScreen() {
     }
 
     fun handleDelete(item: AcquisitionItem) {
+        // Show confirmation dialog first
+        showDeleteConfirmDialog = item
+    }
+    
+    fun confirmDelete(item: AcquisitionItem) {
+        showDeleteConfirmDialog = null
         // Reset undo flag and set pending deletion
         isUndoClicked = false
         pendingDeletion = item
@@ -132,7 +139,6 @@ fun AcquisitionsScreen() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp)
         ) {
         if (acquisitionItems.isEmpty()) {
             // No acquisitions, place a logo and a message as placeholder
@@ -162,7 +168,8 @@ fun AcquisitionsScreen() {
             }
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(1.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(8.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 items(
@@ -215,6 +222,33 @@ fun AcquisitionsScreen() {
             }
         }
         }
+        
+        // Delete confirmation dialog
+        showDeleteConfirmDialog?.let { item ->
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirmDialog = null },
+                title = {
+                    Text(stringResource(R.string.acquisitions_delete_confirm_title))
+                },
+                text = {
+                    Text(stringResource(R.string.acquisitions_delete_confirm_message, item.name))
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { confirmDelete(item) }
+                    ) {
+                        Text(stringResource(R.string.acquisitions_delete))
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showDeleteConfirmDialog = null }
+                    ) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -259,85 +293,88 @@ fun AcquisitionItemRow(
         )
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 12.dp, horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Medium
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            item.completed?.let {
-                Spacer(modifier = Modifier.height(2.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Completed: ${dateFormat.format(it)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    text = item.name,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+                item.completed?.let {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Completed: ${dateFormat.format(it)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
             }
-        }
 
-        Box {
-            IconButton(onClick = { expanded = true }) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "More options",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-            }
+            Box {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "More options",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
 
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.width(180.dp)
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.acquisitions_rename)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = null
-                        )
-                    },
-                    onClick = {
-                        expanded = false
-                        showRename = true
-                    }
-                )
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.width(180.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.acquisitions_rename)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            showRename = true
+                        }
+                    )
 
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            stringResource(R.string.acquisitions_delete),
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                    },
-                    onClick = {
-                        expanded = false
-                        onDelete()
-                    }
-                )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(R.string.acquisitions_delete),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            onDelete()
+                        }
+                    )
+                }
             }
         }
     }
-
-    HorizontalDivider(
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-        thickness = 1.dp
-    )
 }
 
