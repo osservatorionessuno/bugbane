@@ -56,6 +56,16 @@
     <string name="scan_disable_dialog_close_button">Close</string>
     <string name="scan_cancel_button">Stop Acquisition</string>
     <string name="scan_cancelling_button">Cancelling...</string>
+    <string name="scan_module_running">Running %1$s: %2$s</string>
+    <string name="scan_module_completed">Completed %1$s: %2$s</string>
+
+    <string name="beta_warning_title">Beta Version Warning</string>
+    <string name="beta_warning_message">This is a beta version that could contain bugs, work-in-progress features, issues, etc.
+    \n\n
+    DO NOT use this version to handle sensitive data on the field.
+    \n
+    Only proceed if you understand the risks and are willing to take the responsibilityz.</string>
+    <string name="beta_warning_understand">I understand</string>
 
     <!-- Settings screen strings -->
     <string name="settings_description">Configure your preferences and app settings here.</string>
