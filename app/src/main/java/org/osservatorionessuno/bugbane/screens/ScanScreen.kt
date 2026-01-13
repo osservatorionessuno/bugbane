@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
@@ -32,6 +33,7 @@ import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
 import org.osservatorionessuno.cadb.AdbState
 import org.osservatorionessuno.bugbane.utils.AppState
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
+import org.osservatorionessuno.bugbane.utils.Utils
 import org.osservatorionessuno.qf.AcquisitionRunner
 import java.io.File
 
@@ -54,8 +56,70 @@ fun ScanScreen() {
     val progressLogs = remember { mutableStateListOf<String>() }
     val moduleLogIndex = remember { mutableStateMapOf<String, Int>() }
     val moduleBytes = remember { mutableStateMapOf<String, Long>() }
+    
+    val isBetaVersion = context.packageName.contains("beta", ignoreCase = true)
+    var showBetaWarningDialog by remember { mutableStateOf(false) }
+    var betaCountdown by remember { mutableStateOf(10) }
+    var betaButtonEnabled by remember { mutableStateOf(false) }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    
+    fun startAcquisition() {
+        val baseDir = File(context.filesDir, "acquisitions")
+        progressLogs.clear()
+        moduleLogIndex.clear()
+        moduleBytes.clear()
+        completedModules = 0
+        totalModules = 0
+        adbManager.runQuickForensics(baseDir, object : AcquisitionRunner.ProgressListener {
+            override fun onModuleStart(name: String, completed: Int, total: Int) {
+                coroutineScope.launch {
+                    totalModules = total
+                    moduleLogIndex[name] = progressLogs.size
+                    moduleBytes[name] = 0L
+                    progressLogs.add(context.getString(R.string.scan_module_running, name, Utils.formatBytes(0L)))
+                }
+            }
+
+            override fun onModuleProgress(name: String, bytes: Long) {
+                coroutineScope.launch {
+                    val idx = moduleLogIndex[name] ?: return@launch
+                    moduleBytes[name] = bytes
+                    progressLogs[idx] = context.getString(R.string.scan_module_running, name, Utils.formatBytes(bytes))
+                }
+            }
+
+            override fun onModuleComplete(name: String, completed: Int, total: Int) {
+                coroutineScope.launch {
+                    completedModules = completed
+                    val idx = moduleLogIndex[name]
+                    val finalBytes = moduleBytes[name] ?: 0L
+                    if (idx != null) {
+                        progressLogs[idx] = context.getString(R.string.scan_module_completed, name, Utils.formatBytes(finalBytes))
+                    } else {
+                        progressLogs.add(context.getString(R.string.scan_module_completed, name, Utils.formatBytes(finalBytes)))
+                    }
+                }
+            }
+
+            override fun isCancelled(): Boolean = adbManager.isQuickForensicsCancelled
+
+            override fun onFinished(cancelled: Boolean) {
+                coroutineScope.launch {
+                    if (!cancelled) {
+                        val latest = baseDir.listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.lastModified() }
+                        if (latest != null) {
+                            val intent = Intent(context, AcquisitionActivity::class.java).apply {
+                                putExtra(AcquisitionActivity.EXTRA_PATH, latest.absolutePath)
+                            }
+                            context.startActivity(intent)
+                        }
+                        showDisableDialog = true
+                    }
+                }
+            }
+        })
+    }
 
     Column(
         modifier = Modifier
@@ -160,7 +224,7 @@ fun ScanScreen() {
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.ic_bugbane_zoom),
-                            contentDescription = "Bugbane Logo",
+                            contentDescription = stringResource(R.string.app_name),
                             modifier = Modifier.size(160.dp),
                             alpha = 0.4f
                         )
@@ -191,7 +255,7 @@ fun ScanScreen() {
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.ic_bugbane_zoom),
-                            contentDescription = "Bugbane Logo",
+                            contentDescription = stringResource(R.string.app_name),
                             modifier = Modifier.size(160.dp),
                             alpha = 0.4f
                         )
@@ -265,66 +329,19 @@ fun ScanScreen() {
                         }
                     }
                 }
-
+                
                 // Scan Button fixed at the bottom
                 Button(
                     onClick = {
                         when (appState.value) {
                             AppState.AdbConnected -> {
-                                val baseDir = File(context.filesDir, "acquisitions")
-                                progressLogs.clear()
-                                moduleLogIndex.clear()
-                                moduleBytes.clear()
-                                completedModules = 0
-                                totalModules = 0
-                                adbManager.runQuickForensics(baseDir, object : AcquisitionRunner.ProgressListener {
-                                    override fun onModuleStart(name: String, completed: Int, total: Int) {
-                                        coroutineScope.launch {
-                                            totalModules = total
-                                            moduleLogIndex[name] = progressLogs.size
-                                            moduleBytes[name] = 0L
-                                            progressLogs.add("Running $name: 0 B")
-                                        }
-                                    }
-
-                                    override fun onModuleProgress(name: String, bytes: Long) {
-                                        coroutineScope.launch {
-                                            val idx = moduleLogIndex[name] ?: return@launch
-                                            moduleBytes[name] = bytes
-                                            progressLogs[idx] = "Running $name: ${formatBytes(bytes)}"
-                                        }
-                                    }
-
-                                    override fun onModuleComplete(name: String, completed: Int, total: Int) {
-                                        coroutineScope.launch {
-                                            completedModules = completed
-                                            val idx = moduleLogIndex[name]
-                                            val finalBytes = moduleBytes[name] ?: 0L
-                                            if (idx != null) {
-                                                progressLogs[idx] = "Completed $name: ${formatBytes(finalBytes)}"
-                                            } else {
-                                                progressLogs.add("Completed $name: ${formatBytes(finalBytes)}")
-                                            }
-                                        }
-                                    }
-
-                                    override fun isCancelled(): Boolean = adbManager.isQuickForensicsCancelled
-
-                                    override fun onFinished(cancelled: Boolean) {
-                                        coroutineScope.launch {
-                                            if (!cancelled) {
-                                                val latest = baseDir.listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.lastModified() }
-                                                if (latest != null) {
-                                                    val intent = Intent(context, AcquisitionActivity::class.java).apply {
-                                                        putExtra(AcquisitionActivity.EXTRA_PATH, latest.absolutePath)
-                                                    }
-                                                    context.startActivity(intent)
-                                                }
-                                                showDisableDialog = true
-                                            }
-                                        }
-                                    }
-                                })
+                                if (isBetaVersion) {
+                                    showBetaWarningDialog = true
+                                    betaCountdown = 10
+                                    betaButtonEnabled = false
+                                    return@Button
+                                }
+                                startAcquisition()
                             }
                             AppState.AdbConnecting, AppState.TryAutoConnect -> {
                                 // No-op and button is disabled below
@@ -372,16 +389,52 @@ fun ScanScreen() {
                 }
             }
         }
+        
+        // Beta warning dialog
+        if (showBetaWarningDialog) {
+            LaunchedEffect(showBetaWarningDialog) {
+                if (showBetaWarningDialog) {
+                    betaCountdown = 10
+                    betaButtonEnabled = false
+                    for (i in 10 downTo 1) {
+                        delay(1000)
+                        betaCountdown = i - 1
+                    }
+                    betaButtonEnabled = true
+                }
+            }
+            
+            LaunchedEffect(betaCountdown) {
+                // This ensures recomposition happens when countdown changes
+            }
+            
+            AlertDialog(
+                onDismissRequest = { showBetaWarningDialog = false },
+                title = {
+                    Text(stringResource(R.string.beta_warning_title))
+                },
+                text = {
+                    Text(stringResource(R.string.beta_warning_message))
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showBetaWarningDialog = false
+                            startAcquisition()
+                        },
+                        enabled = betaButtonEnabled
+                    ) {
+                        Text(if (betaButtonEnabled) stringResource(R.string.beta_warning_understand) else "$betaCountdown")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showBetaWarningDialog = false }
+                    ) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                }
+            )
+        }
     }
-}
-
-private fun formatBytes(bytes: Long): String {
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    var value = bytes.toDouble()
-    var idx = 0
-    while (value >= 1024 && idx < units.lastIndex) {
-        value /= 1024
-        idx++
-    }
-    return String.format("%.1f %s", value, units[idx])
 }
