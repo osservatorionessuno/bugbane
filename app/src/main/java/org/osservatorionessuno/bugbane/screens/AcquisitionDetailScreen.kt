@@ -5,10 +5,17 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -27,7 +34,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.qf.AcquisitionScanner
-import org.osservatorionessuno.bugbane.ScanDetailActivity
+import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.libmvt.common.AlertLevel
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
@@ -41,6 +49,7 @@ import kage.Age
 import kage.crypto.scrypt.ScryptRecipient
 import org.osservatorionessuno.bugbane.utils.Utils
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AcquisitionDetailScreen(acquisitionDir: File) {
     val context = LocalContext.current
@@ -56,6 +65,16 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     var passphrase by remember { mutableStateOf<String?>(null) }
     var showPassDialog by remember { mutableStateOf(false) }
     var generatedFile by remember { mutableStateOf<File?>(null) }
+    
+    // Bottom sheet state
+    val screenHeight = configuration.screenHeightDp.dp
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = false
+    )
+    var selectedScan by remember { mutableStateOf<ScanSummary?>(null) }
+    var isSelectionMode by remember { mutableStateOf(false) }
+    var selectedScans by remember { mutableStateOf<Set<ScanSummary>>(emptySet()) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(acquisitionDir) {
         size = Utils.calculateSize(acquisitionDir)
@@ -131,6 +150,50 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
         }
     }
 
+    fun deleteAnalysis(scan: ScanSummary) {
+        scope.launch(Dispatchers.IO) {
+            scan.file.delete()
+            scans = loadScans(acquisitionDir)
+            size = Utils.calculateSize(acquisitionDir)
+        }
+    }
+
+    fun deleteSelectedAnalyses() {
+        scope.launch(Dispatchers.IO) {
+            selectedScans.forEach { scan ->
+                scan.file.delete()
+            }
+            scans = loadScans(acquisitionDir)
+            size = Utils.calculateSize(acquisitionDir)
+            selectedScans = emptySet()
+            isSelectionMode = false
+        }
+    }
+
+    fun exitSelectionMode() {
+        isSelectionMode = false
+        selectedScans = emptySet()
+    }
+
+    fun toggleScanSelection(scan: ScanSummary) {
+        if (selectedScans.contains(scan)) {
+            val newSet = selectedScans - scan
+            // Exit selection mode if all items are unselected
+            if (newSet.isEmpty()) {
+                exitSelectionMode()
+            } else {
+                selectedScans = newSet
+            }
+        } else {
+            selectedScans = selectedScans + scan
+        }
+    }
+
+    // Handle back press to exit selection mode
+    BackHandler(enabled = isSelectionMode) {
+        exitSelectionMode()
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             Row(
@@ -145,17 +208,10 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, Utils.formatBytes(size)),
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                        stringResource(R.string.acquisition_details_name, acquisitionDir.name),
+                        style = MaterialTheme.typography.bodyLarge
                     )
                     meta?.let {
-                        val started = it.optString("started", "null").let { s ->
-                            try {
-                                dateFormat.format(Date.from(Instant.parse(s)))
-                            } catch (_: Exception) {
-                                s
-                            }
-                        } ?: "-"
                         val completed = it.optString("completed", "null").let { s ->
                             try {
                                 dateFormat.format(Date.from(Instant.parse(s)))
@@ -165,20 +221,26 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                         } ?: "-"
 
                         Text(
-                            text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_uuid, it.optString("uuid")),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_started, started),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
                             text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_completed, completed),
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
-
-                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, Utils.formatBytes(size)),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                    )
+                    Button(
+                        onClick = { startAnalysis() },
+                        enabled = processing == ProcessingState.OFF,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.acquisition_details_rescan))
+                    }
                 }
 
                 Column(
@@ -186,15 +248,32 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                         .weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_analyses),
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
-                    )
                     ScanList(
                         acquisitionDir = acquisitionDir,
                         scans = scans,
                         dateFormat = dateFormat,
                         processing = processing,
+                        isSelectionMode = isSelectionMode,
+                        selectedScans = selectedScans,
+                        onScanClick = { scan ->
+                            if (isSelectionMode) {
+                                toggleScanSelection(scan)
+                            } else {
+                                selectedScan = scan
+                                scope.launch {
+                                    sheetState.show()
+                                }
+                            }
+                        },
+                        onScanLongClick = { scan ->
+                            if (!isSelectionMode) {
+                                isSelectionMode = true
+                                selectedScans = setOf(scan)
+                            }
+                        },
+                        onToggleSelection = { scan ->
+                            toggleScanSelection(scan)
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
@@ -209,17 +288,10 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, Utils.formatBytes(size)),
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                    stringResource(R.string.acquisition_details_name, acquisitionDir.name),
+                    style = MaterialTheme.typography.bodyLarge
                 )
                 meta?.let {
-                    val started = it.optString("started", "null").let { s ->
-                        try {
-                            dateFormat.format(Date.from(Instant.parse(s)))
-                        } catch (_: Exception) {
-                            s
-                        }
-                    } ?: "-"
                     val completed = it.optString("completed", "null").let { s ->
                         try {
                             dateFormat.format(Date.from(Instant.parse(s)))
@@ -229,28 +301,53 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     } ?: "-"
 
                     Text(
-                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_uuid, it.optString("uuid")),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                        text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_started, started),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
                         text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_completed, completed),
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
-
                 Text(
-                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_analyses),
+                    text = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_size, Utils.formatBytes(size)),
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                 )
+                Button(
+                    onClick = { startAnalysis() },
+                    enabled = processing == ProcessingState.OFF,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.acquisition_details_rescan))
+                }
+
                 ScanList(
                     acquisitionDir = acquisitionDir,
                     scans = scans,
                     dateFormat = dateFormat,
                     processing = processing,
+                    isSelectionMode = isSelectionMode,
+                    selectedScans = selectedScans,
+                    onScanClick = { scan ->
+                        if (isSelectionMode) {
+                            toggleScanSelection(scan)
+                        } else {
+                            selectedScan = scan
+                            scope.launch {
+                                sheetState.show()
+                            }
+                        }
+                    },
+                    onScanLongClick = { scan ->
+                        if (!isSelectionMode) {
+                            isSelectionMode = true
+                            selectedScans = setOf(scan)
+                        }
+                    },
+                    onToggleSelection = { scan ->
+                        toggleScanSelection(scan)
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
@@ -258,16 +355,73 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             }
         }
 
-        // Bottom floating dock
-        FloatingActionDock(
-            onRescan = { startAnalysis() },
-            onExport = { startExport() },
-            onShare = { startShare() },
-            enabled = processing == ProcessingState.OFF,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp)
-        )
+        // Export and Share buttons
+        AnimatedVisibility(
+            visible = !isSelectionMode,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = { startExport() },
+                    enabled = processing == ProcessingState.OFF,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.acquisition_details_export))
+                }
+                Button(
+                    onClick = { startShare() },
+                    enabled = processing == ProcessingState.OFF,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.acquisition_details_share))
+                }
+            }
+        }
+
+        // Selection mode delete button
+        AnimatedVisibility(
+            visible = isSelectionMode && selectedScans.isNotEmpty(),
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = { showDeleteConfirmDialog = true },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.analysis_delete))
+                    Text(" (${selectedScans.size})")
+                }
+            }
+        }
 
         if (processing != ProcessingState.OFF) {
             Box(
@@ -330,6 +484,91 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             }
         )
     }
+    
+    // Bottom sheet for scan details
+    selectedScan?.let { scan ->
+        ModalBottomSheet(
+            onDismissRequest = {
+                scope.launch {
+                    sheetState.hide()
+                }.invokeOnCompletion {
+                    selectedScan = null
+                }
+            },
+            sheetState = sheetState,
+            dragHandle = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .width(40.dp)
+                            .height(4.dp),
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    ) {}
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            val initialHeight = screenHeight * 0.9f
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = initialHeight, max = screenHeight)
+            ) {
+                ScanDetailScreen(
+                    acquisitionDir = acquisitionDir,
+                    scanFile = scan.file,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+    
+    // Delete confirmation dialog
+    if (showDeleteConfirmDialog && selectedScans.isNotEmpty()) {
+        val count = selectedScans.size
+        AlertDialog(
+            onDismissRequest = { 
+                showDeleteConfirmDialog = false
+            },
+            title = {
+                Text(stringResource(R.string.analysis_delete_confirm_title))
+            },
+            text = {
+                Text(
+                    if (count == 1) {
+                        stringResource(R.string.analysis_delete_confirm_message)
+                    } else {
+                        context.getString(R.string.analysis_delete_confirm_message) + " ($count analyses)"
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        deleteSelectedAnalyses()
+                    }
+                ) {
+                    Text(stringResource(R.string.analysis_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                    }
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -338,19 +577,23 @@ private fun ScanList(
     scans: List<ScanSummary>,
     dateFormat: DateFormat,
     processing: ProcessingState,
+    isSelectionMode: Boolean,
+    selectedScans: Set<ScanSummary>,
+    onScanClick: (ScanSummary) -> Unit,
+    onScanLongClick: (ScanSummary) -> Unit,
+    onToggleSelection: (ScanSummary) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 88.dp),
+        contentPadding = PaddingValues(start = 2.dp, top = 4.dp, end = 2.dp, bottom = 22.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 2.dp, vertical = 8.dp)
             ) {
                 Text(
                     stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_analyses_date),
@@ -365,7 +608,7 @@ private fun ScanList(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_analyses_matches),
+                    stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_analyses_level),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -373,27 +616,44 @@ private fun ScanList(
             }
         }
         items(scans) { scan ->
+            val isSelected = selectedScans.contains(scan)
+            val scale = animateFloatAsState(
+                targetValue = if (isSelected && isSelectionMode) 1.02f else 1f,
+                animationSpec = tween(300),
+                label = "scale"
+            )
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    if (processing != ProcessingState.OFF) return@Card
-                    val intent = Intent(context, ScanDetailActivity::class.java).apply {
-                        putExtra(ScanDetailActivity.EXTRA_ACQUISITION_PATH, acquisitionDir.absolutePath)
-                        putExtra(ScanDetailActivity.EXTRA_SCAN_PATH, scan.file.absolutePath)
-                    }
-                    context.startActivity(intent)
-                },
-                enabled = processing == ProcessingState.OFF,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .scale(scale.value)
+                    .combinedClickable(
+                        enabled = processing == ProcessingState.OFF,
+                        onClick = {
+                            if (processing != ProcessingState.OFF) return@combinedClickable
+                            onScanClick(scan)
+                        },
+                        onLongClick = {
+                            if (processing != ProcessingState.OFF) return@combinedClickable
+                            onScanLongClick(scan)
+                        }
+                    ),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    containerColor = if (isSelected && isSelectionMode) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainer
+                    }
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = if (isSelected && isSelectionMode) 6.dp else 2.dp
+                )
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         dateFormat.format(Date.from(scan.started)),
@@ -407,78 +667,12 @@ private fun ScanList(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        scan.matchCount.toString(),
+                        scan.level.toString(),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Bold
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FloatingActionDock(
-    onRescan: () -> Unit,
-    onExport: () -> Unit,
-    onShare: () -> Unit,
-    enabled: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        tonalElevation = 3.dp,
-        shadowElevation = 3.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = { if (enabled) onRescan() },
-                enabled = enabled
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_rescan),
-                    tint = if (enabled) {
-                        MaterialTheme.colorScheme.tertiary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    }
-                )
-            }
-            IconButton(
-                onClick = { if (enabled) onExport() },
-                enabled = enabled
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Save,
-                    contentDescription = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_export),
-                    tint = if (enabled) {
-                        MaterialTheme.colorScheme.tertiary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    }
-                )
-            }
-            IconButton(
-                onClick = { if (enabled) onShare() },
-                enabled = enabled
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = stringResource(org.osservatorionessuno.bugbane.R.string.acquisition_details_share),
-                    tint = if (enabled) {
-                        MaterialTheme.colorScheme.tertiary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    }
-                )
             }
         }
     }
@@ -488,7 +682,7 @@ private data class ScanSummary(
     val file: File,
     val started: Instant,
     val indicatorsHash: String,
-    val matchCount: Int,
+    val level: AlertLevel,
 )
 
 private fun loadScans(acquisitionDir: File): List<ScanSummary> {
@@ -510,21 +704,25 @@ private fun loadScans(acquisitionDir: File): List<ScanSummary> {
                 Utils.sha256(hashes.joinToString(""))
             }
             val resultsArray = obj.optJSONArray("results")
-            val results = if (resultsArray != null) {
-                var count = 0
-                // Remove the LOG level alerts from the count
+            val level = if (resultsArray != null) {
+                var highestLevel = AlertLevel.LOG
                 for (i in 0 until resultsArray.length()) {
                     val resultObj = resultsArray.getJSONObject(i)
-                    val level = resultObj.optString("level", "").uppercase()
-                    if (level != "LOG") {
-                        count++
+                    val levelStr = resultObj.optString("level", "").uppercase()
+                    try {
+                        val level = AlertLevel.valueOf(levelStr)
+                        if (level.ordinal > highestLevel.ordinal) {
+                            highestLevel = level
+                        }
+                    } catch (_: Exception) {
+                        // Ignore unknown levels
                     }
                 }
-                count
+                highestLevel
             } else {
-                0
+                AlertLevel.LOG
             }
-            ScanSummary(file, started, hash, results)
+            ScanSummary(file, started, hash, level)
         } catch (_: Exception) {
             null
         }

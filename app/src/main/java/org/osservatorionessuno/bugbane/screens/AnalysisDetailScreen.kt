@@ -31,7 +31,11 @@ import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.libmvt.common.AlertLevel
 
 @Composable
-fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
+fun ScanDetailScreen(
+    acquisitionDir: File, 
+    scanFile: File,
+    modifier: Modifier = Modifier
+) {
     val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
     val uriHandler = LocalUriHandler.current
     val supportUrl = stringResource(R.string.spyware_support_url)
@@ -73,7 +77,7 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -82,19 +86,10 @@ fun ScanDetailScreen(acquisitionDir: File, scanFile: File) {
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                stringResource(R.string.analysis_details_acquisition_name, acquisitionDir.name),
-                style = MaterialTheme.typography.bodyLarge
-            )
             acquisitionMeta?.let {
-                val uuid = it.optString("uuid")
                 val completed = it.optString("completed").let { s ->
                     try { dateFormat.format(Date.from(Instant.parse(s))) } catch (_: Exception) { s }
                 }
-                Text(
-                    stringResource(R.string.analysis_details_acquisition_uuid, uuid),
-                    style = MaterialTheme.typography.bodyLarge
-                )
                 Text(
                     stringResource(R.string.analysis_details_acquisition_completed, completed),
                     style = MaterialTheme.typography.bodyLarge
