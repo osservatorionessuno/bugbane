@@ -64,7 +64,7 @@
     \n\n
     DO NOT use this version to handle sensitive data on the field.
     \n
-    Only proceed if you understand the risks and are willing to take the responsibilityz.</string>
+    Only proceed if you understand the risks and are willing to take the responsibility.</string>
     <string name="beta_warning_understand">I understand</string>
 
     <!-- Settings screen strings -->

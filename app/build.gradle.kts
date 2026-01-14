@@ -11,12 +11,23 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "org.osservatorionessuno.bugbane.beta"
+        applicationId = "org.osservatorionessuno.bugbane"
         minSdk = 30
         targetSdk = 36
         versionCode = 4
         versionName = "0.1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    flavorDimensions += "version"
+    productFlavors {
+        create("beta") {
+            dimension = "version"
+            applicationIdSuffix = ".beta"
+        }
+        create("production") {
+            dimension = "version"
+        }
     }
 
     signingConfigs {
