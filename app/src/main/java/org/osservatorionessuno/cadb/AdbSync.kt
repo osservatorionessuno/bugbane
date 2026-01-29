@@ -202,7 +202,7 @@ class AdbSync(
         assert(remoteDir.endsWith("/"))
 
         val entries = list(remoteDir)
-        // TODO: files starting with "." are ignored??
+        // TODO: BUG: files starting with "." are ignored??
         for (entry in entries) {
             val path = entry["path"] as String
             val mode = entry["mode"] as Int

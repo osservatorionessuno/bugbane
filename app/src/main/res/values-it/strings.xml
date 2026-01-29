@@ -7,13 +7,11 @@
     <string name="slideshow_welcome_title">Benvenuto in Bugbane</string>
     <string name="slideshow_welcome_description">Questa applicazione aiuta con l\'analisi forense consensuale di dispositivi Android per identificare segnali di compromissione o sorveglianza.\n\nL\'assenza di rilevazioni da quest\'app tuttavia non significa che il tuo dispositivo è sicuro o protetto. \n</string>
     <string name="slideshow_unsupported_version">Ci dispiace, Bugbane non è supportato sulle versioni di Android inferiori a 11 (API level 30). Si consiglia l\'uso di AndroidQF o MVT da un computer fidato.</string>
-    <!-- TODO fix/review this translation -->
     <string name="slideshow_button_exit">Esci</string>
     <string name="slideshow_welcome_button">Ho capito</string>
     <string name="slideshow_wifi_title">Connetti a una rete Wi-Fi fidata</string>
     <string name="slideshow_wifi_description">Per continuare, connetti il tuo dispositivo ad una rete Wi-Fi protetta, ad esempio alla tua rete casalinga o ad un hotspot personale.</string>
     <string name="slideshow_wifi_button">Apri impostazioni Wi-Fi</string>
-    <!-- TODO fix/review this translation -->
     <string name="slideshow_button_continue">Continuare</string>
     <string name="slideshow_notification_title">Abilita autorizzazioni alle notifiche</string>
     <string name="slideshow_notification_description">Per utilizzare questa applicazione, è necessario abilitare l\'autorizzazione alle notifiche.\n\nBugbane visualizzerà una notifica dove puoi inserire il codice di abbinamento per l\' ADB Wireless Debugging.</string>
@@ -41,11 +39,8 @@
     <string name="scan_module_running">Esecuzione di %1$s: %2$s</string>
     <string name="scan_module_completed">Completato %1$s: %2$s</string>
     <string name="beta_warning_title">Avviso Versione Beta</string>
-    <string name="beta_warning_message">Questa è una versione beta che potrebbe contenere bug, funzionalità in fase di sviluppo, problemi, ecc.
-    \n\n
-    NON utilizzare questa versione per gestire dati sensibili sul campo.
-    \n
-    Procedi solo se hai compreso i rischi e sei disposto a assumerti la responsabilità.</string>
+    <string name="beta_warning_message">Questa è una versione Beta. Installala e testala su un telefono di riserva, NON su quello che usi quotidianamente. Procedi solo se hai compreso i rischi.</string>
+    <string name="beta_warning_quit">Esci dall\'app</string>
     <string name="beta_warning_understand">Ho capito</string>
     <string name="settings_description">Configura qui le tue preferenze e le impostazioni dell\'app.</string>
     <string name="settings_general">Impostazioni generali</string>
@@ -94,7 +89,6 @@
     <string name="acquisition_share_message">Archivio di acquisizione. Passphrase: %1$s</string>
     <string name="acquisition_passphrase_copy">Copia nella clipboard</string>
     <string name="acquisition_passphrase_close">Chiudi</string>
-    <!-- Scan details strings -->
     <string name="analysis_details_title">Dettagli analisi</string>
     <string name="analysis_details_artifact">Livello</string>
     <string name="analysis_details_type">Tipo</string>
