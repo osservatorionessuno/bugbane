@@ -60,12 +60,9 @@
     <string name="scan_module_completed">Completed %1$s: %2$s</string>
 
     <string name="beta_warning_title">Beta Version Warning</string>
-    <string name="beta_warning_message">This is a beta version that could contain bugs, work-in-progress features, issues, etc.
-    \n\n
-    DO NOT use this version to handle sensitive data on the field.
-    \n
-    Only proceed if you understand the risks and are willing to take the responsibility.</string>
+    <string name="beta_warning_message">This is a Beta version. Install and test it on a spare phone, NOT on your everyday device. Only proceed if you understand the risks.</string>
     <string name="beta_warning_understand">I understand</string>
+    <string name="beta_warning_quit">Quit the app</string>
 
     <!-- Settings screen strings -->
     <string name="settings_description">Configure your preferences and app settings here.</string>

@@ -1,5 +1,6 @@
 package org.osservatorionessuno.bugbane.screens
 
+import android.app.Activity
 import android.app.Application
 import android.content.Intent
 import androidx.compose.foundation.Image
@@ -429,9 +430,14 @@ fun ScanScreen() {
                 },
                 dismissButton = {
                     TextButton(
-                        onClick = { showBetaWarningDialog = false }
+                        onClick = {
+                            showBetaWarningDialog = false
+                            // Close the application
+                            (context as? Activity)?.finishAffinity()
+                            System.exit(0);
+                        }
                     ) {
-                        Text(stringResource(android.R.string.cancel))
+                        Text(stringResource(R.string.beta_warning_quit))
                     }
                 }
             )
