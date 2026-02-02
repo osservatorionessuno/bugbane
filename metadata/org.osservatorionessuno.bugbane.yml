@@ -30,7 +30,7 @@ Builds:
       chmod +x gradlew
     gradle:
       - yes
-    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
 
 AutoUpdateMode: None
 UpdateCheckMode: None
