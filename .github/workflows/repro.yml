@@ -31,13 +31,13 @@ jobs:
       - name: Download Build artifact (ubuntu-22.04)
         uses: actions/download-artifact@v4
         with:
-          name: app-release-ubuntu-22.04
+          name: app-production-release-ubuntu-22.04
           path: artifacts/ubuntu-22.04
 
       - name: Download Build artifact (ubuntu-24.04)
         uses: actions/download-artifact@v4
         with:
-          name: app-release-ubuntu-24.04
+          name: app-production-release-ubuntu-24.04
           path: artifacts/ubuntu-24.04
 
       - name: Download F-Droid artifact
@@ -62,8 +62,8 @@ jobs:
       - name: Compare 22.04 vs 24.04
         run: |
           set -euo pipefail
-          A=./artifacts/ubuntu-22.04/app-release.apk
-          B=./artifacts/ubuntu-24.04/app-release.apk
+          A=./artifacts/ubuntu-22.04/app-production-release.apk
+          B=./artifacts/ubuntu-24.04/app-production-release.apk
           test -f "$A" && test -f "$B"
           # apksigcopier compares APK contents ignoring signatures
           apksigcopier compare "$A" "$B"
@@ -71,8 +71,8 @@ jobs:
       - name: Compare vs F-Droid repo APK
         run: |
           set -euo pipefail
-          A=./artifacts/ubuntu-22.04/app-release.apk
-          B=./artifacts/ubuntu-24.04/app-release.apk
+          A=./artifacts/ubuntu-22.04/app-production-release.apk
+          B=./artifacts/ubuntu-24.04/app-production-release.apk
           # F-Droid puts signed APKs in repo/, pick the newest one
           F=$(ls -t ./artifacts/fdroid/repo/*.apk | head -n1)
           echo "Comparing against F-Droid APK: $F"
@@ -84,8 +84,8 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          A=artifacts/ubuntu-22.04/app-release.apk
-          B=artifacts/ubuntu-24.04/app-release.apk
+          A=artifacts/ubuntu-22.04/app-production-release.apk
+          B=artifacts/ubuntu-24.04/app-production-release.apk
           diffoscope "$A" "$B" > diffoscope-22-vs-24.txt || true
 
       - name: diffoscope (22.04 vs F-Droid)
@@ -93,7 +93,7 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          A=artifacts/ubuntu-22.04/app-release.apk
+          A=artifacts/ubuntu-22.04/app-production-release.apk
           F=$(ls -t artifacts/fdroid/repo/*.apk | head -n1)
           diffoscope "$A" "$F" > diffoscope-22-vs-fdroid.txt || true
 
@@ -102,7 +102,7 @@ jobs:
         continue-on-error: true
         run: |
           set -euo pipefail
-          B=artifacts/ubuntu-24.04/app-release.apk
+          B=artifacts/ubuntu-24.04/app-production-release.apk
           F=$(ls -t artifacts/fdroid/repo/*.apk | head -n1)
           diffoscope "$B" "$F" > diffoscope-24-vs-fdroid.txt || true
 

@@ -56,14 +56,14 @@ jobs:
           gradle --version
 
       - name: Build with Gradle
-        run: gradle --no-daemon assembleDebug assembleRelease
+        run: gradle --no-daemon assembleProductionDebug assembleProductionRelease
 
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-${{ matrix.os }}
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: app-production-debug-${{ matrix.os }}
+          path: app/build/outputs/apk/production/debug/app-production-debug.apk
           compression-level: 0
           retention-days: 7
 
@@ -71,7 +71,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-${{ matrix.os }}
-          path: app/build/outputs/apk/release/app-release.apk
+          name: app-production-release-${{ matrix.os }}
+          path: app/build/outputs/apk/production/release/app-production-release.apk
           compression-level: 0
           retention-days: 7
