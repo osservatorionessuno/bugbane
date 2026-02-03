@@ -3,7 +3,8 @@ package org.osservatorionessuno.libmvt.android.artifacts
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.libmvt.common.AlertLevel
 import org.osservatorionessuno.libmvt.common.Detection
-import org.osservatorionessuno.libmvt.common.IndicatorType
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType
+import java.io.InputStream
 
 /**
  * Parser for Android tombstone crash files.
@@ -12,13 +13,13 @@ import org.osservatorionessuno.libmvt.common.IndicatorType
  */
 class TombstoneCrashes : AndroidArtifact() {
 
-    override fun parse(input: String?) {
+    override fun paths(): List<String> = emptyList()
+
+    override fun parse(input: InputStream) {
         results.clear()
-        if (input == null) return
 
         val rec = HashMap<String, Any?>()
-        val lines = input.split('\n')
-        for (raw in lines) {
+        for (raw in collectLines(input)) {
             val line = raw.trim()
             when {
                 line.startsWith("Timestamp:") -> {
@@ -153,11 +154,13 @@ class TombstoneCrashes : AndroidArtifact() {
                 else -> null
             }
             if (uid != null && (uid == 0 || uid == 1000 || uid == 2000)) {
-                detected.add(Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_tombstone_crashes_uid_title),
-                    String.format(
-                        context.getString(R.string.mvt_tombstone_crashes_uid_message),
-                        uid, proc ?: ""
-                    )));
+                context?.let { ctx ->
+                    detected.add(Detection(AlertLevel.MEDIUM, ctx.getString(R.string.mvt_tombstone_crashes_uid_title),
+                        String.format(
+                            ctx.getString(R.string.mvt_tombstone_crashes_uid_message),
+                            uid, proc ?: ""
+                        )))
+                }
             }
         }
     }

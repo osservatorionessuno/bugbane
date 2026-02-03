@@ -1,8 +1,10 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 
 import java.util.*;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -12,11 +14,16 @@ public class DumpsysDBInfo extends AndroidArtifact {
     private static final Pattern RXP_NO_PID = Pattern.compile(".*\\[([0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3})\\][ ]{1}(\\w+).*sql=\\\"(.+?)\\\"");
 
     @Override
-    public void parse(String output) {
+    public List<String> paths() {
+        return List.of("dumpsys.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         results.clear();
         String pool = null;
         boolean inOperations = false;
-        for (String line : output.split("\n")) {
+        for (String line : collectLines(input)) {
             if (line.startsWith("Connection pool for ")) {
                 pool = line.replace("Connection pool for ", "").replaceFirst(":$", "");
             }

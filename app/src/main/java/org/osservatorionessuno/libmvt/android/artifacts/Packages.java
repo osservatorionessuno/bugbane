@@ -3,7 +3,7 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.Detection;
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 import org.osservatorionessuno.libmvt.common.Utils;
 
 import org.json.JSONArray;
@@ -12,12 +12,20 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * Parser for packages.json artifact collected by the `packages` module.
  * This is different from the DumpsysPackages module that use a BugReport artifact instead.
  */
 public class Packages extends AndroidArtifact {
+
+    @Override
+    public List<String> paths() {
+        return List.of("packages.json");
+    }
+
     private static class PackageResult {
         String name = "";
         Boolean disabled = false;
@@ -29,10 +37,10 @@ public class Packages extends AndroidArtifact {
     }
 
     @Override
-    public void parse(String input) {
+    public void parse(InputStream input) throws IOException {
         try {
             // Try to parse the input as a JSON array
-            JSONArray arr = new JSONArray(input);
+            JSONArray arr = new JSONArray(collectText(input));
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject obj = arr.getJSONObject(i);
 
@@ -74,31 +82,31 @@ public class Packages extends AndroidArtifact {
             PackageResult result = (PackageResult) r;
 
             if (Utils.ROOT_PACKAGES.contains(result.name)) {
-                this.detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_packages_root_package_title),
+                detected.add(new Detection(AlertLevel.MEDIUM, getContext().getString(R.string.mvt_packages_root_package_title),
                     String.format(
-                        context.getString(R.string.mvt_packages_root_package_message),
+                        getContext().getString(R.string.mvt_packages_root_package_message),
                         result.name
                     )));
                 continue;
             }
 
             if ("null".equals(result.installer) && !result.system) {
-                this.detected.add(new Detection(AlertLevel.HIGH, context.getString(R.string.mvt_packages_non_system_package_title),
+                detected.add(new Detection(AlertLevel.HIGH, getContext().getString(R.string.mvt_packages_non_system_package_title),
                     String.format(
-                        context.getString(R.string.mvt_packages_non_system_package_message),
+                        getContext().getString(R.string.mvt_packages_non_system_package_message),
                         result.name
                     )));
             } else if (Utils.THIRD_PARTY_STORE_INSTALLERS.contains(result.installer)) {
-                this.detected.add(new Detection(AlertLevel.INFO, context.getString(R.string.mvt_packages_third_party_store_package_title),
+                detected.add(new Detection(AlertLevel.INFO, getContext().getString(R.string.mvt_packages_third_party_store_package_title),
                     String.format(
-                        context.getString(R.string.mvt_packages_third_party_store_package_message),
+                        getContext().getString(R.string.mvt_packages_third_party_store_package_message),
                         result.installer,
                         result.name
                     )));
             } else if (Utils.BROWSER_INSTALLERS.contains(result.installer)) {
-                this.detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_packages_browser_package_title),
+                detected.add(new Detection(AlertLevel.MEDIUM, getContext().getString(R.string.mvt_packages_browser_package_title),
                     String.format(
-                        context.getString(R.string.mvt_packages_browser_package_message),
+                        getContext().getString(R.string.mvt_packages_browser_package_message),
                         result.installer,
                         result.name
                     )));
@@ -106,30 +114,28 @@ public class Packages extends AndroidArtifact {
 
 
             if (Utils.SECURITY_PACKAGES.contains(result.name) && result.disabled) {
-                this.detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_packages_security_package_title),
+                detected.add(new Detection(AlertLevel.MEDIUM, getContext().getString(R.string.mvt_packages_security_package_title),
                     String.format(
-                        context.getString(R.string.mvt_packages_security_package_message),
+                        getContext().getString(R.string.mvt_packages_security_package_message),
                         result.name
                     )));
             }
 
             if (Utils.SYSTEM_UPDATE_PACKAGES.contains(result.name) && result.disabled) {
-                this.detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_packages_system_update_package_title),
+                detected.add(new Detection(AlertLevel.MEDIUM, getContext().getString(R.string.mvt_packages_system_update_package_title),
                     String.format(
-                        context.getString(R.string.mvt_packages_system_update_package_message),
+                        getContext().getString(R.string.mvt_packages_system_update_package_message),
                         result.name
                     )));
             }
 
-            if (this.indicators == null) {
-                continue;
-            }
+            if (indicators == null) return;
 
-            detected.addAll(this.indicators.matchString(result.name, IndicatorType.APP_ID));
+            detected.addAll(indicators.matchString(result.name, IndicatorType.APP_ID));
 
             for (Map<String, String> packageFile : result.files) {
-                detected.addAll(this.indicators.matchString(packageFile.get("path"), IndicatorType.FILE_PATH));
-                detected.addAll(this.indicators.matchString(packageFile.get("sha256"), IndicatorType.FILE_HASH_SHA256));
+                detected.addAll(indicators.matchString(packageFile.get("path"), IndicatorType.FILE_PATH));
+                detected.addAll(indicators.matchString(packageFile.get("sha256"), IndicatorType.FILE_HASH_SHA256));
 
                 // TODO: Implement certificate checks
             }

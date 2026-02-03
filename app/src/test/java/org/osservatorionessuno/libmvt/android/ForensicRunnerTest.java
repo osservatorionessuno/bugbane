@@ -20,10 +20,11 @@ public class ForensicRunnerTest {
         Indicators ind = new Indicators();
         ind.loadFromDirectory(iocDir);
 
-        ForensicRunner runner = new ForensicRunner(dir);
+        ForensicRunner runner = new ForensicRunner();
         runner.setIndicators(ind);
 
-        Map<String, Artifact> res = runner.runAll();
+        //Map<String, Artifact> res = runner.runAll();
+        Map<String, Artifact> res = runner.streamLegacyAnalysisFromDirectory(dir);
 
         assertTrue(res.containsKey("processes"));
         Artifact proc = res.get("processes");
@@ -39,8 +40,8 @@ public class ForensicRunnerTest {
     public void testRunSingleModule() throws Exception {
         File dir = Paths.get("src", "test", "resources", "androidqf").toFile();
 
-        ForensicRunner runner = new ForensicRunner(dir);
-        Artifact art = runner.runModule("getprop");
+        ForensicRunner runner = new ForensicRunner();
+        Artifact art = runner.runModule("getprop", dir);
 
         assertNotNull(art);
         assertEquals(10, art.getResults().size());

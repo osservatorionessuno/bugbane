@@ -2,10 +2,12 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 
 import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 import org.osservatorionessuno.libmvt.common.Detection;
 
 import java.util.*;
+import java.io.IOException;
+import java.io.InputStream;
 
 /** Parser for dumpsys appops output. */
 public class DumpsysAppops extends AndroidArtifact {
@@ -13,14 +15,19 @@ public class DumpsysAppops extends AndroidArtifact {
     private static final Set<String> RISKY_PACKAGES = Set.of("com.android.shell");
 
     @Override
-    public void parse(String output) {
+    public List<String> paths() {
+        return List.of("dumpsys.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         results.clear();
         Map<String, Object> pkg = null;
         Map<String, Object> perm = new HashMap<>();
         Map<String, Object> entry = new HashMap<>();
         String uid = null;
         boolean inPackages = false;
-        for (String line : output.split("\n")) {
+        for (String line : collectLines(input)) {
             if (line.startsWith("  Uid 0:")) inPackages = true;
             if (!inPackages) continue;
             if (line.startsWith("  Uid ")) {
@@ -108,9 +115,9 @@ public class DumpsysAppops extends AndroidArtifact {
             for (Map<String, Object> perm : perms) {
                 String permName = (String) perm.get("name");
                 if (RISKY_PERMISSIONS.contains(permName) || riskyPkg) {
-                    detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_appops_risky_permission_title),
+                    detected.add(new Detection(AlertLevel.MEDIUM, getContext().getString(R.string.mvt_appops_risky_permission_title),
                         String.format(
-                            context.getString(R.string.mvt_appops_risky_permission_message), 
+                            getContext().getString(R.string.mvt_appops_risky_permission_message), 
                             pkgName, permName, perm.get("access"), perm.get("timestamp")
                         )));
                 }

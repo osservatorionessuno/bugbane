@@ -1,15 +1,23 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 
 import java.util.*;
+import java.io.IOException;
+import java.io.InputStream;
 
 /** Parser for dumpsys battery history output. */
 public class DumpsysBatteryHistory extends AndroidArtifact {
+
     @Override
-    public void parse(String data) {
+    public List<String> paths() {
+        return List.of("dumpsys.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         results.clear();
-        for (String line : data.split("\n")) {
+        for (String line : collectLines(input)) {
             if (line.startsWith("Battery History ")) continue;
             if (line.trim().isEmpty()) break;
             String trimmed = line.trim();

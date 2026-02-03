@@ -3,14 +3,17 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.Detection;
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * Parser for the output of the `getprop` command.
@@ -32,9 +35,14 @@ public class GetProp extends AndroidArtifact {
     );
 
     @Override
-    public void parse(String input) {
+    public List<String> paths() {
+        return List.of("getprop.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         results.clear();
-        for (String line : input.split("\n")) {
+        for (String line : collectLines(input)) {
             line = line.trim();
             if (line.isEmpty()) continue;
             Matcher m = PATTERN.matcher(line);
@@ -55,9 +63,9 @@ public class GetProp extends AndroidArtifact {
             if (Objects.equals(name, "ro.build.version.security_patch")) {
                 String patchLevel = map.get("value");
                 if (daysSinceSecurityPatchLevel(patchLevel) > 180) {
-                    detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_getprop_security_patch_title),
+                    detected.add(new Detection(AlertLevel.MEDIUM, getContext().getString(R.string.mvt_getprop_security_patch_title),
                         String.format(
-                            context.getString(R.string.mvt_getprop_security_patch_message), 
+                            getContext().getString(R.string.mvt_getprop_security_patch_message), 
                             patchLevel
                         )));
                 }

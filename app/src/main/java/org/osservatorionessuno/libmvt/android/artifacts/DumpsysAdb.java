@@ -3,23 +3,30 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.Detection;
-import org.osservatorionessuno.libmvt.common.IndicatorType;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
 import java.util.*;
+import java.io.InputStream;
+import java.io.IOException;
 
 /** Parser for dumpsys adb output. */
 public class DumpsysAdb extends AndroidArtifact {
     private static final Set<String> MULTILINE = Set.of("user_keys", "keystore");
 
     @Override
-    public void parse(String input) throws Exception {
+    public List<String> paths() {
+        return List.of("dumpsys.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws Exception {
+        String content = collectText(input);
         results.clear();
-        if (input == null || input.contains("Can't find service: adb")) return;
+        if (input == null || content.contains("Can't find service: adb")) return;
         Map<String, Object> res = new HashMap<>();
-        String[] lines = input.split("\n");
+        String[] lines = content.split("\n"); // use collectLines
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.startsWith("user_keys=")) {
@@ -160,9 +167,9 @@ public class DumpsysAdb extends AndroidArtifact {
             List<Map<String, String>> userKeys = (List<Map<String, String>>) map.get("user_keys");
             if (userKeys != null) {
                 for (Map<String, String> userKey : userKeys) {
-                    detected.add(new Detection(AlertLevel.INFO, context.getString(R.string.mvt_adb_fingerprint_title),
+                    detected.add(new Detection(AlertLevel.INFO, getContext().getString(R.string.mvt_adb_fingerprint_title),
                         String.format(
-                            context.getString(R.string.mvt_adb_fingerprint_message), 
+                            getContext().getString(R.string.mvt_adb_fingerprint_message), 
                             userKey.get("user"), 
                             userKey.get("fingerprint")
                         )));

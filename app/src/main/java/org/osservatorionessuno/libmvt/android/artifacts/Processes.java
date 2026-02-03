@@ -1,21 +1,30 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 
 import java.math.BigInteger;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * Parser for the output of the `ps` command.
  */
 public class Processes extends AndroidArtifact {
+
     @Override
-    public void parse(String input) {
+    public List<String> paths() {
+        return List.of("processes.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         results.clear();
-        String[] lines = input.split("\n");
-        for (int i = 1; i < lines.length; i++) {
-            String line = lines[i].trim();
+        for (String line : collectLines(input)) {
+            if (line.startsWith("USER")) continue; // Skip header line
+            line = line.trim();
             if (line.isEmpty()) continue;
             String[] parts = line.split("\\s+");
             // Sometimes WCHAN is empty or label present; adjust length

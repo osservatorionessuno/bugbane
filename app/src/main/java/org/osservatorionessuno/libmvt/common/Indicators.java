@@ -29,6 +29,25 @@ import java.util.Set;
 public class Indicators {
     private static final String TAG = "Indicators";
 
+    public enum IndicatorType {
+        OTHER,
+        DOMAIN,
+        URL,
+        PROCESS,
+        EMAIL,
+        APP_ID,
+        PROPERTY,
+        FILE_PATH,
+        FILE_NAME,
+        FILE_HASH_MD5,
+        FILE_HASH_SHA1,
+        FILE_HASH_SHA256,
+        APP_CERT_HASH_MD5,
+        APP_CERT_HASH_SHA1,
+        APP_CERT_HASH_SHA256,
+        IOS_PROFILE_ID,
+    }
+
     /**
      * Configuration mapping indicator types to their JSON field keys and STIX pattern keys.
      * This makes it easy to add new indicator types without modifying the core logic.

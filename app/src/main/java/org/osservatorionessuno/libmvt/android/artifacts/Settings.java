@@ -5,6 +5,8 @@ import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.Detection;
 
 import java.util.*;
+import java.io.InputStream;
+import java.io.IOException;
 
 /** Parser for Android settings files. */
 public class Settings extends AndroidArtifact {
@@ -36,11 +38,16 @@ public class Settings extends AndroidArtifact {
     }
 
     @Override
-    public void parse(String input) {
+    public List<String> paths() {
+        return List.of("settings_system.txt", "settings_secure.txt", "settings_global.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         results.clear();
         Map<String, String> map = new HashMap<>();
         if (input != null) {
-            for (String line : input.split("\n")) {
+            for (String line : collectLines(input)) {
                 line = line.trim();
                 if (line.isEmpty() || !line.contains("=")) continue;
                 String[] parts = line.split("=", 2);
@@ -60,8 +67,8 @@ public class Settings extends AndroidArtifact {
             if (ds != null &&
                 !ds.safeValue.equals(entry.getValue())) {
                 detected.add(new Detection(
-                        AlertLevel.INFO, context.getString(R.string.mvt_dangerous_settings_title),
-                        String.format(context.getString(R.string.mvt_dangerous_settings_message),
+                        AlertLevel.INFO, getContext().getString(R.string.mvt_dangerous_settings_title),
+                        String.format(getContext().getString(R.string.mvt_dangerous_settings_message),
                             ds.description, entry.getKey(), entry.getValue()
                         )));
             }

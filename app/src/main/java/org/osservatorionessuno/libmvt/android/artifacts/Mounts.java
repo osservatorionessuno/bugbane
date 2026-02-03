@@ -3,7 +3,7 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.Detection;
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.function.Predicate;
 import org.json.JSONArray;
+import java.io.InputStream;
+import java.io.IOException;
 
 /**
  * Parser for the output of the `mount` command.
@@ -22,13 +24,19 @@ public class Mounts extends AndroidArtifact {
     private static final Set<String> ALLOWLIST_NOATIME = Set.of("/system_dlkm", "/system_ext", "/product", "/vendor", "/vendor_dlkm");
 
     @Override
-    public void parse(String input) {
+    public List<String> paths() {
+        return List.of("mounts.json");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         // Expect input as a JSON string representing an array of mount entry lines (not direct file lines).
-        if (input == null || input.trim().isEmpty()) {
+        String content = collectText(input);
+        if (content == null || content.trim().isEmpty()) {
             return;
         }
         try {
-            JSONArray entries = new JSONArray(input);
+            JSONArray entries = new JSONArray(content);
 
             Predicate<String> isSuspicious = mnt -> {
                 return SUSPICIOUS_MOUNT_POINTS.contains(mnt) || 
@@ -94,7 +102,7 @@ public class Mounts extends AndroidArtifact {
                     mountEntry.put("is_system_partition", isSystemPartition);
                     mountEntry.put("is_read_write", isReadWrite);
 
-                    this.results.add(mountEntry);
+                    results.add(mountEntry);
                 } catch (Exception e) {
                     // parsing failed, skip this line
                     continue;
@@ -112,7 +120,7 @@ public class Mounts extends AndroidArtifact {
         List<Map<String, Object>> systemRwMounts = new ArrayList<>();
         List<Map<String, Object>> suspiciousMounts = new ArrayList<>();
 
-        for (Object obj : this.results) {
+        for (Object obj : results) {
             @SuppressWarnings("unchecked")
             Map<String, Object> mount = (Map<String, Object>) obj;
             String mountPoint = (String) mount.get("mount_point");
@@ -123,15 +131,15 @@ public class Mounts extends AndroidArtifact {
             if (Boolean.TRUE.equals(mount.get("is_system_partition")) && Boolean.TRUE.equals(mount.get("is_read_write"))) {
                 systemRwMounts.add(mount);
                 if ("/system".equals(mountPoint)) {
-                    detected.add(new Detection(AlertLevel.HIGH, context.getString(R.string.mvt_mounts_root_title),
+                    detected.add(new Detection(AlertLevel.HIGH, getContext().getString(R.string.mvt_mounts_root_title),
                         String.format(
-                            context.getString(R.string.mvt_mounts_root_message), 
+                            getContext().getString(R.string.mvt_mounts_root_message), 
                             mountPoint
                         )));
                 } else {
-                    detected.add(new Detection(AlertLevel.HIGH, context.getString(R.string.mvt_mounts_system_title),
+                    detected.add(new Detection(AlertLevel.HIGH, getContext().getString(R.string.mvt_mounts_system_title),
                         String.format(
-                            context.getString(R.string.mvt_mounts_system_message), 
+                            getContext().getString(R.string.mvt_mounts_system_message), 
                             mountPoint
                         )));
                 }
@@ -152,16 +160,16 @@ public class Mounts extends AndroidArtifact {
                     continue;
                 }
                 suspiciousMounts.add(mount);
-                detected.add(new Detection(AlertLevel.HIGH, context.getString(R.string.mvt_mounts_suspicious_title),
-                    String.format(context.getString(R.string.mvt_mounts_suspicious_message), 
+                detected.add(new Detection(AlertLevel.HIGH, getContext().getString(R.string.mvt_mounts_suspicious_title),
+                    String.format(getContext().getString(R.string.mvt_mounts_suspicious_message), 
                         mountPoint, String.join(", ", suspiciousOpts)
                     )));
             }
 
             // Log interesting mount information (just log - map to LOG detection)
             if ("/data".equals(mountPoint) || mountPoint.startsWith("/sdcard")) {
-                detected.add(new Detection(AlertLevel.LOG, context.getString(R.string.mvt_mounts_data_title),
-                    String.format(context.getString(R.string.mvt_mounts_data_message),
+                detected.add(new Detection(AlertLevel.LOG, getContext().getString(R.string.mvt_mounts_data_title),
+                    String.format(getContext().getString(R.string.mvt_mounts_data_message),
                         mountPoint,
                         mount.get("filesystem_type"),
                         mount.get("mount_options")
@@ -170,21 +178,19 @@ public class Mounts extends AndroidArtifact {
         }
 
         // Check indicators if available
-        if (this.indicators == null) {
-            return;
-        }
+        if (indicators == null) return;
 
-        for (Object obj : this.results) {
+        for (Object obj : results) {
             @SuppressWarnings("unchecked")
             Map<String, Object> mount = (Map<String, Object>) obj;
 
             // Check if any mount points match indicators
             String mp = (String) mount.get("mount_point");
-            detected.addAll(this.indicators.matchString(mp, IndicatorType.FILE_PATH));
+            detected.addAll(indicators.matchString(mp, IndicatorType.FILE_PATH));
 
             // Check device paths for indicators
             String dev = (String) mount.get("device");
-            detected.addAll(this.indicators.matchString(dev, IndicatorType.FILE_PATH));
+            detected.addAll(indicators.matchString(dev, IndicatorType.FILE_PATH));
         }
     }
 }
