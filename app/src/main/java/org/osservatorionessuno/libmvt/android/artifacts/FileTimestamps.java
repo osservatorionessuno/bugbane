@@ -1,12 +1,20 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
 import java.util.*;
+import java.io.IOException;
+import java.io.InputStream;
 
 /** Utility artifact for converting file timestamp records to timeline entries. */
 // TODO: Implement this
 public class FileTimestamps extends AndroidArtifact {
+
     @Override
-    public void parse(String input) {
+    public List<String> paths() {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         // No parsing implemented; timestamps are expected as structured records.
     }
 

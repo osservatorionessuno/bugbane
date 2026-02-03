@@ -1,17 +1,25 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 
 import java.util.*;
+import java.io.IOException;
+import java.io.InputStream;
 
 /** Parser for dumpsys battery daily output. */
 public class DumpsysBatteryDaily extends AndroidArtifact {
+
     @Override
-    public void parse(String output) {
+    public List<String> paths() {
+        return List.of("dumpsys.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         results.clear();
         Map<String, String> daily = null;
         List<Map<String, String>> updates = new ArrayList<>();
-        for (String line : output.split("\n")) {
+        for (String line : collectLines(input)) {
             if (line.startsWith("  Daily from ")) {
                 if (!updates.isEmpty()) {
                     results.addAll(updates);

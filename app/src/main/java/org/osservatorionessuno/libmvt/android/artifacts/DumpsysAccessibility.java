@@ -1,16 +1,24 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.io.InputStream;
+import java.io.IOException;
 
 public class DumpsysAccessibility extends AndroidArtifact {
 
     @Override
-    public void parse(String input) {
-        List<String> lines = Arrays.asList(input.split("\n"));
+    public List<String> paths() {
+        return List.of("dumpsys.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
+        results.clear();
+        List<String> lines = collectLines(input);
         Pattern legacyPattern = Pattern.compile("\\s*(\\d+) : (.+)");
         Pattern v14Pattern = Pattern.compile("\\{\\{(.+?)\\}\\}", Pattern.DOTALL);
 

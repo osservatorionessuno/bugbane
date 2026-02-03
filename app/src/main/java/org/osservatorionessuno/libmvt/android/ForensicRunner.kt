@@ -1,19 +1,22 @@
 package org.osservatorionessuno.libmvt.android
 
 import android.content.Context
+import android.util.Log
 import org.osservatorionessuno.libmvt.android.artifacts.*
 import org.osservatorionessuno.libmvt.common.Artifact
 import org.osservatorionessuno.libmvt.common.Indicators
 import java.io.File
+import java.io.InputStream
 import java.io.IOException
 import java.nio.charset.Charset
 import java.util.LinkedHashMap
+import java.util.zip.ZipFile
 
 /**
  * Simple helper to run the available AndroidQF artifact parsers on a folder
  * containing extracted androidqf data. Android 11+ safe (no Java 9/11 APIs).
  */
-class ForensicRunner(private val directory: File, private val context: Context? = null) {
+class ForensicRunner(private val context: Context? = null) {
 
     private var indicators: Indicators? = null
 
@@ -23,172 +26,112 @@ class ForensicRunner(private val directory: File, private val context: Context? 
         indicators?.setContext(context)
     }
 
-    /** Run all known modules on the provided directory. */
+    /** This is a LEGACY method to analyze a plaintext directory. */
     @Throws(Exception::class)
-    fun runAll(): Map<String, Artifact> {
+    fun streamLegacyAnalysisFromDirectory(directory: File): Map<String, Artifact> {
         val map = LinkedHashMap<String, Artifact>()
-        for (name in AVAILABLE_MODULES) {
-            val art = runModule(name)
+        val files = directory.listFiles()
+        if (files == null) return map
+        for (file in files) {
+            if (!file.isFile) continue;
+
+            val art = streamFileAnalysis(file.absolutePath, file.inputStream())
             if (art != null) {
-                map[name] = art
+                map[file.name] = art
             }
         }
         return map
     }
 
-    /** Run a single module by name. */
+    /** This is a method to analyze a zip file. */
     @Throws(Exception::class)
-    fun runModule(moduleName: String): Artifact? = runModule(moduleName, directory)
+    fun streamAnalysisFromZip(zip: File): Map<String, Artifact> {
+        val map = LinkedHashMap<String, Artifact>()
+        val zipFile = ZipFile(zip)
+        val entries = zipFile.entries()
+        for (entry in entries) {
+            val art = streamFileAnalysis(entry.name, zipFile.getInputStream(entry))
+            if (art != null) {
+                map[entry.name] = art
+            }
+        }
+        return map
+    }
 
-    /** Run a single module on a custom directory. */
+    /** Format-agnostic analysis of a file stream.
+     * 
+     * @param path the path of the file
+     * @param content the content of the file
+     * @return the artifact
+     * 
+     * This method is used to analyze a file stream. It will determine the module to use based on the file name
+     * and then parse the content of the file using the appropriate module.
+     * 
+     * The method will log an error and return null if the file is not known.
+     */
     @Throws(Exception::class)
-    fun runModule(moduleName: String, dir: File): Artifact? {
-        return when (moduleName) {
-            "dumpsys_accessibility" ->
-            runDumpsysSection(dir, DumpsysAccessibility(), "DUMP OF SERVICE accessibility:")
-            "dumpsys_activities" ->
-            runDumpsysSection(dir, DumpsysPackageActivities(), "DUMP OF SERVICE package:")
-            "dumpsys_adb" ->
-            runDumpsysSection(dir, DumpsysAdb(), "DUMP OF SERVICE adb:")
-            "dumpsys_appops" ->
-            runDumpsysSection(dir, DumpsysAppops(), "DUMP OF SERVICE appops:")
-            "dumpsys_battery_daily" ->
-            runDumpsysSection(dir, DumpsysBatteryDaily(), "DUMP OF SERVICE batterystats:")
-            "dumpsys_battery_history" ->
-            runDumpsysSection(dir, DumpsysBatteryHistory(), "DUMP OF SERVICE batterystats:")
-            "dumpsys_dbinfo" ->
-            runDumpsysSection(dir, DumpsysDBInfo(), "DUMP OF SERVICE dbinfo:")
-            "dumpsys_packages" ->
-            runDumpsysSection(dir, DumpsysPackages(), "DUMP OF SERVICE package:")
-            "dumpsys_platform_compat" ->
-            runDumpsysSection(dir, DumpsysPlatformCompat(), "DUMP OF SERVICE platform_compat:")
-            "dumpsys_receivers" ->
-            runDumpsysSection(dir, DumpsysReceivers(), "DUMP OF SERVICE package:")
-            "aqf_packages" ->
-            runSimpleFile(dir, "packages.json", Packages())
-            "aqf_processes" ->
-            runSimpleFile(dir, "processes.txt", Processes())
-            "aqf_getprop" ->
-            runSimpleFile(dir, "getprop.txt", GetProp())
-            "aqf_settings" ->
-            runSettings(dir)
-            "aqf_files" ->
-            runSimpleFile(dir, "files.json", Files())
-            "sms" ->
-            runSimpleFile(dir, "sms.txt", SMS())
-            "root_binaries" ->
-            runSimpleFile(dir, "root_binaries.json", RootBinaries())
-            "mounts" ->
-            runSimpleFile(dir, "mounts.json", Mounts())
-            else -> throw IllegalArgumentException("Unknown module: $moduleName")
+    fun streamFileAnalysis(path: String, content: InputStream): Artifact? {
+        content.use {
+            val fileName = path.split('/').last()
+            val index = MODULES_MAP[fileName]
+            if (index == null) {
+                Log.w("ForensicRunner", "Unknown file: $fileName")
+                return null
+            }
+            val art = MODULES_LIST[index]
+            art.parse(it)
+            return finalizeArtifact(art)
         }
     }
 
     private fun finalizeArtifact(art: AndroidArtifact): Artifact {
-        context?.let { art.setContext(it) }
-        indicators?.let {
-            art.setIndicators(it)
+        context?.let { ctx: Context ->
+            art.context = ctx
+        }
+        indicators?.let { ind: Indicators ->
+            art.setIndicators(ind)
             art.checkIndicators()
         }
         return art
     }
 
-    @Throws(Exception::class)
-    private fun runDumpsysSection(dir: File, art: AndroidArtifact, header: String): Artifact? {
-        val file = File(dir, "dumpsys.txt")
-        if (!file.exists()) return null
-        val dumpsys = safeReadText(file)
-        val section = extractSection(dumpsys, header)
-        art.parse(section)
-        return finalizeArtifact(art)
-    }
-
-    @Throws(Exception::class)
-    private fun runSimpleFile(dir: File, name: String, art: AndroidArtifact): Artifact? {
-        val file = File(dir, name)
-        if (!file.exists()) return null
-        val data = safeReadText(file)
-        art.parse(data)
-        return finalizeArtifact(art)
-    }
-
-    @Throws(Exception::class)
-    private fun runSettings(dir: File): Artifact? {
-        if (!dir.exists() || !dir.isDirectory) return null
-        val files = dir.listFiles { f ->
-                f.isFile && f.name.startsWith("settings_") && f.name.endsWith(".txt")
-        }?.sortedBy { it.name } ?: emptyList()
-
-        if (files.isEmpty()) return null
-
-        val sb = StringBuilder()
-        for (f in files) {
-            sb.append(safeReadText(f)).append('\n')
-        }
-        val settings = Settings()
-        settings.parse(sb.toString())
-        return finalizeArtifact(settings)
-    }
-
-    private fun extractSection(dumpsys: String, header: String): String {
-        val linesOut = ArrayList<String>()
-        var inSection = false
-        val delimiter = buildHyphens(78)
-        for (raw in dumpsys.split('\n')) {
-            val line = raw.trim()
-            if (!inSection) {
-                if (line == header) inSection = true
-                continue
-            }
-            if (line.startsWith(delimiter)) break
-            linesOut.add(raw) // preserve original spacing
-        }
-        return linesOut.joinToString("\n")
-    }
-
-    private fun buildHyphens(n: Int): String = buildString {
-        repeat(n) { append('-') }
-    }
-
-    @Throws(IOException::class)
-    private fun safeReadText(file: File, charset: Charset = Charsets.UTF_8): String {
-        // Avoid Files.readString; use buffered reader for Android friendliness
-        file.inputStream().buffered().reader(charset).use { br ->
-                val sb = StringBuilder()
-            val buf = CharArray(8192)
-            while (true) {
-                val read = br.read(buf)
-                if (read < 0) break
-                sb.append(buf, 0, read)
-            }
-            return sb.toString()
-        }
-    }
-
     companion object {
-        /** List of all module names understood by the runner. */
+        private const val TAG = "ForensicRunner"
+
         @JvmField
-        val AVAILABLE_MODULES: List<String> = listOf(
+        val MODULES_LIST: List<AndroidArtifact> = listOf(
                 // Bugreport modules
-                "dumpsys_accessibility",
-                "dumpsys_activities",
-                "dumpsys_adb",
-                "dumpsys_appops",
-                "dumpsys_battery_daily",
-                "dumpsys_battery_history",
-                "dumpsys_dbinfo",
-                "dumpsys_packages",
-                "dumpsys_platform_compat",
-                "dumpsys_receivers",
+                DumpsysAccessibility(),
+                DumpsysPackageActivities(),
+                DumpsysAdb(),
+                DumpsysAppops(),
+                DumpsysBatteryDaily(),
+                DumpsysBatteryHistory(),
+                DumpsysDBInfo(),
+                DumpsysPackages(),
+                DumpsysPlatformCompat(),
+                DumpsysReceivers(),
                 // AndroidQF modules
-                "aqf_packages",
-                "aqf_processes",
-                "aqf_getprop",
-                "aqf_settings",
-                "aqf_files",
-                "sms",
-                "root_binaries",
-                "mounts",
+                Packages(),
+                Processes(),
+                GetProp(),
+                Settings(),
+                Files(),
+                SMS(),
+                RootBinaries(),
+                Mounts(),
         )
+
+        /** Map from file name to artifact instance, built from MODULES_LIST paths(). */
+        @JvmField
+        val MODULES_MAP: Map<String, Int> = run {
+            val map = mutableMapOf<String, Int>()
+            for ((index, module) in MODULES_LIST.withIndex()) {
+                for (path in module.paths()) {
+                    map[path] = index
+                }
+            }
+            map
+        }
     }
 }

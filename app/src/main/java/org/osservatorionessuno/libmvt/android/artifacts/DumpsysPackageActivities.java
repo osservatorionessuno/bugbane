@@ -1,18 +1,26 @@
 package org.osservatorionessuno.libmvt.android.artifacts;
 
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 
 import java.util.*;
+import java.io.IOException;
+import java.io.InputStream;
 
 /** Parser for dumpsys packages activities output. */
 public class DumpsysPackageActivities extends AndroidArtifact {
+
     @Override
-    public void parse(String content) {
+    public List<String> paths() {
+        return List.of("dumpsys.txt");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         results.clear();
         boolean inActivityResolver = false;
         boolean inNonDataActions = false;
         String intent = null;
-        for (String line : content.split("\n")) {
+        for (String line : collectLines(input)) {
             if (line.startsWith("Activity Resolver Table:")) {
                 inActivityResolver = true;
                 continue;

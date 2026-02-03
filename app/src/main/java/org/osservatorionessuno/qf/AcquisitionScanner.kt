@@ -34,9 +34,9 @@ object AcquisitionScanner {
             indicatorHashes += hash
         }
 
-        val runner = ForensicRunner(acquisitionDir, context);
+        val runner = ForensicRunner(context);
         runner.setIndicators(indicators);
-        val detections = runner.runAll();
+        val detections = runner.streamLegacyAnalysisFromDirectory(acquisitionDir);
 
         val results = JSONArray()
         for ((key, value) in detections) {

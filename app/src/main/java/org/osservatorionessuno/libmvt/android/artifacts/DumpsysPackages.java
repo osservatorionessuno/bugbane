@@ -2,18 +2,26 @@ package org.osservatorionessuno.libmvt.android.artifacts;
 
 import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 import org.osservatorionessuno.libmvt.common.Utils;
 import org.osservatorionessuno.libmvt.common.Detection;
 
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * Parser for dumpsys package information.
  */
 public class DumpsysPackages extends AndroidArtifact {
+
+    @Override
+    public List<String> paths() {
+        return List.of("dumpsys.txt");
+    }
+
     private static class PackageDetails {
         String packageName = "";
         String uid = "";
@@ -153,11 +161,11 @@ public class DumpsysPackages extends AndroidArtifact {
     }
 
     @Override
-    public void parse(String content) {
+    public void parse(InputStream input) throws IOException {
         results.clear();
         boolean inPackageList = false;
         List<String> packageLines = new ArrayList<>();
-        for (String line : content.split("\n")) {
+        for (String line : collectLines(input)) {
             if (line.startsWith("Packages:")) { inPackageList = true; continue; }
             if (!inPackageList) continue;
             if (line.trim().isEmpty()) break;
@@ -173,9 +181,9 @@ public class DumpsysPackages extends AndroidArtifact {
             Map<String, Object> record = (Map<String, Object>) obj;
             String pkg = (String) record.get("package_name");
             if (Utils.ROOT_PACKAGES.contains(pkg)) {
-                detected.add(new Detection(AlertLevel.MEDIUM, context.getString(R.string.mvt_packages_root_package_title),
+                detected.add(new Detection(AlertLevel.MEDIUM, getContext().getString(R.string.mvt_packages_root_package_title),
                     String.format(
-                        context.getString(R.string.mvt_packages_root_package_message), 
+                        getContext().getString(R.string.mvt_packages_root_package_message), 
                         pkg
                     )));
                 continue;

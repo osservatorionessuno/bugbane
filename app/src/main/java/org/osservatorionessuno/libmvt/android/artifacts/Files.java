@@ -4,13 +4,16 @@ import org.json.JSONException;
 import org.osservatorionessuno.bugbane.R;
 import org.osservatorionessuno.libmvt.common.AlertLevel;
 import org.osservatorionessuno.libmvt.common.Detection;
-import org.osservatorionessuno.libmvt.common.IndicatorType;
+import org.osservatorionessuno.libmvt.common.Indicators.IndicatorType;
 
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
+import java.io.IOException;
+import java.io.InputStream;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -23,10 +26,15 @@ public class Files extends AndroidArtifact {
     );
 
     @Override
-    public void parse(String input) {
+    public List<String> paths() {
+        return List.of("files.json");
+    }
+
+    @Override
+    public void parse(InputStream input) throws IOException {
         try {
             // Try to parse the input as a JSON array
-            JSONArray arr = new JSONArray(input);
+            JSONArray arr = new JSONArray(collectText(input));
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject obj = arr.getJSONObject(i);
                 Map<String, Object> map = new HashMap<>();
@@ -39,8 +47,8 @@ public class Files extends AndroidArtifact {
             }
         } catch (JSONException ex) {
             // Fallback: input may be JSON lines, one object per line
-            String[] lines = input.split("\n");
-            for (String line : lines) {
+            // TODO: I think this wont work cause Text was already collected.
+            for (String line : collectLines(input)) {
                 String trimmed = line.trim();
                 if (trimmed.isEmpty()) continue;
                 try {
@@ -63,9 +71,7 @@ public class Files extends AndroidArtifact {
 
     @Override
     public void checkIndicators() {
-        if (indicators == null) {
-            return;
-        }
+        if (indicators == null) return;
 
         for (Object obj : results) {
             @SuppressWarnings("unchecked")
@@ -99,8 +105,8 @@ public class Files extends AndroidArtifact {
                         fileType = "executable ";
                     }
 
-                    String msg = String.format(context.getString(R.string.mvt_files_suspicious_path_message), fileType, path);
-                    detected.add(new Detection(AlertLevel.HIGH, context.getString(R.string.mvt_files_suspicious_path_title), msg));
+                    String msg = String.format(getContext().getString(R.string.mvt_files_suspicious_path_message), fileType, path);
+                    detected.add(new Detection(AlertLevel.HIGH, getContext().getString(R.string.mvt_files_suspicious_path_title), msg));
                 }
             }
  
