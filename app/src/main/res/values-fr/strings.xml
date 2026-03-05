@@ -1,3 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Bugbane</string>
+    <string name="main_nav_scan">Acquérir</string>
+    <string name="main_nav_acquisitions">Acquisitions</string>
+    <string name="main_nav_settings">Paramètres</string>
+    <string name="slideshow_welcome_title">Bienvenu sur Bugbane</string>
+    <string name="slideshow_unsupported_version">Désolé, Bugbane n’est pas pris en charge sur les versions d’Android inférieures à 11 (niveau API 30). S\'il vous plait, utilisez AndroidQF ou MVT depuis un ordinateur de confiance.</string>
+    <string name="slideshow_button_exit">Quitter</string>
+    <string name="slideshow_welcome_button">Je comprend</string>
+    <string name="slideshow_wifi_title">Connection a un réseau Wi-Fi de confiance</string>
+    <string name="slideshow_wifi_description">Pour continuer, connectez votre appareil a un réseau Wi-Fi protégé, comme le réseau de votre domicile ou depuis un partage de connection.</string>
+    <string name="slideshow_wifi_button">Ouvrir les Paramètres Wi-Fi</string>
+    <string name="slideshow_button_continue">Continuer</string>
+    <string name="slideshow_notification_title">Activer les notifications</string>
+    <string name="slideshow_notification_description">Pour utiliser cette application, vous devez activer les notifications.\n\nBugbane envois une notification pour que vous puissiez entrer le code d\'appairage pour le débogage sans fil ADB.</string>
+    <string name="slideshow_notification_button">Activer</string>
+    <string name="slideshow_developer_title">Activer les options développeur</string>
+    <string name="slideshow_developer_description">Pour utiliser cette application, activez le mode développeur dans les paramètres de votre appareil.\n\nCette application collecte des données en utilisant le débogage sans fil ADB, qui n\'est possible que si le mode développeur est activé.</string>
+    <string name="slideshow_button_text_enable">Activer</string>
+    <string name="slideshow_wireless_and_pair_title">Activer le débogage sans fil et appairer</string>
+    <string name="slideshow_wireless_and_pair_description">Connecter au Wi-Fi, activer le débogage sans fil, appuyez sur \"Appairer l\'appareil avec le code d\'appairage,\" puis entrez le code de la notification Bugbane.</string>
+    <string name="slideshow_wireless_and_pair_button">Appairer</string>
+    <string name="slideshow_wireless_title">Activer le débogage sans fil</string>
+    <string name="slideshow_wireless_description">Se connecter au Wi-Fi et activer le débogage sans fil ADB.</string>
+    <string name="slideshow_ready_title">Prêt à commencer</string>
+    <string name="slideshow_ready_description">Tout est prêt. Vous pouvez maintenant acquérir des données et lancer une analyse, puis partager les résultats avec des tiers de confiance.</string>
+    <string name="slideshow_ready_button">Commencer</string>
+    <string name="button_working_adb_pairing">En attente de l\'appairage ADB…</string>
+    <string name="home_scan_button">Commencer l’acquisition</string>
+    <string name="home_scanning_button">Collecte…</string>
+    <string name="home_permissions_button">Activer les autorisations</string>
+    <string name="scan_disable_dialog_title">Après chaque acquisition, il est recommandé de désactiver le mode développeur jusqu\'à la prochaine session.</string>
+    <string name="scan_disable_dialog_button">Désactiver</string>
+    <string name="scan_disable_dialog_close_button">Fermer</string>
+    <string name="scan_cancel_button">Arrêter l\'acquisition</string>
+    <string name="scan_cancelling_button">Annulation...</string>
+    <string name="scan_module_running">Exécution de %1$s: %2$s</string>
+    <string name="scan_module_completed">Terminé %1$s : %2$s</string>
+    <string name="beta_warning_title">Attention version beta</string>
+    <string name="beta_warning_message">Ceci est une version bêta. Installez-la et testez-la sur un téléphone de rechange, PAS sur votre appareil quotidien. Ne continuez que si vous comprenez les risques.</string>
+    <string name="beta_warning_understand">Je comprend</string>
+    <string name="beta_warning_quit">Quitter l\'application</string>
+    <string name="settings_description">Configurez vos préférences et vos paramètres ici.</string>
+    <string name="settings_general">Paramètres généraux</string>
+    <string name="settings_developer_options">Désactiver le mode développeur</string>
 </resources>
