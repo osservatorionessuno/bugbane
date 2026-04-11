@@ -50,4 +50,20 @@ Ease as much as possible the process for enabling Developer Options in order to 
 Secure the ADB communication channel using a strong key.
 The ADB key is stored in the application sandbox encrypted with a StrongBox key (whenever supported).
 
+## Threat: Attacker on a privileged network position in respect to the Device
+The attacker in this scenario has a privileged network position meaning:
+- they are connected on the same Wi-Fi network as the device, detecting the usage of Wireless ADB.
+- they monitor the network traffic, detecting the fetch and download of IoC.
+
+### Countermeasures
+
+Bugbane should inform the user that using it on untrusted, public or shared Wi-Fi network is unsafe from a privacy perspective.
+It should suggest to use a trusted Wi-Fi or alternatively an hot-spot from another trusted device.
+
+IoC MUST always be downloaded via HTTPS and should be downloaded via OHTTP.
+
+## Threat: User adds a malicious upstream Indicator Source
+The attacker can force the user into downloading files that Bugbane will later load as indicators.
+
+### Countermeasures
 
