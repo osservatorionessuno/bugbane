@@ -44,3 +44,10 @@ Bugbane is divided in 4 main coponents:
 - **cabd**, a Kotlin implementation of a minimal ADB client (`org.osservatorionessuno.cadb.*`)
 - **QF**, a Kotlin implementation of [AndroidQF](https://github.com/mvt-project/androidqf/) acquisition modules (`org.osservatorionessuno.qf.*`). Its main entrypoint is the `AcquisitionRunner` class.
 - **LibMVT**, a Java implementation of [MVT](https://github.com/mvt-project/mvt/) IOC analysis engine (`org.osservatorionessuno.libmvt.*`). Its main entrypoint is the `ForeniscRunner` class.
+
+## Funding
+
+<img src="https://nlnet.nl/logo/banner.svg" width=200px>
+<img src="https://nlnet.nl/image/logos/NGI_Mobifree_tag.svg" width=200px>
+
+This project was funded through the [NGI Mobifree Fund](https://nlnet.nl/mobifree), a fund established by [NLnet](https://nlnet.nl/) with financial support from the [European Commission's Next Generation Internet](https://ngi.eu/) programme under the aegis of [DG Communications Networks, Content and Technology](https://commission.europa.eu/about-european-commission/departments-and-executive-agencies/communications-networks-content-and-technology_en).
