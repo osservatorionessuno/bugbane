@@ -20,6 +20,7 @@ snakeyaml             = "2.5"
 kage                  = "0.3.0"
 json                  = "20250517"
 accompanist-permissions = "0.37.3"
+libmvt                = "0.0.2"
 
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
@@ -58,3 +59,4 @@ androidx-work-runtime-ktx         = { group = "androidx.work",              name
 snakeyaml                         = { group = "org.yaml",                   name = "snakeyaml",             version.ref = "snakeyaml" }
 kage                              = { group = "com.github.android-password-store", name = "kage", version.ref = "kage" }
 org-json                          = { group = "org.json",                     name = "json",                   version.ref = "json" }
+libmvt                            = { group = "com.github.osservatorionessuno", name = "libmvt", version.ref = "libmvt" }
