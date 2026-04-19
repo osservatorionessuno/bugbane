@@ -4,16 +4,19 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import org.osservatorionessuno.bugbane.utils.Utils
+import org.osservatorionessuno.bugbane.utils.initLibmvtLogging
 import org.osservatorionessuno.libmvt.android.ForensicRunner
 import org.osservatorionessuno.libmvt.common.Indicators
 import org.osservatorionessuno.libmvt.common.IndicatorsUpdates
+import org.osservatorionessuno.bugbane.utils.AndroidStringResolver
 import java.io.File
 import java.time.Instant
 import java.util.UUID
-import kotlin.collections.iterator
 
 object AcquisitionScanner {
     fun scan(context: Context, acquisitionDir: File): File {
+        initLibmvtLogging()
+
         val indicatorsDir = IndicatorsUpdates(context.filesDir.toPath(), null).getIndicatorsFolder().toFile()
         return scanWithIndicators(context, acquisitionDir, indicatorsDir)
     }
@@ -34,13 +37,13 @@ object AcquisitionScanner {
             indicatorHashes += hash
         }
 
-        val runner = ForensicRunner(context);
-        runner.setIndicators(indicators);
+        val runner = ForensicRunner(AndroidStringResolver(context));
+        runner.setIndicators(indicators)
         val detections = runner.streamLegacyAnalysisFromDirectory(acquisitionDir);
 
         val results = JSONArray()
         for ((key, value) in detections) {
-            for (detected in value.getDetected()) {
+            for (detected in value.detected) {
                 val obj = JSONObject()
                 obj.put("level", detected.level.name)
                 obj.put("title", detected.title)

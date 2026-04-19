@@ -82,6 +82,9 @@ dependencies {
     implementation(libs.snakeyaml)
     implementation(libs.google.accompanist.permissions)
 
+    // external libMVT
+    implementation(libs.libmvt)
+
     // libadb-android and its dependency
     implementation(libs.libadb.android)
     implementation(libs.sun.security.android)
