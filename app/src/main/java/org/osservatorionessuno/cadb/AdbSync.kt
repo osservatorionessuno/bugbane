@@ -1,5 +1,6 @@
 package org.osservatorionessuno.cadb
 
+import android.util.Log
 import io.github.muntashirakon.adb.LocalServices
 import java.io.EOFException
 import java.io.File
@@ -18,6 +19,14 @@ class AdbSync(
     private val manager: AdbConnectionManager,
     private val progress: ((Long) -> Unit)? = null,
 ) {
+    private companion object {
+        private const val TAG = "AdbSync"
+        // Unix file type bits (st_mode & 0xF000)
+        private const val S_IFMT = 0xF000
+        private const val S_IFDIR = 0x4000
+        private const val S_IFREG = 0x8000
+    }
+
     /**
      * Pull a remote file to a local destination.
      *
@@ -99,7 +108,9 @@ class AdbSync(
         var remaining = length
         while (remaining > 0) {
             val read = input.read(buffer, off, remaining)
-            if (read < 0) throw EOFException()
+            if (read < 0) {
+                throw EOFException("EOF while reading from input stream: $remaining bytes remaining")
+            }
             off += read
             remaining -= read
         }
@@ -213,12 +224,21 @@ class AdbSync(
             val localPath = File(localDest, path)
             localPath.parentFile?.mkdirs()
 
-            if (mode and 0x4000 != 0) {
-                pullFolder(remoteDir + path, localPath)
-            } else {
-                pull(remoteDir + path, localPath)
-                // set last modified time accordingly
-                localPath.setLastModified(mtime.toLong() * 1000)
+            val type = mode and S_IFMT
+            when (type) {
+                S_IFDIR -> {
+                    pullFolder(remoteDir + path + "/", localPath)
+                }
+                S_IFREG -> {
+                    pull(remoteDir + path, localPath)
+                    // set last modified time accordingly
+                    localPath.setLastModified(mtime.toLong() * 1000)
+                }
+                else -> {
+                    // Skip non-regular files (symlinks, sockets, fifos, device nodes).
+                    // Some pseudo-files (e.g. under /proc, /sys) may never reach EOF when read.
+                    Log.d(TAG, "Skipping non-regular entry: ${remoteDir}${path} (mode=${Integer.toHexString(mode)})")
+                }
             }
         }
     }

@@ -36,7 +36,7 @@ class Logs : Module {
         val dest = File(outDir, "logs")
         dest.mkdirs()
 
-        runCatching {
+        val result = runCatching {
             for (target in targets) {
                 if (target.endsWith("/")) {
                     sync.pullFolder(target, dest)
@@ -45,6 +45,10 @@ class Logs : Module {
                 }
             }
             Log.i(TAG, "Pulled logs to: ${dest.absolutePath}")
+        }
+        if (result.isFailure) {
+            // TODO: write this feedback to the acquisition report in some way
+            Log.e(TAG, "Failed to pull logs", result.exceptionOrNull())
         }
     }
 }

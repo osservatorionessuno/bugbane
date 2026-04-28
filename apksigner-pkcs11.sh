@@ -5,6 +5,7 @@
 # - https://developers.yubico.com/PIV/Guides/Android_code_signing.html
 # - https://geoffreymetais.github.io/code/key-signing/
 # - https://medium.com/swlh/android-app-signing-with-a-yubikey-fdfc3d730965
+# for macOS: brew install opensc pkcs11-helper
 
 # Environment variables that can be overridden:
 #  - ANDROID_HOME -> the path to the Android SDK (by default $HOME/Library/Android/sdk or $HOME/Android/Sdk will be used)
