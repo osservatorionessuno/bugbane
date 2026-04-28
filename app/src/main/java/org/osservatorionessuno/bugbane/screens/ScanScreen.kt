@@ -39,6 +39,8 @@ import org.osservatorionessuno.qf.AcquisitionRunner
 import java.io.File
 
 private const val TAG = "ScanScreen"
+private const val BETA_COUNTDOWN_SECONDS = 10
+
 @Composable
 fun ScanScreen() {
     val coroutineScope = rememberCoroutineScope()
@@ -60,7 +62,7 @@ fun ScanScreen() {
     
     val isBetaVersion = context.packageName.contains("beta", ignoreCase = true)
     var showBetaWarningDialog by remember { mutableStateOf(false) }
-    var betaCountdown by remember { mutableStateOf(10) }
+    var betaCountdown by remember { mutableStateOf(BETA_COUNTDOWN_SECONDS) }
     var betaButtonEnabled by remember { mutableStateOf(false) }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -338,8 +340,6 @@ fun ScanScreen() {
                             AppState.AdbConnected -> {
                                 if (isBetaVersion) {
                                     showBetaWarningDialog = true
-                                    betaCountdown = 10
-                                    betaButtonEnabled = false
                                     return@Button
                                 }
                                 startAcquisition()
@@ -395,20 +395,16 @@ fun ScanScreen() {
         if (showBetaWarningDialog) {
             LaunchedEffect(showBetaWarningDialog) {
                 if (showBetaWarningDialog) {
-                    betaCountdown = 10
+                    betaCountdown = BETA_COUNTDOWN_SECONDS
                     betaButtonEnabled = false
-                    for (i in 10 downTo 1) {
+                    for (i in betaCountdown.toInt() downTo 1) {
                         delay(1000)
                         betaCountdown = i - 1
                     }
                     betaButtonEnabled = true
                 }
             }
-            
-            LaunchedEffect(betaCountdown) {
-                // This ensures recomposition happens when countdown changes
-            }
-            
+
             AlertDialog(
                 onDismissRequest = { showBetaWarningDialog = false },
                 title = {
