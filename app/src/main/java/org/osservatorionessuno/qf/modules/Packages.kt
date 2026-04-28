@@ -1,10 +1,15 @@
 package org.osservatorionessuno.qf.modules
 
 import android.content.Context
+import android.util.Log
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.qf.Utils
 import org.osservatorionessuno.cadb.AdbShell
+import org.osservatorionessuno.cadb.AdbSync
 import org.osservatorionessuno.cadb.AdbConnectionManager
+import org.osservatorionessuno.libmvt.android.parsers.APKParser
+import org.osservatorionessuno.libmvt.android.parsers.CertificateParser
+
 import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
@@ -15,6 +20,7 @@ import org.json.JSONObject
  */
 class Packages : Module {
     override val name: String = "packages"
+    private val TAG = "PackagesModule"
 
     // Data class to hold package info
     data class Package(
@@ -34,8 +40,24 @@ class Packages : Module {
         var sha1: String,
         var sha256: String,
         var sha512: String,
-        // TODO: implement certificate validation checks
+        var suspicious: Boolean,
+        var certificates: List<CertificateParser.CertificateInfo>,
+        var infiles: List<String>
     ) {
+        private fun certToJsonObject(c: CertificateParser.CertificateInfo): JSONObject {
+            return JSONObject().apply {
+                put("Md5", c.checksums.md5)
+                put("Sha1", c.checksums.sha1)
+                put("Sha256", c.checksums.sha256)
+                put("ValidFrom", c.notBefore)
+                put("ValidTo", c.notAfter)
+                put("Issuer", c.issuer)
+                put("Subject", c.subject)
+                put("SignatureAlgorithm", c.algorithm)
+                put("SerialNumber", c.serialNumber)
+            }
+        }
+
         fun toJsonObject(): JSONObject {
             return JSONObject().apply {
                 put("path", path)
@@ -44,6 +66,9 @@ class Packages : Module {
                 put("sha1", sha1)
                 put("sha256", sha256)
                 put("sha512", sha512)
+                put("suspicious", suspicious)
+                put("certificates", JSONArray().apply { certificates.forEach { put(certToJsonObject(it)) } })
+                put("infiles", infiles)
             }
         }
         
@@ -68,7 +93,20 @@ class Packages : Module {
         return Triple(packageName, installer, uid)
     }
 
-    fun getPackageFiles(shell: AdbShell, packageName: String): List<PackageFile> {
+    fun getPathToLocalCopy(apksPath: String, packageName: String, filePath: String): String {
+        val fileName = APKParser.extractFileName(filePath)
+
+        var localPath = File(apksPath, "${packageName}${fileName}.apk")
+        var counter = 0
+
+        while (localPath.exists()) {
+            counter++
+            localPath = File(apksPath, "${packageName}${fileName}_$counter.apk")
+        }
+        return localPath.absolutePath
+    }
+
+    fun getPackageFiles(shell: AdbShell, sync: AdbSync, apksDir: File, packageName: String): List<PackageFile> {
         val files = mutableListOf<PackageFile>()
         val output = try {
             shell.exec("pm path $packageName")
@@ -87,6 +125,9 @@ class Packages : Module {
                 sha1 = "",
                 sha256 = "",
                 sha512 = "",
+                suspicious = false,
+                certificates = emptyList(),
+                infiles = emptyList(),
             )
 
             runCatching {
@@ -106,6 +147,23 @@ class Packages : Module {
                 packageFile.sha512 = sha512Out.trim().split(Regex("\\s+"), 2).getOrElse(0) { "" }
             }
 
+            val apkInfo = APKParser.parseAPK(File(packagePath))
+            packageFile.suspicious = apkInfo.suspicious
+            packageFile.certificates = apkInfo.certificates
+            packageFile.infiles = apkInfo.files
+
+            if (packageFile.suspicious) {
+                val localPath = getPathToLocalCopy(apksDir.absolutePath, packageName, packageFile.path)
+                Log.i(TAG, "copying $packagePath to $localPath")
+                val result = runCatching {
+                    sync.pull(packagePath, File(localPath))
+                }
+                if (result.isFailure) {
+                    // TODO: write this feedback to the acquisition report in some way
+                    Log.e(TAG, "Failed to copy $packagePath to $localPath", result.exceptionOrNull())
+                }
+            }
+
             files.add(packageFile)
         }
         return files
@@ -118,6 +176,7 @@ class Packages : Module {
         progress: ((Long) -> Unit)?
     ) {
         val shell = AdbShell(manager, progress = progress)
+        val sync = AdbSync(manager, progress = progress)
 
         var withInstaller = true
 
@@ -146,6 +205,9 @@ class Packages : Module {
             }
         }
 
+        // Create the apks directory
+        val apksDir = File(outDir, "apks")
+        apksDir.mkdirs()
         val packages = mutableListOf<Package>()
 
         output.lineSequence().forEach { line ->
@@ -159,7 +221,7 @@ class Packages : Module {
                     name = packageName,
                     installer = installer,
                     uid = uid,
-                    files = getPackageFiles(shell, packageName)
+                    files = getPackageFiles(shell, sync, apksDir, packageName)
                 )
             )
         }
@@ -208,7 +270,7 @@ class Packages : Module {
                 put("uid", pkg.uid)
                 put("disabled", pkg.disabled)
                 put("system", pkg.system)
-                put("thirdParty", pkg.thirdParty)
+                put("third_party", pkg.thirdParty)
             }
             jsonArray.put(obj)
         }

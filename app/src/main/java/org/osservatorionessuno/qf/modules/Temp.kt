@@ -25,11 +25,13 @@ class Temp : Module {
         val dest = File(outDir, "tmp")
         dest.mkdirs()
 
-        try {
+        val result = runCatching {
             sync.pullFolder("/data/local/tmp/", dest)
             Log.i(TAG, "Pulled temp to: ${dest.absolutePath}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to pull temp", e)
+        }
+        if (result.isFailure) {
+            // TODO: write this feedback to the acquisition report in some way
+            Log.e(TAG, "Failed to pull temp", result.exceptionOrNull())
         }
     }
 }
