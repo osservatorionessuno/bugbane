@@ -1,7 +1,0 @@
-{
-  "indicators": [
-    {
-      "process:name": ["com.sec.android.app.camera"]
-    }
-  ]
-}
