@@ -135,6 +135,7 @@ class AcquisitionRunner(
                 Log.i(TAG, "Module ${module.name} finished")
             } catch (t: Throwable) {
                 Log.e(TAG, "Module ${module.name} failed", t)
+                // TODO: display error message to the user
             }
             completedCount++
             listener?.onModuleComplete(module.name, completedCount, total)
