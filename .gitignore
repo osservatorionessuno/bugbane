@@ -2,7 +2,7 @@
 .idea
 .vscode
 build
-gradle
+gradle/wrapper/
 gradlew
 gradlew.bat
 local.properties
