@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.junit5)
     alias(libs.plugins.protobuf)
 }
 
@@ -73,13 +72,10 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.foundation)
     implementation(libs.compose.material.icons.extended)
     implementation(libs.androidx.work.runtime.ktx)
-    implementation(libs.snakeyaml)
     implementation(libs.google.accompanist.permissions)
 
     // external libMVT
@@ -88,30 +84,12 @@ dependencies {
     // libadb-android and its dependency
     implementation(libs.libadb.android)
     implementation(libs.sun.security.android)
-    // Required for ADB encryption
-    implementation(libs.conscrypt.android)
 
     // Required for age encrypted export/share
     implementation(libs.kage)
 
-    // Quick string matching for mvt
-    implementation(libs.ahocorasick)
-
     // Tombstone protobuf (lite)
     implementation(libs.protobuf.javalite)
-
-    // --- Unit test (JUnit 5) ---
-    testImplementation(libs.junit.jupiter.api)
-    testRuntimeOnly(libs.junit.jupiter.engine)
-
-    testImplementation(libs.org.json)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
 }
 
 protobuf {

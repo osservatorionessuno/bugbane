@@ -40,4 +40,13 @@ if (useLocalLibmvt) {
     }
     println("using local LibMVT")
 }
+
+// TEMPORARY: Use local libadb-android-bc
+includeBuild("../libadb-android-bc") {
+    dependencySubstitution {
+        substitute(module("io.github.muntashirakon:libadb-android"))
+            .using(project(":"))
+    }
+}
+println("using local libadb-android-bc")
  
