@@ -7,13 +7,12 @@ activityCompose       = "1.10.1"
 composeBom            = "2025.08.01"
 protobuf              = "4.32.0"
 protobufPlugin        = "0.9.5"
-conscrypt             = "2.5.3"
 libadb                = "3.0.0"
 sunSecurityAndroid    = "1.1"
 work                  = "2.10.3"
 kage                  = "0.3.0"
 accompanist-permissions = "0.37.3"
-libmvt                = "0.0.2"
+libmvt                = "0.0.3"
 
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
@@ -34,7 +33,6 @@ compose-material-icons-extended   = { group = "androidx.compose.material",   nam
 google-accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
 libadb-android                    = { group = "com.github.MuntashirAkon",    name = "libadb-android",         version.ref = "libadb" }
 sun-security-android              = { group = "com.github.MuntashirAkon",    name = "sun-security-android",   version.ref = "sunSecurityAndroid" }
-conscrypt-android                 = { group = "org.conscrypt",                name = "conscrypt-android",      version.ref = "conscrypt" }
 protobuf-javalite                 = { group = "com.google.protobuf",          name = "protobuf-javalite",      version.ref = "protobuf" }
 protoc                            = { group = "com.google.protobuf",          name = "protoc",                 version.ref = "protobuf" }
 androidx-work-runtime-ktx         = { group = "androidx.work",              name = "work-runtime-ktx",      version.ref = "work" }
