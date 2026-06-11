@@ -1,3 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Bugbane</string>
+    <string name="main_nav_scan">Adquiere</string>
+    <string name="main_nav_acquisitions">Adquisiciones</string>
+    <string name="main_nav_settings">Ajustes</string>
+    <string name="slideshow_welcome_title">Bienvenido a Bugbane</string>
+    <string name="slideshow_welcome_description">Estas ayudas de aplicación con consensual análisis forense de aparatos de Androide para identificar signos de compromise o vigilancia. \n\n La ausencia de detección de esta aplicación no significa que vuestro aparato es seguro o seguro. \n</string>
 </resources>
