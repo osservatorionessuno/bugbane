@@ -79,11 +79,15 @@ dependencies {
     implementation(libs.androidx.foundation)
     implementation(libs.compose.material.icons.extended)
     implementation(libs.androidx.work.runtime.ktx)
-    implementation(libs.snakeyaml)
     implementation(libs.google.accompanist.permissions)
 
     // external libMVT
     implementation(libs.libmvt)
+
+    // OHTTP update transport (Oblivious HTTP, RFC 9458 + 9292 + 9180)
+    implementation(libs.libohttp)
+    implementation(libs.libbhttp)
+    implementation(libs.libohttp.hpke.bc)
 
     // libadb-android and its dependency
     implementation(libs.libadb.android)
@@ -94,8 +98,8 @@ dependencies {
     // Required for age encrypted export/share
     implementation(libs.kage)
 
-    // Quick string matching for mvt
-    implementation(libs.ahocorasick)
+    // Applying the update feed's unified-diff deltas
+    implementation(libs.java.diff.utils)
 
     // Tombstone protobuf (lite)
     implementation(libs.protobuf.javalite)

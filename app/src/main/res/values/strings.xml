@@ -70,9 +70,10 @@
     <string name="settings_developer_options">Disable Developer Options</string>
     <string name="settings_developer_options_desc">It\'s recommended to disable Developer Options after each session and re-enable them only when needed.</string>
     <string name="settings_indicators_title">Indicators of Compromise (IoCs)</string>
+    <string name="settings_indicators_version">Version: %1$s</string>
     <string name="settings_indicators_last_fetch">Last fetch: %1$s</string>
     <string name="settings_indicators_last_update">Last update: %1$s</string>
-    <string name="settings_indicators_count">Indicator files: %1$d</string>
+    <string name="settings_indicators_count">Indicator files: %1$s</string>
     <string name="settings_indicators_desc">The indicators of compromise (IoCs) are used to identify signs of infections or surveillance on Android devices. They are updated periodically to ensure the accuracy of the analysis.</string>
     <string name="settings_about">About Us &amp; Credits</string>
     <string name="settings_about_desc">Bugbane is an open-source project developed by Osservatorio Nessuno OdV.</string>

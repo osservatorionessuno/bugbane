@@ -47,9 +47,10 @@
     <string name="settings_developer_options">Disabilita opzioni sviluppatore</string>
     <string name="settings_developer_options_desc">Si raccomanda di disabilitare le opzioni sviluppatore dopo ogni sessione e ri-abilitarle solamente quando necessario.</string>
     <string name="settings_indicators_title">Indicatori</string>
+    <string name="settings_indicators_version">Versione: %1$s</string>
     <string name="settings_indicators_last_fetch">Ultimo download: %1$s</string>
     <string name="settings_indicators_last_update">Ultimo aggiornamento: %1$s</string>
-    <string name="settings_indicators_count">File indicatori: %1$d</string>
+    <string name="settings_indicators_count">File indicatori: %1$s</string>
     <string name="notification_channel_indicators">Indicatori</string>
     <string name="notification_indicators_updated">Scaricati %1$d nuovi indicatori</string>
     <string name="acquisitions_title">Acquisizioni</string>
