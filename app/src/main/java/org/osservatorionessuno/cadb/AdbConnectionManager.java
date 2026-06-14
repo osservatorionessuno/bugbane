@@ -5,27 +5,20 @@ import android.content.Context;
 import android.os.Build;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
-import android.sun.misc.BASE64Encoder;
-import android.sun.security.provider.X509Factory;
-import android.sun.security.x509.AlgorithmId;
-import android.sun.security.x509.CertificateAlgorithmId;
-import android.sun.security.x509.CertificateExtensions;
-import android.sun.security.x509.CertificateIssuerName;
-import android.sun.security.x509.CertificateSerialNumber;
-import android.sun.security.x509.CertificateSubjectName;
-import android.sun.security.x509.CertificateValidity;
-import android.sun.security.x509.CertificateVersion;
-import android.sun.security.x509.CertificateX509Key;
-import android.sun.security.x509.KeyIdentifier;
-import android.sun.security.x509.PrivateKeyUsageExtension;
-import android.sun.security.x509.SubjectKeyIdentifierExtension;
-import android.sun.security.x509.X500Name;
-import android.sun.security.x509.X509CertImpl;
-import android.sun.security.x509.X509CertInfo;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
+
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -33,6 +26,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -108,29 +103,22 @@ public class AdbConnectionManager extends AbsAdbConnectionManager {
     }
 
     private Certificate generateCertificate(@NonNull Context context) throws Exception {
-        String subject = "CN=Bugbane";
         String algorithmName = "SHA512withRSA";
-        long expiryDate = System.currentTimeMillis() + 86400000;
-        CertificateExtensions certificateExtensions = new CertificateExtensions();
-        certificateExtensions.set("SubjectKeyIdentifier", new SubjectKeyIdentifierExtension(
-                new KeyIdentifier(mPublicKey).getIdentifier()));
-        X500Name x500Name = new X500Name(subject);
+        X500Name subject = new X500Name("CN=Bugbane");
+        BigInteger serialNumber = BigInteger.valueOf(new Random().nextInt() & Integer.MAX_VALUE);
         Date notBefore = new Date();
-        Date notAfter = new Date(expiryDate);
-        certificateExtensions.set("PrivateKeyUsage", new PrivateKeyUsageExtension(notBefore, notAfter));
-        CertificateValidity certificateValidity = new CertificateValidity(notBefore, notAfter);
-        X509CertInfo x509CertInfo = new X509CertInfo();
-        x509CertInfo.set("version", new CertificateVersion(2));
-        x509CertInfo.set("serialNumber", new CertificateSerialNumber(new Random().nextInt() & Integer.MAX_VALUE));
-        x509CertInfo.set("algorithmID", new CertificateAlgorithmId(AlgorithmId.get(algorithmName)));
-        x509CertInfo.set("subject", new CertificateSubjectName(x500Name));
-        x509CertInfo.set("key", new CertificateX509Key(mPublicKey));
-        x509CertInfo.set("validity", certificateValidity);
-        x509CertInfo.set("issuer", new CertificateIssuerName(x500Name));
-        x509CertInfo.set("extensions", certificateExtensions);
-        X509CertImpl x509CertImpl = new X509CertImpl(x509CertInfo);
-        x509CertImpl.sign(mPrivateKey, algorithmName);
-        return x509CertImpl;
+        Date notAfter = new Date(System.currentTimeMillis() + 86400000L);
+
+        // Self-signed v3 certificate (issuer == subject) carrying the RSA public key.
+        JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(
+                subject, serialNumber, notBefore, notAfter, subject, mPublicKey);
+        JcaX509ExtensionUtils extUtils = new JcaX509ExtensionUtils();
+        certBuilder.addExtension(Extension.subjectKeyIdentifier, false,
+                extUtils.createSubjectKeyIdentifier(mPublicKey));
+
+        ContentSigner signer = new JcaContentSignerBuilder(algorithmName).build(mPrivateKey);
+        X509CertificateHolder certHolder = certBuilder.build(signer);
+        return new JcaX509CertificateConverter().getCertificate(certHolder);
     }
 
     @NonNull
@@ -164,13 +152,9 @@ public class AdbConnectionManager extends AbsAdbConnectionManager {
     private static void writeCertificateToFile(@NonNull Context context, @NonNull Certificate certificate)
             throws CertificateEncodingException, IOException {
         File certFile = new File(context.getFilesDir(), CERT_FILE_NAME);
-        BASE64Encoder encoder = new BASE64Encoder();
-        try (OutputStream os = new FileOutputStream(certFile)) {
-            os.write(X509Factory.BEGIN_CERT.getBytes(StandardCharsets.UTF_8));
-            os.write('\n');
-            encoder.encode(certificate.getEncoded(), os);
-            os.write('\n');
-            os.write(X509Factory.END_CERT.getBytes(StandardCharsets.UTF_8));
+        try (JcaPEMWriter writer = new JcaPEMWriter(
+                new OutputStreamWriter(new FileOutputStream(certFile), StandardCharsets.UTF_8))) {
+            writer.writeObject(certificate);
         }
     }
 
