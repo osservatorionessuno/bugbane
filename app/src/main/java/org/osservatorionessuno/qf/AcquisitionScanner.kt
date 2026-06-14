@@ -7,7 +7,7 @@ import org.osservatorionessuno.bugbane.utils.Utils
 import org.osservatorionessuno.bugbane.utils.initLibmvtLogging
 import org.osservatorionessuno.libmvt.android.ForensicRunner
 import org.osservatorionessuno.libmvt.common.Indicators
-import org.osservatorionessuno.libmvt.common.IndicatorsUpdates
+import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.bugbane.utils.AndroidStringResolver
 import java.io.File
 import java.time.Instant
@@ -17,7 +17,7 @@ object AcquisitionScanner {
     fun scan(context: Context, acquisitionDir: File): File {
         initLibmvtLogging()
 
-        val indicatorsDir = IndicatorsUpdates(context.filesDir.toPath(), null).getIndicatorsFolder().toFile()
+        val indicatorsDir = IndicatorStore(context).indicatorsDir
         return scanWithIndicators(context, acquisitionDir, indicatorsDir)
     }
 
