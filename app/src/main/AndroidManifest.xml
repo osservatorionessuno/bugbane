@@ -53,7 +53,7 @@
         <service
             android:name="org.osservatorionessuno.cadb.AdbPairingService"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="shortService" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

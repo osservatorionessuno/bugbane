@@ -64,6 +64,23 @@ android {
             isIncludeAndroidResources = true
         }
     }
+
+    packaging {
+        jniLibs {
+            // The app never invokes PathIterator (only standard Material/Compose components, which
+            // render via the platform canvas), so the .so is useless.
+            excludes += "**/libandroidx.graphics.path.so"
+        }
+        resources {
+            // BouncyCastle ships large data files as java resources for the Picnic post-quantum
+            // signature scheme and other stuff
+            excludes += setOf(
+                "org/bouncycastle/pqc/**",
+                "org/bouncycastle/x509/CertPathReviewerMessages*.properties",
+                "org/bouncycastle/pkix/CertPathReviewerMessages*.properties",
+            )
+        }
+    }
 }
 
 dependencies {
@@ -75,7 +92,6 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.foundation)
     implementation(libs.compose.material.icons.extended)
     implementation(libs.androidx.work.runtime.ktx)
@@ -89,11 +105,10 @@ dependencies {
     implementation(libs.libbhttp)
     implementation(libs.libohttp.hpke.bc)
 
-    // libadb-android and its dependency
+    // libadb-android (BouncyCastle fork)
     implementation(libs.libadb.android)
-    implementation(libs.sun.security.android)
-    // Required for ADB encryption
-    implementation(libs.conscrypt.android)
+    // X.509 certificate generation for ADB pairing (BouncyCastle)
+    implementation(libs.bouncycastle.pkix)
 
     // Required for age encrypted export/share
     implementation(libs.kage)
