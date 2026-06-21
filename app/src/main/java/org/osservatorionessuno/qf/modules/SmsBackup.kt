@@ -6,9 +6,8 @@ import io.github.muntashirakon.adb.AdbStream
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import org.osservatorionessuno.qf.storage.ArtifactSink
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 class SmsBackup : Module {
@@ -19,12 +18,9 @@ class SmsBackup : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
-        val dest = File(outDir, "sms_backup.ab")
-        val temp = File(outDir, "sms_backup.ab.part").apply { delete() }
-
         // Optional preflight: if allowBackup=false, likely no data.
         runCatching {
             val shell = AdbShell(manager, "ShellQF", progress = null, timeoutMs = 30_000, inactivityMs = 10_000)
@@ -43,15 +39,16 @@ class SmsBackup : Module {
         var stream: AdbStream? = null
         var total = 0L
         var sawAnyBytes = false
+        val headerPreview = ByteArrayOutputStream()
 
         try {
             stream = manager.openStream(service)
-            stream.openInputStream().use { ins ->
-                FileOutputStream(temp).use { out ->
-                    val buf = ByteArray(64 * 1024)
+            stream.openInputStream().use { input ->
+                writer.useArtifact("sms_backup.ab") { output ->
+                    val buffer = ByteArray(64 * 1024)
                     while (true) {
-                        val n = try {
-                            ins.read(buf)
+                        val readCount = try {
+                            input.read(buffer)
                         } catch (e: IOException) {
                             if (e.message?.contains("Stream closed", ignoreCase = true) == true && sawAnyBytes) {
                                 Log.i(TAG, "Backup stream closed by device (EOF after $total bytes).")
@@ -60,39 +57,36 @@ class SmsBackup : Module {
                             throw e
                         }
 
-                        if (n < 0) {
+                        if (readCount < 0) {
                             Log.i(TAG, "EOF after $total bytes.")
                             break
                         }
-                        if (n == 0) continue
+                        if (readCount == 0) continue
 
-                        out.write(buf, 0, n)
-                        total += n
+                        if (headerPreview.size() < 512) {
+                            val headerBytes = minOf(readCount, 512 - headerPreview.size())
+                            headerPreview.write(buffer, 0, headerBytes)
+                        }
+                        output.write(buffer, 0, readCount)
+                        total += readCount
                         sawAnyBytes = true
                         progress?.invoke(total)
                     }
-                    out.fd.sync()
+                    output.flush()
                 }
             }
 
-            // Atomic move
-            if (dest.exists()) dest.delete()
-            if (!temp.renameTo(dest)) temp.copyTo(dest, overwrite = true)
-            temp.delete()
-
-            Log.i(TAG, "Wrote $total bytes to ${dest.absolutePath}")
-            runCatching { logAbHeader(dest) }
+            Log.i(TAG, "Wrote $total bytes to sms_backup.ab")
+            runCatching { logAbHeader(headerPreview.toByteArray()) }
                 .onFailure { Log.w(TAG, "Could not parse .ab header: ${it.message}") }
 
-            if (dest.length() < 2048L) {
-                Log.w(TAG, "Backup looks header-only (${dest.length()} bytes). " +
+            if (total < 2048L) {
+                Log.w(TAG, "Backup looks header-only ($total bytes). " +
                         "Device likely blocks SMS app-data via ADB backup (allowBackup=false or modern restrictions).")
             } else {
-                Log.i(TAG, "SMS backup completed: ${dest.absolutePath}")
+                Log.i(TAG, "SMS backup completed")
             }
         } catch (e: IOException) {
-            // If user cancelled immediately, we might have 0 bytes + Stream closed -> still error
-            temp.delete()
             Log.e(TAG, "SMS backup failed: ${e.message}", e)
             throw e
         } finally {
@@ -101,30 +95,29 @@ class SmsBackup : Module {
     }
 
     /** Minimal ANDROID BACKUP header introspection for logging. */
-    private fun logAbHeader(file: File) {
-        FileInputStream(file).use { ins ->
-            fun readLine(): String {
-                val sb = StringBuilder()
-                while (true) {
-                    val b = ins.read()
-                    if (b == -1 || b == '\n'.code) break
-                    sb.append(b.toChar())
-                }
-                return sb.toString()
+    private fun logAbHeader(bytes: ByteArray) {
+        var offset = 0
+        fun readLine(): String {
+            val builder = StringBuilder()
+            while (offset < bytes.size) {
+                val character = bytes[offset++].toInt().toChar()
+                if (character == '\n') break
+                builder.append(character)
             }
+            return builder.toString()
+        }
 
-            val magic = readLine()
-            if (magic != "ANDROID BACKUP") {
-                Log.w(TAG, "Not an ANDROID BACKUP file (magic=$magic)")
-                return
-            }
-            val ver = readLine().toIntOrNull() ?: -1
-            val comp = readLine()
-            val enc = readLine()
-            Log.i(TAG, "AB header: version=$ver, compression=$comp, encryption=$enc")
-            if (!enc.equals("none", ignoreCase = true)) {
-                Log.i(TAG, "Encrypted backup: small files can still be valid (salts/IV/metadata even if no app data).")
-            }
+        val magic = readLine()
+        if (magic != "ANDROID BACKUP") {
+            Log.w(TAG, "Not an ANDROID BACKUP file (magic=$magic)")
+            return
+        }
+        val version = readLine().toIntOrNull() ?: -1
+        val compression = readLine()
+        val encryption = readLine()
+        Log.i(TAG, "AB header: version=$version, compression=$compression, encryption=$encryption")
+        if (!encryption.equals("none", ignoreCase = true)) {
+            Log.i(TAG, "Encrypted backup: small files can still be valid (salts/IV/metadata even if no app data).")
         }
     }
 }

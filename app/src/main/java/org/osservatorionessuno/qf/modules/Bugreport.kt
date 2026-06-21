@@ -6,8 +6,8 @@ import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbSync
-import java.io.File
 import java.io.IOException
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Generates a bugreport on the device and pulls it locally via ADB Sync.
@@ -20,7 +20,7 @@ class Bugreport : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
         // Shell progress is NOT file progress; leave it null.
@@ -35,7 +35,6 @@ class Bugreport : Module {
         // Sync progress is the one we want to surface.
         val sync = AdbSync(manager, progress)
 
-        val dest = File(outDir, "bugreport.zip")
         var remotePath: String? = null
         var pulled = false
 
@@ -43,9 +42,11 @@ class Bugreport : Module {
             remotePath = discoverBugreportPath(shell)
             Log.i(TAG, "Bugreport path on device: $remotePath")
 
-            sync.pull(remotePath, dest)  // <-- progress reported from here
+            writer.useArtifact("bugreport.zip") { output ->
+                sync.pull(remotePath, output)
+            }
             pulled = true
-            Log.i(TAG, "Pulled bugreport to: ${dest.absolutePath}")
+            Log.i(TAG, "Pulled bugreport")
         } finally {
             // Only delete remote if pull succeeded, to avoid races.
             if (pulled) {

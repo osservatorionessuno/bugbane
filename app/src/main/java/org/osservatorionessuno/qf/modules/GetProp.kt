@@ -4,7 +4,7 @@ import android.content.Context
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import java.io.File
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Collects device properties via `getprop`.
@@ -16,10 +16,12 @@ class GetProp : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
         val shell = AdbShell(manager, progress = progress)
-        shell.execToFile("getprop", File(outDir, "getprop.txt"))
+        writer.useArtifact("getprop.txt") { output ->
+            shell.execToStream("getprop", output)
+        }
     }
 }

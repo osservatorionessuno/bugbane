@@ -3,14 +3,26 @@ package org.osservatorionessuno.cadb
 import android.util.Log
 import io.github.muntashirakon.adb.LocalServices
 import java.io.EOFException
-import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import kotlin.math.min
+import org.osservatorionessuno.qf.storage.ArtifactSink
+
+private data class SyncDirEntry(
+    val name: String,
+    val mode: Int,
+    val mtime: Int,
+)
+
+private data class RemoteFileEntry(
+    val remotePath: String,
+    val artifactPath: String,
+    val mtime: Int,
+)
 
 /**
  * Minimal ADB sync implementation supporting file pulls.
@@ -31,88 +43,15 @@ class AdbSync(
      * Pull a remote file to a local destination.
      *
      * @param remotePath Path on the device to pull from.
-     * @param localDest Local file to write to.
+     * @param output Output stream to write to.
      */
     @Throws(IOException::class, InterruptedException::class)
-    fun pull(remotePath: String, localDest: File) {
-        val temp = File(localDest.parentFile, localDest.name + ".part").apply {
-            parentFile?.mkdirs()
-            delete()
-        }
-
+    fun pull(remotePath: String, output: OutputStream) {
         manager.openStream(LocalServices.SYNC).use { stream ->
             val out = stream.openOutputStream()
             val input = stream.openInputStream()
-
-            // Send RECV request
-            val pathBytes = remotePath.toByteArray(StandardCharsets.UTF_8)
-            val req = ByteBuffer.allocate(8 + pathBytes.size).order(ByteOrder.LITTLE_ENDIAN)
-            req.put(AdbConstants.RECV.toByteArray(StandardCharsets.US_ASCII))
-            req.putInt(pathBytes.size)
-            req.put(pathBytes)
-            out.write(req.array())
-            out.flush()
-
-            FileOutputStream(temp).use { fileOut ->
-                val header = ByteArray(4)
-                val lenBuf = ByteArray(4)
-                val buf = ByteArray(8192) // local IO buffer
-
-                while (true) {
-                    readFully(input, header, 0, 4)
-                    val cmd = String(header, StandardCharsets.US_ASCII)
-
-                    when (cmd) {
-                        AdbConstants.DATA -> {
-                            // DATA <len> <payload>
-                            readFully(input, lenBuf, 0, 4)
-                            var remaining = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-                            // Read the payload in chunks to avoid oversized single reads.
-                            while (remaining > 0) {
-                                val chunk = min(remaining, buf.size)
-                                readFully(input, buf, 0, chunk)
-                                fileOut.write(buf, 0, chunk)
-                                progress?.invoke(chunk.toLong())
-                                remaining -= chunk
-                            }
-                        }
-
-                        AdbConstants.DONE -> {
-                            // DONE is followed by a 4-byte mtime (uint32). Ignore contents.
-                            readFully(input, lenBuf, 0, 4)
-                            break
-                        }
-
-                        AdbConstants.FAIL -> {
-                            readFully(input, lenBuf, 0, 4)
-                            val msgLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-                            val msgBytes = ByteArray(msgLen)
-                            readFully(input, msgBytes, 0, msgLen)
-                            val msg = String(msgBytes, StandardCharsets.UTF_8)
-                            throw IOException("Sync failed: $msg")
-                        }
-
-                        else -> throw IOException("Unexpected sync response: $cmd")
-                    }
-                }
-            }
-        }
-
-        if (localDest.exists()) localDest.delete()
-        if (!temp.renameTo(localDest)) temp.copyTo(localDest, overwrite = true)
-        temp.delete()
-    }
-
-    private fun readFully(input: InputStream, buffer: ByteArray, offset: Int, length: Int) {
-        var off = offset
-        var remaining = length
-        while (remaining > 0) {
-            val read = input.read(buffer, off, remaining)
-            if (read < 0) {
-                throw EOFException("EOF while reading from input stream: $remaining bytes remaining")
-            }
-            off += read
-            remaining -= read
+            sendRecv(out, remotePath)
+            receiveFile(input, output)
         }
     }
 
@@ -124,122 +63,216 @@ class AdbSync(
      */
     @Throws(IOException::class)
     fun list(remoteDir: String): List<Map<String, Any>> {
-        val entries = mutableListOf<Map<String, Any>>()
-
         manager.openStream(LocalServices.SYNC).use { stream ->
             val out = stream.openOutputStream()
             val input = stream.openInputStream()
-
-            // Send LIST request
-            val remoteBytes = remoteDir.toByteArray(StandardCharsets.UTF_8)
-            val payloadLen = remoteBytes.size
-            val header = ByteBuffer.allocate(8)
-                .order(ByteOrder.LITTLE_ENDIAN)
-                .put(AdbConstants.LIST.toByteArray(StandardCharsets.US_ASCII))
-                .putInt(payloadLen)
-                .array()
-            out.write(header)
-            out.write(remoteBytes)
-            out.flush()
-
-            val nameBuf = ByteArray(1024)
-            val lenBuf = ByteArray(4)
-
-            while (true) {
-                // Read 4-byte command header
-                readFully(input, nameBuf, 0, 4)
-                val respCmd = String(nameBuf, 0, 4, StandardCharsets.US_ASCII)
-
-                when (respCmd) {
-                    AdbConstants.DENT -> {
-                        // Read 8 bytes for mode (uint32), size (uint64 not supported in V1: still uint32), mtime (uint32)
-                        readFully(input, lenBuf, 0, 4)
-                        val mode = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-
-                        readFully(input, lenBuf, 0, 4)
-                        val size = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-
-                        readFully(input, lenBuf, 0, 4)
-                        val mtime = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-
-                        // Next 4 is name length, then name data
-                        readFully(input, lenBuf, 0, 4)
-                        val nameLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-                        val nameBytes = ByteArray(nameLen)
-                        readFully(input, nameBytes, 0, nameLen)
-                        val name = String(nameBytes, StandardCharsets.UTF_8)
-
-                        val entry = mapOf(
-                            "path" to name,
-                            "mode" to mode,
-                            "size" to size,
-                            "mtime" to mtime
-                        )
-                        entries.add(entry)
-                    }
-
-                    AdbConstants.DONE -> {
-                        // No payload, end of list
-                        break
-                    }
-
-                    AdbConstants.FAIL -> {
-                        // 4-byte length, then error string
-                        readFully(input, lenBuf, 0, 4)
-                        val msgLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-                        val msgBytes = ByteArray(msgLen)
-                        readFully(input, msgBytes, 0, msgLen)
-                        val msg = String(msgBytes, StandardCharsets.UTF_8)
-                        throw IOException("List failed: $msg")
-                    }
-
-                    else -> {
-                        throw IOException("Unexpected list response: $respCmd")
-                    }
-                }
+            return listEntries(input, out, remoteDir).map { entry ->
+                mapOf(
+                    "path" to entry.name,
+                    "mode" to entry.mode,
+                    "size" to 0,
+                    "mtime" to entry.mtime,
+                )
             }
         }
-        return entries
     }
 
     /**
      * Pull a remote folder to a local destination.
      *
-     * @param remoteDir Path on the device to pull from.
-     * @param localDest Local folder to write to.
+     * This will first wall all the local files and then pull each of them.
+     * Doing otherwill can end up in a desync state with ADB daemon.
      */
     @Throws(IOException::class)
-    fun pullFolder(remoteDir: String, localDest: File) {
-        assert(remoteDir.endsWith("/"))
-
-        val entries = list(remoteDir)
-        // TODO: BUG: files starting with "." are ignored??
-        for (entry in entries) {
-            val path = entry["path"] as String
-            val mode = entry["mode"] as Int
-            val mtime = entry["mtime"] as Int
-
-            if (path == "." || path == "..") continue
-
-            val localPath = File(localDest, path)
-            localPath.parentFile?.mkdirs()
-
-            val type = mode and S_IFMT
-            when (type) {
-                S_IFDIR -> {
-                    pullFolder(remoteDir + path + "/", localPath)
+    fun pullFolder(
+        remoteDir: String,
+        writer: ArtifactSink,
+        artifactPrefix: String = "",
+    ) {
+        require(remoteDir.endsWith("/")) { "remoteDir must end with /" }
+        val prefix = artifactPrefix.trimEnd('/').let { normalized ->
+            if (normalized.isEmpty()) "" else "$normalized/"
+        }
+        manager.openStream(LocalServices.SYNC).use { stream ->
+            val out = stream.openOutputStream()
+            val input = stream.openInputStream()
+            val files = mutableListOf<RemoteFileEntry>()
+            collectFiles(input, out, remoteDir, prefix, files)
+            for (file in files) {
+                try {
+                    writer.useArtifact(file.artifactPath, file.mtime.toLong() * 1000) { artifact ->
+                        // this does not call pull() explicitly cause otherwise a new manager->stream would be created
+                        sendRecv(out, file.remotePath)
+                        receiveFile(input, artifact)
+                    }
+                } catch (e: IOException) {
+                    if (e.message.orEmpty().contains("Permission denied", ignoreCase = true)) {
+                        continue
+                    }
+                    throw e
                 }
-                S_IFREG -> {
-                    pull(remoteDir + path, localPath)
-                    // set last modified time accordingly
-                    localPath.setLastModified(mtime.toLong() * 1000)
+            }
+        }
+    }
+
+    private fun collectFiles(
+        input: InputStream,
+        out: OutputStream,
+        remoteDir: String,
+        prefix: String,
+        files: MutableList<RemoteFileEntry>,
+    ) {
+        for (entry in listEntries(input, out, remoteDir)) {
+            if (entry.name == "." || entry.name == "..") continue
+            when {
+                isDirectory(entry.mode) -> {
+                    collectFiles(
+                        input,
+                        out,
+                        "$remoteDir${entry.name}/",
+                        prefix + entry.name + "/",
+                        files,
+                    )
+                }
+                isRegularFile(entry.mode) -> {
+                    files += RemoteFileEntry(
+                        remotePath = remoteDir + entry.name,
+                        artifactPath = prefix + entry.name,
+                        mtime = entry.mtime,
+                    )
                 }
                 else -> {
                     // Skip non-regular files (symlinks, sockets, fifos, device nodes).
                     // Some pseudo-files (e.g. under /proc, /sys) may never reach EOF when read.
-                    Log.d(TAG, "Skipping non-regular entry: ${remoteDir}${path} (mode=${Integer.toHexString(mode)})")
+                    Log.d(TAG, "Skipping non-regular entry: ${remoteDir}${entry.name} (mode=${Integer.toHexString(entry.mode)})")
                 }
             }
+        }
+    }
+
+    private fun listEntries(input: InputStream, out: OutputStream, remoteDir: String): List<SyncDirEntry> {
+        val entries = mutableListOf<SyncDirEntry>()
+
+        // Send LIST request
+        val remoteBytes = remoteDir.toByteArray(StandardCharsets.UTF_8)
+        val payloadLen = remoteBytes.size
+        val header = ByteBuffer.allocate(8)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .put(AdbConstants.LIST.toByteArray(StandardCharsets.US_ASCII))
+            .putInt(payloadLen)
+            .array()
+        out.write(header)
+        out.write(remoteBytes)
+        out.flush()
+
+        val nameBuf = ByteArray(1024)
+        val lenBuf = ByteArray(4)
+
+        while (true) {
+            // Read 4-byte command header
+            readFully(input, nameBuf, 0, 4)
+            val respCmd = String(nameBuf, 0, 4, StandardCharsets.US_ASCII)
+
+            when (respCmd) {
+                AdbConstants.DENT -> {
+                    // Read 8 bytes for mode (uint32), size (uint64 not supported in V1: still uint32), mtime (uint32)
+                    readFully(input, lenBuf, 0, 4)
+                    val mode = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+                    readFully(input, lenBuf, 0, 4)
+                    val size = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+                    readFully(input, lenBuf, 0, 4)
+                    val mtime = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+                    // Next 4 is name length, then name data
+                    readFully(input, lenBuf, 0, 4)
+                    val nameLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+                    val nameBytes = ByteArray(nameLen)
+                    readFully(input, nameBytes, 0, nameLen)
+                    val name = String(nameBytes, StandardCharsets.UTF_8)
+                    entries += SyncDirEntry(name = name, mode = mode, mtime = mtime)
+                }
+                AdbConstants.DONE -> break
+                AdbConstants.FAIL -> throw IOException("List failed: ${readFailMessage(input)}")
+                else -> throw IOException("Unexpected list response: ${respCmd}")
+            }
+        }
+        return entries
+    }
+
+    private fun sendRecv(out: OutputStream, remotePath: String) {
+        val pathBytes = remotePath.toByteArray(StandardCharsets.UTF_8)
+        val request = ByteBuffer.allocate(8 + pathBytes.size).order(ByteOrder.LITTLE_ENDIAN)
+        request.put(AdbConstants.RECV.toByteArray(StandardCharsets.US_ASCII))
+        request.putInt(pathBytes.size)
+        request.put(pathBytes)
+        out.write(request.array())
+        out.flush()
+    }
+
+    private fun receiveFile(input: InputStream, output: OutputStream) {
+        val header = ByteArray(4)
+        val lenBuf = ByteArray(4)
+        val buf = ByteArray(8192)
+        while (true) {
+            readFully(input, header, 0, 4)
+            when (String(header, StandardCharsets.US_ASCII)) {
+                // DATA <len> <payload>
+                AdbConstants.DATA -> {
+                    readFully(input, lenBuf, 0, 4)
+                    var remaining = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+                    while (remaining > 0) {
+                        // Read the payload in chunks to avoid oversized single reads.
+                        val chunk = min(remaining, buf.size)
+                        readFully(input, buf, 0, chunk)
+                        output.write(buf, 0, chunk)
+                        progress?.invoke(chunk.toLong())
+                        remaining -= chunk
+                    }
+                }
+                AdbConstants.DONE -> {
+                    // DONE is followed by a 4-byte mtime (uint32). Ignore contents.
+                    readFully(input, lenBuf, 0, 4)
+                    output.flush()
+                    return
+                }
+                AdbConstants.FAIL -> throw IOException("Sync failed: ${readFailMessage(input)}")
+                else -> throw IOException("Unexpected sync response: ${String(header, StandardCharsets.US_ASCII)}")
+            }
+        }
+    }
+
+    private fun readFailMessage(input: InputStream): String {
+        val lenBuf = ByteArray(4)
+        readFully(input, lenBuf, 0, 4)
+        val msgLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+        val msgBytes = ByteArray(msgLen)
+        readFully(input, msgBytes, 0, msgLen)
+        return String(msgBytes, StandardCharsets.UTF_8)
+    }
+
+    private fun parseEntryName(nameBytes: ByteArray, nameLen: Int): String {
+        val end = if (nameLen > 0 && nameBytes[nameLen - 1] == 0.toByte()) nameLen - 1 else nameLen
+        return String(nameBytes, 0, end, StandardCharsets.UTF_8)
+    }
+
+    private fun isDirectory(mode: Int): Boolean {
+        return (mode and S_IFMT) == S_IFDIR
+    }
+
+    private fun isRegularFile(mode: Int): Boolean {
+        return (mode and S_IFMT) == S_IFREG
+    }
+
+    private fun readFully(input: InputStream, buffer: ByteArray, offset: Int, length: Int) {
+        var off = offset
+        var remaining = length
+        while (remaining > 0) {
+            val read = input.read(buffer, off, remaining)
+            if (read < 0) throw EOFException("EOF while reading from input stream: $remaining bytes remaining")
+            off += read
+            remaining -= read
         }
     }
 }

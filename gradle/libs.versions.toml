@@ -20,7 +20,7 @@ snakeyaml             = "2.5"
 kage                  = "0.3.0"
 json                  = "20250517"
 accompanist-permissions = "0.37.3"
-libmvt                = "0.0.3"
+libmvt                = "208e15bbac"
 
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
