@@ -5,7 +5,7 @@ import android.util.Log
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbSync
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import java.io.File
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Pull all the temporary files from the device.
@@ -17,17 +17,14 @@ class Temp : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
         val sync = AdbSync(manager, progress)
 
-        val dest = File(outDir, "tmp")
-        dest.mkdirs()
-
         val result = runCatching {
-            sync.pullFolder("/data/local/tmp/", dest)
-            Log.i(TAG, "Pulled temp to: ${dest.absolutePath}")
+            sync.pullFolder("/data/local/tmp/", writer, "tmp")
+            Log.i(TAG, "Pulled temp")
         }
         if (result.isFailure) {
             // TODO: write this feedback to the acquisition report in some way

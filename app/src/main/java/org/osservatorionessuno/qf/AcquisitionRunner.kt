@@ -25,6 +25,8 @@ import org.osservatorionessuno.qf.modules.Packages
 import org.osservatorionessuno.qf.modules.RootBinaries
 import org.osservatorionessuno.qf.modules.Temp
 import org.osservatorionessuno.cadb.AdbShell
+import org.osservatorionessuno.qf.storage.AcquisitionIndex
+import org.osservatorionessuno.qf.storage.PlaintextAcquisitionWriter
 
 private const val TAG = "AcquisitionRunner"
 
@@ -114,9 +116,25 @@ class AcquisitionRunner(
         val total = modules.size
         var completedCount = 0
 
+        var index = AcquisitionIndex(
+            uuid = acquisitionDir.name,
+            status = AcquisitionIndex.STATUS_RUNNING,
+            created = started.toString(),
+            completed = null,
+            androidqfVersion = BuildConfig.VERSION_NAME,
+            storagePath = acquisitionDir.absolutePath,
+            tmpDir = tmpDir,
+            sdcard = sdCard,
+            cpu = cpu,
+            analysisDir = AcquisitionIndex.ANALYSIS_DIR,
+        )
+
+        val writer = PlaintextAcquisitionWriter(acquisitionDir)
+
         for (module in modules) {
             if (listener?.isCancelled() == true) {
                 Log.i(TAG, "Acquisition cancelled before module ${module.name}")
+                writer.writeIndex(index.markCompleted(Instant.now()))
                 listener.onFinished(true)
                 return acquisitionDir
             }
@@ -130,8 +148,7 @@ class AcquisitionRunner(
             Log.i(TAG, "Running module ${module.name}")
             listener?.onModuleStart(module.name, completedCount, total)
             try {
-                if (!acquisitionDir.exists()) acquisitionDir.mkdirs()
-                module.run(context, manager, acquisitionDir, progressCb)
+                module.run(context, manager, writer, progressCb)
                 Log.i(TAG, "Module ${module.name} finished")
             } catch (t: Throwable) {
                 Log.e(TAG, "Module ${module.name} failed", t)
@@ -142,19 +159,8 @@ class AcquisitionRunner(
         }
 
         val completed = Instant.now()
-        val metadata = JSONObject().apply {
-            put("uuid", acquisitionDir.name)
-            // TODO: here we should use a better key, for exampple "bugbane_version"
-            put("androidqf_version", BuildConfig.VERSION_NAME)
-            put("storage_path", acquisitionDir.absolutePath)
-            put("started", started.toString())
-            put("completed", completed.toString())
-            put("tmp_dir", tmpDir)
-            put("sdcard", sdCard)
-            put("cpu", cpu)
-            put("streaming_mode", false)
-        }
-        File(acquisitionDir, "acquisition.json").writeText(Utils.toJsonString(metadata))
+        index = index.markCompleted(completed)
+        writer.writeIndex(index)
 
         Log.i(TAG, "Acquisition complete in ${acquisitionDir.absolutePath}")
         listener?.onFinished(false)

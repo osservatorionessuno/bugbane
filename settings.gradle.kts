@@ -40,4 +40,3 @@ if (useLocalLibmvt) {
     }
     println("using local LibMVT")
 }
- 

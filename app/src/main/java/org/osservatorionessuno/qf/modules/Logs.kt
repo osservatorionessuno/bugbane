@@ -5,7 +5,7 @@ import android.util.Log
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.cadb.AdbSync
-import java.io.File
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Pull all the various logs files and directories from the device.
@@ -28,23 +28,23 @@ class Logs : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
         val sync = AdbSync(manager, progress)
 
-        val dest = File(outDir, "logs")
-        dest.mkdirs()
-
         val result = runCatching {
             for (target in targets) {
                 if (target.endsWith("/")) {
-                    sync.pullFolder(target, dest)
+                    sync.pullFolder(target, writer, "logs")
                 } else {
-                    sync.pull(target, dest)
+                    val name = target.substringAfterLast('/')
+                    writer.useArtifact("logs/$name") { output ->
+                        sync.pull(target, output)
+                    }
                 }
             }
-            Log.i(TAG, "Pulled logs to: ${dest.absolutePath}")
+            Log.i(TAG, "Pulled logs")
         }
         if (result.isFailure) {
             // TODO: write this feedback to the acquisition report in some way

@@ -2,12 +2,11 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.util.Log
-import org.json.JSONArray
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import org.osservatorionessuno.qf.Utils
-import java.io.File
+import org.osservatorionessuno.qf.ArtifactProtobuf
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Pull all the mount points set int the device.
@@ -19,7 +18,7 @@ class Mounts : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
         Log.i(TAG, "Collecting mount information")
@@ -61,9 +60,10 @@ class Mounts : Module {
 
         Log.d(TAG, "Found ${mountsData.size} mount entries")
 
-        // Save as mounts.json in the acquisition directory
-        File(outDir, "mounts.json").writeText(
-            Utils.toJsonString(JSONArray(mountsData))
-        )
+        writer.useArtifact("mounts.pb") { output ->
+            for (mount in mountsData) {
+                ArtifactProtobuf.writeDelimitedStringRecord(output, mount)
+            }
+        }
     }
 }

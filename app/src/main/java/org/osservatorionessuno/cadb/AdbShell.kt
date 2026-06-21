@@ -6,6 +6,10 @@ import java.nio.charset.StandardCharsets
 import java.util.*
 import java.util.concurrent.*
 
+class ShellTimeoutException(message: String) : IOException(message)
+
+class ShellInactivityException(message: String, cause: Throwable? = null) : IOException(message, cause)
+
 class AdbShell(
     private val manager: AdbConnectionManager,
     private val tag: String = "AdbShell",
@@ -18,12 +22,12 @@ class AdbShell(
     }
 
     fun exec(command: String): String {
-        // TODO: implement command-injection checks!
         val output = ByteArrayOutputStream()
         execInternal(command, output)
         return output.toString(StandardCharsets.UTF_8.name())
     }
 
+    @Deprecated("Use execToStream instead")
     fun execToFile(command: String, file: File) {
         val temp = File(file.parentFile, file.name + ".part").apply {
             parentFile?.mkdirs()
@@ -33,6 +37,16 @@ class AdbShell(
         if (file.exists()) file.delete()
         if (!temp.renameTo(file)) temp.copyTo(file, overwrite = true)
         temp.delete()
+    }
+
+    fun execToStream(command: String, output: OutputStream) {
+        execInternal(command, output)
+    }
+
+    fun execForEachLine(command: String, onLine: (String) -> Unit) {
+        LineDispatchOutputStream(onLine).use { output ->
+            execInternal(command, output)
+        }
     }
 
     private fun execInternal(command: String, sink: OutputStream) {
@@ -59,8 +73,8 @@ class AdbShell(
     }
 
     /**
-     * Reads the stream, writes to [sink], returns true if marker matched, false if stream ended/idle first.
-     * Throws only on hard timeout or unexpected IO.
+     * Reads the stream, writes to [sink], returns true if marker matched.
+     * Throws on hard timeout, inactivity, or unexpected IO.
      */
     private fun runWithStream(command: String, sink: OutputStream, marker: String): Boolean {
         val stream = manager.openStream(command)
@@ -77,14 +91,16 @@ class AdbShell(
             loop@ while (true) {
                 // Hard timeout always enforced
                 if (System.nanoTime() - startTime > TimeUnit.MILLISECONDS.toNanos(timeoutMs)) {
-                    throw IOException("Shell command timed out: $command")
+                    throw ShellTimeoutException("Shell command timed out after ${timeoutMs}ms: $command")
                 }
 
                 val bytesRead = try {
                     readOnceWithTimeout(executor, input, buf, inactivityMs)
                 } catch (e: TimeoutException) {
-                    Log.d(tag, "[exec] Inactivity: no bytes for ${inactivityMs}ms (fallback exit)")
-                    break
+                    throw ShellInactivityException(
+                        "Shell command inactive for ${inactivityMs}ms: $command",
+                        e,
+                    )
                 } catch (e: IOException) {
                     // Some devices close the stream abruptly when the process exits.
                     if (e.message?.contains("stream closed", ignoreCase = true) == true) {
@@ -166,5 +182,44 @@ class AdbShell(
         // ' -> '"'"'  (classic POSIX-safe quoting)
         val escaped = s.replace("'", "'\"'\"'")
         return "'$escaped'"
+    }
+
+    /** Buffers shell output and invokes [onLine] once per newline-delimited line. */
+    private class LineDispatchOutputStream(
+        private val onLine: (String) -> Unit,
+    ) : OutputStream() {
+        private val pending = ByteArrayOutputStream()
+
+        override fun write(b: Int) {
+            write(byteArrayOf(b.toByte()), 0, 1)
+        }
+
+        override fun write(bytes: ByteArray, off: Int, len: Int) {
+            var start = off
+            val end = off + len
+            while (start < end) {
+                var newlineAt = start
+                while (newlineAt < end && bytes[newlineAt] != '\n'.code.toByte()) {
+                    newlineAt++
+                }
+                if (newlineAt == end) {
+                    pending.write(bytes, start, end - start)
+                    return
+                }
+                pending.write(bytes, start, newlineAt - start)
+                dispatchLine()
+                start = newlineAt + 1
+            }
+        }
+
+        override fun close() {
+            dispatchLine()
+        }
+
+        private fun dispatchLine() {
+            if (pending.size() == 0) return
+            onLine(pending.toString(StandardCharsets.UTF_8))
+            pending.reset()
+        }
     }
 }
