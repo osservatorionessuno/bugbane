@@ -44,4 +44,8 @@
     <string name="settings_description">Configurez vos préférences et vos paramètres ici.</string>
     <string name="settings_general">Paramètres généraux</string>
     <string name="settings_developer_options">Désactiver le mode développeur</string>
+    <string name="home_checklist_title">Listado de Comprobación Forense</string>
+    <string name="settings_developer_options_desc">Es recomendado deshabilitar Opciones de Desarrollador tras cada sesión y re‐habilitarlos solo cuando se necesiten.</string>
+    <string name="settings_indicators_title">Indicadores de Compromiso (IoCs)</string>
+    <string name="settings_indicators_last_fetch">Last fetch: %1$s</string>
 </resources>
