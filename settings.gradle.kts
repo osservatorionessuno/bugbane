@@ -22,6 +22,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Bugbane"
 include(":app")
+include(":crypto")
 
 // Project-wide default value is set to true, but can be overridden in "gradle.properties".
 val useLocalLibmvt = providers.gradleProperty("libmvtLocal")

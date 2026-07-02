@@ -27,18 +27,6 @@ class AdbShell(
         return output.toString(StandardCharsets.UTF_8.name())
     }
 
-    @Deprecated("Use execToStream instead")
-    fun execToFile(command: String, file: File) {
-        val temp = File(file.parentFile, file.name + ".part").apply {
-            parentFile?.mkdirs()
-            delete()
-        }
-        FileOutputStream(temp).use { out -> execInternal(command, out) }
-        if (file.exists()) file.delete()
-        if (!temp.renameTo(file)) temp.copyTo(file, overwrite = true)
-        temp.delete()
-    }
-
     fun execToStream(command: String, output: OutputStream) {
         execInternal(command, output)
     }

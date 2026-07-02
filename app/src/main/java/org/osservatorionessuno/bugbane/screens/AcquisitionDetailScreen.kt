@@ -45,9 +45,12 @@ import java.time.Instant
 import java.util.Date
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import kage.Age
-import kage.crypto.scrypt.ScryptRecipient
 import org.osservatorionessuno.bugbane.utils.Utils
+import org.osservatorionessuno.qf.crypto.AgeExporter
+import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
+import org.osservatorionessuno.qf.crypto.age.Age
+import org.osservatorionessuno.qf.crypto.age.ScryptRecipient
+import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -133,6 +136,9 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     Intent.EXTRA_TEXT,
                     context.getString(org.osservatorionessuno.bugbane.R.string.acquisition_share_message, pass)
                 )
+                // Also expose the URI via ClipData so the read grant reaches the
+                // share-sheet preview process (not just the final target app).
+                clipData = ClipData.newRawUri(file.name, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(Intent.createChooser(intent, null))
@@ -732,26 +738,34 @@ private fun loadScans(acquisitionDir: File): List<ScanSummary> {
 private suspend fun createEncryptedArchive(context: Context, sourceDir: File): Pair<File, String> {
     return withContext(Dispatchers.IO) {
         val pass = Utils.generatePassphrase()
-        val dest = File.createTempFile("acquisition", ".zip.age", context.cacheDir)
-        val plainZip = File.createTempFile("acquisition", ".zip", context.cacheDir)
-        // 256MB goes OOM
-        val workFactor = 15
-        ZipOutputStream(FileOutputStream(plainZip)).use { zipOut ->
-            sourceDir.walkTopDown().filter { it.isFile }.forEach { file ->
-                val entryName = file.relativeTo(sourceDir).path
-                val entry = ZipEntry(entryName).apply { time = file.lastModified() }
-                zipOut.putNextEntry(entry)
-                file.inputStream().use { it.copyTo(zipOut) }
-                zipOut.closeEntry()
+        // 2^15 scrypt; the (generated, high-entropy) passphrase is what protects it.
+        val recipient = ScryptRecipient(pass.toByteArray(), logN = 15)
+
+        val archiveFile = File(sourceDir, ARCHIVE_FILE)
+        if (archiveFile.exists()) {
+            // Encrypted acquisition: verbatim re-wrap — re-target the device-bound
+            // archive to a passphrase recipient without decrypting the payload.
+            val dest = File.createTempFile("acquisition", ".age", context.cacheDir)
+            val vault = AndroidKeystoreKeyVault.getOrCreate()
+            archiveFile.inputStream().use { src ->
+                FileOutputStream(dest).use { out -> AgeExporter.export(src, vault, recipient, out) }
             }
-        }
-        FileOutputStream(dest).use { fileOut ->
-            FileInputStream(plainZip).use { plainIn ->
-                Age.encryptStream(listOf(ScryptRecipient(pass.toByteArray(), workFactor = workFactor)), plainIn, fileOut)
+            dest to pass
+        } else {
+            // Legacy plaintext-directory acquisition: stream dir -> ZIP -> age, with
+            // no intermediate plaintext .zip on disk.
+            val dest = File.createTempFile("acquisition", ".zip.age", context.cacheDir)
+            Age.encryptingStream(listOf(recipient), FileOutputStream(dest)).use { ageOut ->
+                ZipOutputStream(ageOut).use { zipOut ->
+                    sourceDir.walkTopDown().filter { it.isFile }.forEach { file ->
+                        zipOut.putNextEntry(ZipEntry(file.relativeTo(sourceDir).path).apply { time = file.lastModified() })
+                        file.inputStream().use { it.copyTo(zipOut) }
+                        zipOut.closeEntry()
+                    }
+                }
             }
+            dest to pass
         }
-        plainZip.delete()
-        dest to pass
     }
 }
 

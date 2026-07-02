@@ -21,3 +21,8 @@
 #-renamesourcefileattribute SourceFile
 -dontwarn com.android.org.conscrypt.**
 -dontwarn org.apache.harmony.xnet.provider.jsse.**
+
+# Apache Commons Compress references optional codecs we don't ship (ZIP-only usage).
+-dontwarn org.tukaani.xz.**
+-dontwarn com.github.luben.zstd.**
+-dontwarn org.brotli.dec.**
