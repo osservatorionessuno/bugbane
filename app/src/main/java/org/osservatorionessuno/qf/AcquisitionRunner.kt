@@ -27,6 +27,7 @@ import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.qf.storage.AcquisitionIndex
 import org.osservatorionessuno.qf.storage.EncryptedAcquisitionWriter
 import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
+import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault.StrongBoxPolicy
 
 private const val TAG = "AcquisitionRunner"
 
@@ -59,6 +60,13 @@ class AcquisitionRunner(
         Temp()
     )
 ) {
+
+    companion object {
+        const val ACQUISITION_KEY_ALIAS = "bugbane.acquisition.kek"
+
+        fun acquisitionKeyVault(): AndroidKeystoreKeyVault =
+            AndroidKeystoreKeyVault.getOrCreateKeyVault(ACQUISITION_KEY_ALIAS, StrongBoxPolicy.PREFER)
+    }
 
     /**
      * Listener used to report progress and check for cancellation.
@@ -129,7 +137,7 @@ class AcquisitionRunner(
             analysisDir = AcquisitionIndex.ANALYSIS_DIR,
         )
 
-        val vault = AndroidKeystoreKeyVault.getOrCreate()
+        val vault = AcquisitionRunner.acquisitionKeyVault()
         val writer = EncryptedAcquisitionWriter(acquisitionDir, vault)
 
         var cancelled = false

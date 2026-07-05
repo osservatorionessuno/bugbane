@@ -13,7 +13,6 @@ import org.osservatorionessuno.bugbane.utils.AndroidStringResolver
 import org.osservatorionessuno.libmvt.common.Artifact
 import org.osservatorionessuno.qf.storage.EncryptedAcquisitionReader
 import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
-import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
 import java.io.File
 import java.time.Instant
 import java.util.UUID
@@ -60,7 +59,8 @@ object AcquisitionScanner {
         if (File(acquisitionDir, ARCHIVE_FILE).exists()) {
             // Encrypted acquisition: decrypt + unzip in one bounded-memory pass and
             // analyze each artifact from its stream — no plaintext is written to disk.
-            val reader = EncryptedAcquisitionReader(acquisitionDir, AndroidKeystoreKeyVault.getOrCreate())
+            val vault = AcquisitionRunner.acquisitionKeyVault()
+            val reader = EncryptedAcquisitionReader(acquisitionDir, vault)
             reader.forEachArtifact { artifact ->
                 if (artifact.path in ForensicRunner.MODULES_MAP.keys) {
                     val input = ArtifactInput(artifact.path, artifact.inputStream)

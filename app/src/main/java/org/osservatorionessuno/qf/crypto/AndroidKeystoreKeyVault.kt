@@ -37,8 +37,8 @@ class AndroidKeystoreKeyVault private constructor(
 ) : KeyVault {
 
     override fun wrap(fileKey: ByteArray): ByteArray {
-        val cipher = Cipher.getInstance(TRANSFORM)
-        cipher.init(Cipher.ENCRYPT_MODE, key)
+        val cipher = Cipher.getInstance(TRANSFORM) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
+        cipher.init(Cipher.ENCRYPT_MODE, key) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         val iv = cipher.iv
         val ct = cipher.doFinal(fileKey)
         // [ivLen:1][iv][ciphertext+tag]
@@ -48,50 +48,77 @@ class AndroidKeystoreKeyVault private constructor(
     override fun unwrap(blob: ByteArray): ByteArray {
         val ivLen = blob[0].toInt() and 0xFF
         val iv = blob.copyOfRange(1, 1 + ivLen)
-        val cipher = Cipher.getInstance(TRANSFORM)
-        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))
+        val cipher = Cipher.getInstance(TRANSFORM) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
+        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv)) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         return cipher.doFinal(blob, 1 + ivLen, blob.size - 1 - ivLen)
+    }
+
+    /** How to pick StrongBox vs TEE when generating a new AES key. */
+    enum class StrongBoxPolicy {
+        /** Try StrongBox, fall back to TEE on [StrongBoxUnavailableException]. */
+        PREFER,
+        /** Always generate in the TEE. */
+        NEVER,
     }
 
     companion object {
         private const val KEYSTORE = "AndroidKeyStore"
-        private const val ALIAS = "bugbane.acquisition.kek"
         private const val TRANSFORM = "AES/GCM/NoPadding"
         private const val GCM_TAG_BITS = 128
 
         const val STANZA_STRONGBOX = "bugbane-se"
         const val STANZA_TEE = "bugbane-tee"
 
-        /** Load the existing acquisition KEK or create one (StrongBox-preferred). */
-        fun getOrCreate(): AndroidKeystoreKeyVault {
+        /** Load or create a vault for [alias]. */
+        @JvmStatic
+        fun getOrCreateKeyVault(
+            alias: String,
+            strongBoxPolicy: StrongBoxPolicy,
+        ): AndroidKeystoreKeyVault {
+            val key = getOrCreateKey(
+                alias,
+                strongBoxPolicy,
+            )
+            return AndroidKeystoreKeyVault(key, stanzaTypeOf(key))
+        }
+
+        private fun getOrCreateKey(
+            alias: String,
+            strongBoxPolicy: StrongBoxPolicy,
+        ): SecretKey {
             val ks = KeyStore.getInstance(KEYSTORE).apply { load(null) }
-            val existing = (ks.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
-            if (existing != null) {
-                return AndroidKeystoreKeyVault(existing, stanzaTypeOf(existing))
-            }
-            return try {
-                generate(strongBox = true)
-            } catch (_: StrongBoxUnavailableException) {
-                generate(strongBox = false)
+            (ks.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.secretKey?.let { return it }
+
+            return when (strongBoxPolicy) {
+                StrongBoxPolicy.PREFER -> try {
+                    generateAesKey(alias, strongBox = true)
+                } catch (_: StrongBoxUnavailableException) {
+                    generateAesKey(alias, strongBox = false)
+                }
+                StrongBoxPolicy.NEVER -> generateAesKey(alias, strongBox = false)
             }
         }
 
-        private fun generate(strongBox: Boolean): AndroidKeystoreKeyVault {
+        private fun generateAesKey(
+            alias: String,
+            strongBox: Boolean,
+        ): SecretKey {
             val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE)
             val spec = KeyGenParameterSpec.Builder(
-                ALIAS,
+                alias,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
             )
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
-                // Transparent for now; switch to true + per-use BiometricPrompt later.
-                .setUserAuthenticationRequired(false)
-                .apply { if (strongBox) setIsStrongBoxBacked(true) }
+                .setUserAuthenticationRequired(strongBox)
+                .apply {
+                    setUserConfirmationRequired(strongBox)
+                    setIsStrongBoxBacked(strongBox)
+                }
                 .build()
             generator.init(spec)
-            val key = generator.generateKey()
-            return AndroidKeystoreKeyVault(key, stanzaTypeOf(key))
+            return generator.generateKey()
         }
 
         /** Determine whether [key] lives in StrongBox (SE) or the TEE. */

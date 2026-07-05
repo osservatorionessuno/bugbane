@@ -46,8 +46,8 @@ import java.util.Date
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.osservatorionessuno.bugbane.utils.Utils
+import org.osservatorionessuno.qf.AcquisitionRunner
 import org.osservatorionessuno.qf.crypto.AgeExporter
-import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
 import org.osservatorionessuno.qf.crypto.age.Age
 import org.osservatorionessuno.qf.crypto.age.ScryptRecipient
 import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
@@ -744,7 +744,7 @@ private suspend fun createEncryptedArchive(context: Context, sourceDir: File): P
         // Encrypted acquisition: verbatim re-wrap — re-target the device-bound
         // archive to a passphrase recipient without decrypting the payload.
         val dest = File.createTempFile("acquisition", ".zip.age", context.cacheDir)
-        val vault = AndroidKeystoreKeyVault.getOrCreate()
+        val vault = AcquisitionRunner.acquisitionKeyVault()
         archiveFile.inputStream().use { src ->
             FileOutputStream(dest).use { out -> AgeExporter.export(src, vault, recipient, out) }
         }

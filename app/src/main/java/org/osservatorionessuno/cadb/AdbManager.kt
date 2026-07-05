@@ -223,7 +223,7 @@ class AdbManager(applicationContext: Context) {
 
     init {
         this.appContext = applicationContext
-        this.adbConnectionManager = AdbConnectionManager.getInstance(appContext!!) as AdbConnectionManager
+        this.adbConnectionManager = AdbConnectionManager.getInstance(appContext!!)
     }
 
     fun execute(command: String) {
