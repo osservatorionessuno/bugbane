@@ -15,7 +15,7 @@ import java.io.ByteArrayOutputStream
 /**
  * End-to-end: the **real libMVT** analyzes artifacts read straight out of the
  * encrypted archive in a single decrypt+unzip streaming pass
- * ([EncryptedArchive.forEachEntry]), with no plaintext written to disk.
+ * ([AgeZipArchiveReader.forEachEntry]), with no plaintext written to disk.
  *
  * For each analyzable artifact the result must match libMVT reading the same
  * bytes from a plain stream — proving the encrypted archive is a transparent
@@ -48,11 +48,11 @@ class LibmvtIntegrationTest {
 
         val vault = InMemoryKeyVault()
         val archive = ByteArrayOutputStream().also { out ->
-            EncryptedArchive.write(out, vault, artifacts.map { (n, b) -> Entry(n) { ByteArrayInputStream(b) } })
+            AgeZipArchiveReader.write(out, vault, artifacts.map { (n, b) -> Entry(n) { ByteArrayInputStream(b) } })
         }.toByteArray()
 
         var sawGetprop = false
-        EncryptedArchive.forEachEntry(ByteArrayRandomAccess(archive), vault) { name, _, stream ->
+        AgeZipArchiveReader.forEachEntry(ByteArrayRandomAccess(archive), vault) { name, _, stream ->
             if (name !in ForensicRunner.MODULES_MAP.keys) return@forEachEntry
 
             // analyze straight from the encrypted archive's stream
