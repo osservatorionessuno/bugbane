@@ -110,8 +110,8 @@ dependencies {
     // X.509 certificate generation for ADB pairing (BouncyCastle)
     implementation(libs.bouncycastle.pkix)
 
-    // Required for age encrypted export/share
-    implementation(libs.kage)
+    // Streaming encrypted+compressed acquisition archive (age + ZIP) engine.
+    implementation(project(":crypto"))
 
     // Applying the update feed's unified-diff deltas
     implementation(libs.java.diff.utils)

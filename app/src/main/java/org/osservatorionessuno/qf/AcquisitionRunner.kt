@@ -6,7 +6,6 @@ import java.io.File
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
-import org.json.JSONObject
 import org.osservatorionessuno.bugbane.BuildConfig
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.qf.modules.Env
@@ -26,7 +25,8 @@ import org.osservatorionessuno.qf.modules.RootBinaries
 import org.osservatorionessuno.qf.modules.Temp
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.qf.storage.AcquisitionIndex
-import org.osservatorionessuno.qf.storage.PlaintextAcquisitionWriter
+import org.osservatorionessuno.qf.storage.EncryptedAcquisitionWriter
+import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
 
 private const val TAG = "AcquisitionRunner"
 
@@ -129,37 +129,44 @@ class AcquisitionRunner(
             analysisDir = AcquisitionIndex.ANALYSIS_DIR,
         )
 
-        val writer = PlaintextAcquisitionWriter(acquisitionDir)
+        val vault = AndroidKeystoreKeyVault.getOrCreate()
+        val writer = EncryptedAcquisitionWriter(acquisitionDir, vault)
 
-        for (module in modules) {
-            if (listener?.isCancelled() == true) {
-                Log.i(TAG, "Acquisition cancelled before module ${module.name}")
-                writer.writeIndex(index.markCompleted(Instant.now()))
-                listener.onFinished(true)
-                return acquisitionDir
-            }
+        var cancelled = false
+        writer.use {
+            for (module in modules) {
+                if (listener?.isCancelled() == true) {
+                    Log.i(TAG, "Acquisition cancelled before module ${module.name}")
+                    cancelled = true
+                    break
+                }
 
-            var moduleBytes = 0L
-            val progressCb: (Long) -> Unit = { delta ->
-                moduleBytes += delta
-                listener?.onModuleProgress(module.name, moduleBytes)
-                Unit
+                var moduleBytes = 0L
+                val progressCb: (Long) -> Unit = { delta ->
+                    moduleBytes += delta
+                    listener?.onModuleProgress(module.name, moduleBytes)
+                    Unit
+                }
+                Log.i(TAG, "Running module ${module.name}")
+                listener?.onModuleStart(module.name, completedCount, total)
+                try {
+                    module.run(context, manager, writer, progressCb)
+                    Log.i(TAG, "Module ${module.name} finished")
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Module ${module.name} failed", t)
+                    // TODO: display error message to the user
+                }
+                completedCount++
+                listener?.onModuleComplete(module.name, completedCount, total)
             }
-            Log.i(TAG, "Running module ${module.name}")
-            listener?.onModuleStart(module.name, completedCount, total)
-            try {
-                module.run(context, manager, writer, progressCb)
-                Log.i(TAG, "Module ${module.name} finished")
-            } catch (t: Throwable) {
-                Log.e(TAG, "Module ${module.name} failed", t)
-                // TODO: display error message to the user
-            }
-            completedCount++
-            listener?.onModuleComplete(module.name, completedCount, total)
         }
 
         val completed = Instant.now()
-        index = index.markCompleted(completed)
+        if (cancelled) {
+            index = index.markAsCancelled(completed)
+        } else {
+            index = index.markAsComplete(completed)
+        }
         writer.writeIndex(index)
 
         Log.i(TAG, "Acquisition complete in ${acquisitionDir.absolutePath}")

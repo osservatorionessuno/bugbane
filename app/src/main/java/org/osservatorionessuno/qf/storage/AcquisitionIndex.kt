@@ -36,8 +36,12 @@ data class AcquisitionIndex(
         return root
     }
 
-    fun markCompleted(completedAt: Instant): AcquisitionIndex {
+    fun markAsComplete(completedAt: Instant): AcquisitionIndex {
         return copy(status = STATUS_COMPLETE, completed = completedAt.toString())
+    }
+
+    fun markAsCancelled(cancelledAt: Instant): AcquisitionIndex {
+        return copy(status = STATUS_CANCELLED, completed = cancelledAt.toString())
     }
 
     companion object {

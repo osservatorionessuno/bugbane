@@ -17,6 +17,7 @@ private const val METADATA_FILE: String = "acquisition.json"
 /*
     Helper class to write plaintext artifacts to the acquisition directory.
 */
+@Deprecated("Use EncryptedAcquisitionWriter instead")
 class PlaintextAcquisitionWriter(
     private val acquisitionDir: File,
 ) : ArtifactSink {
@@ -55,6 +56,7 @@ class PlaintextAcquisitionWriter(
 /*
     Helper class to read plaintext artifacts from the acquisition directory.
 */
+@Deprecated("Use EncryptedAcquisitionReader instead")
 class PlaintextAcquisitionReader(
     private val acquisitionDir: File,
 ) : ArtifactReader {
