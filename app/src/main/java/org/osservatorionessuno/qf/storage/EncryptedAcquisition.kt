@@ -4,12 +4,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
+import org.json.JSONObject
 import org.osservatorionessuno.qf.Utils
-import org.osservatorionessuno.qf.crypto.AgeZipArchiveWriter
 import org.osservatorionessuno.qf.crypto.AgeZipArchiveReader
+import org.osservatorionessuno.qf.crypto.AgeZipArchiveWriter
 import org.osservatorionessuno.qf.crypto.KeyVault
-
-private const val METADATA_FILE: String = "acquisition.json"
 
 /** Single encrypted archive holding every artifact of an acquisition. */
 const val ARCHIVE_FILE: String = "acquisition.age"
@@ -26,6 +25,7 @@ class EncryptedAcquisitionWriter(
 ) : ArtifactSink {
     private val writer = AgeZipArchiveWriter(FileOutputStream(File(acquisitionDir, ARCHIVE_FILE)), vault)
     private val writtenPaths = mutableSetOf<String>()
+    private var indexWritten = false
 
     override fun openArtifact(path: String, modifiedTime: Long?): OutputStream {
         val name = normalizeArtifactPath(path)
@@ -42,11 +42,15 @@ class EncryptedAcquisitionWriter(
 
     override fun close(): Unit = writer.close()
 
+    /** Write [index] as the final [METADATA_FILE] zip entry (before [close]). */
+    @Throws(IOException::class)
     fun writeIndex(index: AcquisitionIndex) {
-        // Index metadata only (never artifact content): kept plaintext beside the
-        // archive so acquisitions can be listed without unlocking the Keystore.
-        File(acquisitionDir, METADATA_FILE)
-            .writeText(Utils.toJsonString(index.toJsonObject()), Charsets.UTF_8)
+        check(!indexWritten) { "index already written" }
+        val json = Utils.toJsonString(index.toJsonObject()).toByteArray(Charsets.UTF_8)
+        writer.putEntry(METADATA_FILE).use { it.write(json) }
+        indexWritten = true
+        // Keep a copy in plaintext so acquisitions can be listed without unlocking the Keystore.
+        File(acquisitionDir, METADATA_FILE).writeText(Utils.toJsonString(index.toJsonObject()), Charsets.UTF_8)
     }
 }
 
@@ -66,7 +70,32 @@ class EncryptedAcquisitionReader(
         }
     }
 
+    fun readIndex(): AcquisitionIndex? {
+        var index: AcquisitionIndex? = null
+        forEachArtifact { artifact ->
+            if (artifact.path != METADATA_FILE) return@forEachArtifact
+            index = AcquisitionIndex.fromJsonObject(
+                JSONObject(artifact.inputStream.bufferedReader().readText()),
+            )
+        }
+        return index
+    }
+
     override fun close(): Unit {
+    }
+}
+
+/** Read [METADATA_FILE] from the archive, falling back to a legacy sidecar file. */
+fun readAcquisitionIndex(acquisitionDir: File, vault: KeyVault): AcquisitionIndex? {
+    EncryptedAcquisitionReader(acquisitionDir, vault).use { reader ->
+        reader.readIndex()?.let { return it }
+    }
+    val legacy = File(acquisitionDir, METADATA_FILE)
+    if (!legacy.exists()) return null
+    return try {
+        AcquisitionIndex.fromJsonObject(JSONObject(legacy.readText(Charsets.UTF_8)))
+    } catch (_: Exception) {
+        null
     }
 }
 
@@ -79,8 +108,7 @@ private fun normalizeArtifactPath(path: String): String {
 }
 
 /*
-    Reserved names live beside the archive as plaintext metadata and must not be
-    claimed by module artifacts.
+    Reserved zip entry names must not be claimed by module artifacts.
 */
 private fun isReservedArtifact(name: String): Boolean {
     if (name == METADATA_FILE) return true

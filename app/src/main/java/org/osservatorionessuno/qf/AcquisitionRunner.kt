@@ -167,15 +167,15 @@ class AcquisitionRunner(
                 completedCount++
                 listener?.onModuleComplete(module.name, completedCount, total)
             }
-        }
 
-        val completed = Instant.now()
-        if (cancelled) {
-            index = index.markAsCancelled(completed)
-        } else {
-            index = index.markAsComplete(completed)
+            val completed = Instant.now()
+            index = if (cancelled) {
+                index.markAsCancelled(completed)
+            } else {
+                index.markAsComplete(completed)
+            }
+            writer.writeIndex(index)
         }
-        writer.writeIndex(index)
 
         Log.i(TAG, "Acquisition complete in ${acquisitionDir.absolutePath}")
         listener?.onFinished(false)

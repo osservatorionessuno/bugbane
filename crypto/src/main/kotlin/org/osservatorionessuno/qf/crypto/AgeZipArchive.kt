@@ -10,6 +10,7 @@ import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import java.io.IOException
 
 /** One streamed artifact: a name (relative path), optional mtime, and a lazy source of bytes. */
 class Entry(val name: String, val modifiedTime: Long? = null, val open: () -> InputStream)
@@ -35,6 +36,7 @@ class AgeZipArchiveWriter(out: OutputStream, vault: KeyVault) : Closeable {
     private var entryOpen = false
 
     fun putEntry(name: String, modifiedTime: Long? = null): OutputStream {
+        // TODO: handle case where previous modules didn't close the entry
         check(!entryOpen) { "previous entry not closed" }
         zip.putNextEntry(ZipEntry(name).apply { if (modifiedTime != null) time = modifiedTime })
         entryOpen = true
@@ -42,7 +44,9 @@ class AgeZipArchiveWriter(out: OutputStream, vault: KeyVault) : Closeable {
     }
 
     private inner class EntryStream : OutputStream() {
+        @Throws(IOException::class)
         override fun write(b: Int) = zip.write(b)
+        @Throws(IOException::class)
         override fun write(b: ByteArray, off: Int, len: Int) = zip.write(b, off, len)
         override fun close() {
             if (!entryOpen) return

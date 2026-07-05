@@ -10,6 +10,8 @@ data class AcquisitionArtifact(
     val inputStream: InputStream,
 )
 
+const val METADATA_FILE: String = "acquisition.json"
+
 interface ArtifactSink : Closeable {
     fun openArtifact(path: String, modifiedTime: Long? = null): OutputStream
 

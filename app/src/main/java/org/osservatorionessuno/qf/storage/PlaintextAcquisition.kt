@@ -12,8 +12,6 @@ import org.osservatorionessuno.qf.storage.AcquisitionArtifact
 import org.osservatorionessuno.qf.storage.AcquisitionIndex
 import org.osservatorionessuno.qf.Utils
 
-private const val METADATA_FILE: String = "acquisition.json"
-
 /*
     Helper class to write plaintext artifacts to the acquisition directory.
 */
