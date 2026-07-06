@@ -14,8 +14,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.osservatorionessuno.libmvt.common.IndicatorsUpdates
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.update.IndicatorUpdater
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -38,17 +38,21 @@ class IndicatorsUpdateWorker(
                 return@withContext Result.success()
             }
             try {
-                val updates = IndicatorsUpdates(applicationContext.filesDir.toPath(), null)
-                val before = updates.countIndicators()
-                Log.i(TAG, "Starting indicator update with $before existing files")
-
-                updates.update()
-
-                val after = updates.countIndicators()
-                val diff = after - before
-                Log.i(TAG, "Indicator update finished, $after files total")
-                if (diff > 0) notify(applicationContext, diff)
-                Result.success()
+                Log.i(TAG, "Starting OHTTP indicator update")
+                val outcome = IndicatorUpdater(applicationContext).runUpdate()
+                when (outcome) {
+                    is IndicatorUpdater.Outcome.Updated -> {
+                        Log.i(TAG, "Updated v${outcome.fromVersion} -> v${outcome.toVersion} " +
+                            "(${if (outcome.viaDelta) "delta" else "full"}), ${outcome.newObjects} new")
+                        if (outcome.newObjects > 0) notify(applicationContext, outcome.newObjects.toLong())
+                        Result.success()
+                    }
+                    is IndicatorUpdater.Outcome.Failed -> {
+                        Log.e(TAG, "Indicator update failed: ${outcome.reason}")
+                        Result.retry()
+                    }
+                    else -> Result.success()
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Indicator update failed", e)
                 Result.retry()

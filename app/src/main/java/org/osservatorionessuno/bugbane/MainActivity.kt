@@ -19,7 +19,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import io.github.muntashirakon.adb.PRNGFixes
 import androidx.work.*
-import org.osservatorionessuno.libmvt.common.IndicatorsUpdates
+import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.bugbane.workers.IndicatorsUpdateWorker
 import java.util.concurrent.TimeUnit
 import org.osservatorionessuno.bugbane.components.AppTopBar
@@ -78,8 +78,7 @@ class MainActivity : ComponentActivity() {
             .build()
 
         // Kick an immediate, one-time run if nothing has been downloaded yet
-        val updates = IndicatorsUpdates(filesDir.toPath(), null)
-        if (updates.latestUpdate == 0L) {
+        if (IndicatorStore(this).readState().version == 0) {
             val now = OneTimeWorkRequestBuilder<IndicatorsUpdateWorker>()
                 .setConstraints(constraints)
                 .addTag("IndicatorsUpdate") // common tag for querying later if you want
