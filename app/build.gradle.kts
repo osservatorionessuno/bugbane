@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.junit5)
     alias(libs.plugins.protobuf)
+    alias(libs.plugins.kotlin.kapt)
 }
 
 android {
@@ -18,6 +19,7 @@ android {
         versionCode = 5
         versionName = "0.1.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "CRASH_REPORT_EMAIL", "\"bugbane@osservatorionessuno.org\"")
     }
 
     flavorDimensions += "version"
@@ -36,7 +38,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "CRASH_REPORTING_ENABLED", "false")
+        }
         release {
+            buildConfigField("boolean", "CRASH_REPORTING_ENABLED", "true")
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -156,6 +162,12 @@ dependencies {
 
     // Tombstone protobuf (lite)
     implementation(libs.protobuf.javalite)
+
+    // Crash reporting (ACRA: mail sender + status-bar notification)
+    implementation(libs.acra.core)
+    implementation(libs.acra.mail)
+    implementation(libs.acra.notification)
+    kapt(libs.acra.core)
 
     // --- Unit test (JUnit 5) ---
     testImplementation(libs.junit.jupiter.api)

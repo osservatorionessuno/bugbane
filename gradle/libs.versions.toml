@@ -20,10 +20,12 @@ libmvt                = "c8415cd719"
 libohttp              = "1.1.0"
 libohttpHpkeBc        = "1.0.1"
 libbhttp              = "1.1.0"
+acra                  = "5.13.1"
 
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
 kotlin-android        = { id = "org.jetbrains.kotlin.android",       version.ref = "kotlin" }
+kotlin-kapt           = { id = "org.jetbrains.kotlin.kapt",          version.ref = "kotlin" }
 kotlin-jvm            = { id = "org.jetbrains.kotlin.jvm",           version.ref = "kotlin" }
 kotlin-compose        = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 junit5                = { id = "de.mannodermaus.android-junit5",     version = "1.13.1.0" }
@@ -59,3 +61,6 @@ libmvt                            = { group = "com.github.osservatorionessuno", 
 libohttp                          = { group = "com.github.osservatorionessuno", name = "libohttp",         version.ref = "libohttp" }
 libohttp-hpke-bc                  = { group = "com.github.osservatorionessuno", name = "libohttp-hpke-bc", version.ref = "libohttpHpkeBc" }
 libbhttp                          = { group = "com.github.osservatorionessuno", name = "libbhttp",         version.ref = "libbhttp" }
+acra-core                         = { group = "ch.acra", name = "acra-core", version.ref = "acra" }
+acra-mail                         = { group = "ch.acra", name = "acra-mail", version.ref = "acra" }
+acra-notification                 = { group = "ch.acra", name = "acra-notification", version.ref = "acra" }
