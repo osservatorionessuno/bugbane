@@ -21,13 +21,14 @@ class AdbShell(
         private const val RETRIES = 1
     }
 
+    @Deprecated("This method buffers and could use a lot of memory. Use execToStream or execForEachLine whenever possible")
     fun exec(command: String): String {
         val output = ByteArrayOutputStream()
         execInternal(command, output)
         return output.toString(StandardCharsets.UTF_8.name())
     }
 
-    @Deprecated("Use execToStream instead")
+    @Deprecated("This method write files on disk and should not be used. Use execToStream instead")
     fun execToFile(command: String, file: File) {
         val temp = File(file.parentFile, file.name + ".part").apply {
             parentFile?.mkdirs()

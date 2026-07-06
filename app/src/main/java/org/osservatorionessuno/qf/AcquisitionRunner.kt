@@ -111,7 +111,7 @@ class AcquisitionRunner(
         val cpu = shell.exec("getprop ro.product.cpu.abi").trim()
         var tmpDir = "/data/local/tmp/"
         var sdCard = "/sdcard/"
-        shell.exec("env").split('\n').forEach { line ->
+        shell.execForEachLine("env") { line ->
             val trimmed = line.trim()
             when {
                 trimmed.startsWith("TMPDIR=") -> tmpDir = trimmed.removePrefix("TMPDIR=")

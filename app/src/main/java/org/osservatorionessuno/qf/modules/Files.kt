@@ -21,9 +21,12 @@ class Files : Module {
         val sh = AdbShell(manager, progress = progress)
 
         // Detect find -printf capability
-        val supportsPrintf = runCatching {
-            sh.exec("""find '/' -maxdepth 1 -printf '%T@ %m %s %u %g %p\n' 2>/dev/null""")
-        }.getOrDefault("").isNotBlank()
+        var supportsPrintf = false
+        runCatching {
+            sh.execForEachLine("""find '/' -maxdepth 1 -printf '%T@ %m %s %u %g %p\n' 2>/dev/null""") {
+                supportsPrintf = true
+            }
+        }
 
         // Folders from https://github.com/mvt-project/androidqf/blob/main/modules/files.go
         val roots = mutableListOf(
@@ -31,11 +34,11 @@ class Files : Module {
             "/vendor/", "/cust/", "/product/", "/apex/", "/data/local/tmp/", "/data/media/0/",
             "/data/misc/radio/", "/data/vendor/secradio/", "/data/log/", "/tmp/", "/", "/data/data/"
         )
-        runCatching { sh.exec("env 2>/dev/null") }.getOrNull()?.let { env ->
-            env.lineSequence().forEach {
+        runCatching {
+            sh.execForEachLine("env 2>/dev/null") { line ->
                 when {
-                    it.startsWith("TMPDIR=") -> addDir(roots, it.substringAfter("TMPDIR="))
-                    it.startsWith("EXTERNAL_STORAGE=") -> addDir(roots, it.substringAfter("EXTERNAL_STORAGE="))
+                    line.startsWith("TMPDIR=") -> addDir(roots, line.substringAfter("TMPDIR="))
+                    line.startsWith("EXTERNAL_STORAGE=") -> addDir(roots, line.substringAfter("EXTERNAL_STORAGE="))
                 }
             }
         }

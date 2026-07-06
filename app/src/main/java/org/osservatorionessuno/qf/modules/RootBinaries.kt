@@ -54,12 +54,11 @@ class RootBinaries : Module {
                 fi
             """.trimIndent()
 
-            val out = shell.exec(script).trim()
-            if (out.isNotEmpty() && !out.contains("not found", ignoreCase = true)) {
-                out.lineSequence()
-                    .map { it.trim() }
-                    .filter { it.startsWith("/") }
-                    .forEach { found.add(it) }
+            runCatching {
+                shell.execForEachLine(script) { line ->
+                    val trimmed = line.trim()
+                    if (trimmed.startsWith("/")) found.add(trimmed)
+                }
             }
         }
 
