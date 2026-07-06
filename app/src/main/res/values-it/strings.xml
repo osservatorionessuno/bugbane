@@ -55,6 +55,13 @@
     <string name="settings_indicators_count">File indicatori: %1$s</string>
     <string name="notification_channel_indicators">Indicatori</string>
     <string name="notification_indicators_updated">Scaricati %1$d nuovi indicatori</string>
+    <string name="notification_channel_crash">Segnalazioni crash</string>
+    <string name="crash_notification_channel_desc">Mostrata quando Bugbane va in crash, per inviare una segnalazione agli sviluppatori.</string>
+    <string name="crash_notification_title">Bugbane si è arrestato</string>
+    <string name="crash_notification_text">Tocca per inviare una segnalazione via email.</string>
+    <string name="crash_notification_ticker">Bugbane si è arrestato — tocca per inviare una segnalazione</string>
+    <string name="crash_report_mail_subject">Segnalazione crash Bugbane</string>
+    <string name="crash_report_mail_body">In allegato trovi la segnalazione del crash. Descrivi cosa stavi facendo quando l\'app si è arrestata.</string>
     <string name="acquisitions_title">Acquisizioni</string>
     <string name="acquisitions_rename">Rinomina</string>
     <string name="acquisitions_delete">Elimina</string>

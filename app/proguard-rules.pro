@@ -32,3 +32,7 @@
 -keepclasseswithmembers class * implements org.apache.commons.compress.archivers.zip.ZipExtraField {
     <init>();
 }
+
+# ACRA kapt pulls compile-only annotation processor classes into R8's classpath.
+-dontwarn javax.annotation.processing.AbstractProcessor
+-dontwarn javax.annotation.processing.SupportedOptions

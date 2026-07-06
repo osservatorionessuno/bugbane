@@ -85,6 +85,15 @@
     <string name="notification_channel_indicators">Indicators</string>
     <string name="notification_indicators_updated">Downloaded %1$d new indicators</string>
 
+    <!-- Crash report notification (ACRA) -->
+    <string name="notification_channel_crash">Crash reports</string>
+    <string name="crash_notification_channel_desc">Shown when Bugbane crashes so you can send a report to the developers.</string>
+    <string name="crash_notification_title">Bugbane crashed</string>
+    <string name="crash_notification_text">Tap to send a crash report by email.</string>
+    <string name="crash_notification_ticker">Bugbane crashed — tap to send a report</string>
+    <string name="crash_report_mail_subject">Bugbane crash report</string>
+    <string name="crash_report_mail_body">A crash report is attached. Please describe what you were doing when the app crashed.</string>
+
     <!-- Acquisitions screen strings -->
     <string name="acquisitions_title">Acquisitions</string>
     <string name="acquisitions_rename">Rename</string>
