@@ -24,46 +24,34 @@ class Mounts : Module {
         Log.i(TAG, "Collecting mount information")
 
         val shell = AdbShell(manager, progress = progress)
-        val mountsData = mutableListOf<String>()
-
-        Log.d(TAG, "Running: mount")
-        val out1: String
-        try {
-            out1 = shell.exec("mount").trim()
-            if (out1.isNotEmpty()) {
-                out1.lines()
-                    .map { it.trim() }
-                    .filter { it.isNotEmpty() }
-                    .forEach { mountsData.add(it) }
-            }
-        } catch (e: Throwable) {
-            Log.d(TAG, "mount command failed or returned empty result")
-        }
-
-        Log.d(TAG, "Running: cat /proc/mounts")
-        val out2: String
-        try {
-            out2 = shell.exec("cat /proc/mounts").trim()
-            if (out2.isNotEmpty()) {
-                out2.lines()
-                    .map { it.trim() }
-                    .filter { it.isNotEmpty() }
-                    .forEach { line ->
-                        if (!mountsData.contains(line)) {
-                            mountsData.add(line)
-                        }
-                    }
-            }
-        } catch (e: Throwable) {
-            Log.d(TAG, "cat /proc/mounts command failed or returned empty result")
-        }
-
-        Log.d(TAG, "Found ${mountsData.size} mount entries")
+        val seen = LinkedHashSet<String>()
 
         writer.useArtifact("mounts.pb") { output ->
-            for (mount in mountsData) {
-                ArtifactProtobuf.writeDelimitedStringRecord(output, mount)
+            Log.d(TAG, "Running: mount")
+            runCatching {
+                shell.execForEachLine("mount") { line ->
+                    val trimmed = line.trim()
+                    if (trimmed.isNotEmpty() && seen.add(trimmed)) {
+                        ArtifactProtobuf.writeDelimitedStringRecord(output, trimmed)
+                    }
+                }
+            }.onFailure {
+                Log.d(TAG, "mount command failed or returned empty result")
+            }
+
+            Log.d(TAG, "Running: cat /proc/mounts")
+            runCatching {
+                shell.execForEachLine("cat /proc/mounts") { line ->
+                    val trimmed = line.trim()
+                    if (trimmed.isNotEmpty() && seen.add(trimmed)) {
+                        ArtifactProtobuf.writeDelimitedStringRecord(output, trimmed)
+                    }
+                }
+            }.onFailure {
+                Log.d(TAG, "cat /proc/mounts command failed or returned empty result")
             }
         }
+
+        Log.i(TAG, "Found ${seen.size} mount entries")
     }
 }

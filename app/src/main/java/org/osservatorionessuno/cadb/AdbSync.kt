@@ -151,54 +151,96 @@ class AdbSync(
     }
 
     private fun listEntries(input: InputStream, out: OutputStream, remoteDir: String): List<SyncDirEntry> {
-        val entries = mutableListOf<SyncDirEntry>()
+        sendSyncRequest(out, AdbConstants.LIST, remoteDir)
+        return readListResponses(input, AdbConstants.LIST_V1_DONE_TAIL)
+    }
 
-        // Send LIST request
-        val remoteBytes = remoteDir.toByteArray(StandardCharsets.UTF_8)
-        val payloadLen = remoteBytes.size
+    private fun sendSyncRequest(out: OutputStream, command: String, remotePath: String) {
+        val pathBytes = remotePath.toByteArray(StandardCharsets.UTF_8)
         val header = ByteBuffer.allocate(8)
             .order(ByteOrder.LITTLE_ENDIAN)
-            .put(AdbConstants.LIST.toByteArray(StandardCharsets.US_ASCII))
-            .putInt(payloadLen)
+            .put(command.toByteArray(StandardCharsets.US_ASCII))
+            .putInt(pathBytes.size)
             .array()
         out.write(header)
-        out.write(remoteBytes)
+        out.write(pathBytes)
         out.flush()
+    }
 
-        val nameBuf = ByteArray(1024)
+    private fun readListResponses(input: InputStream, doneTailBytes: Int): List<SyncDirEntry> {
+        val entries = mutableListOf<SyncDirEntry>()
         val lenBuf = ByteArray(4)
 
         while (true) {
             // Read 4-byte command header
-            readFully(input, nameBuf, 0, 4)
-            val respCmd = String(nameBuf, 0, 4, StandardCharsets.US_ASCII)
-
-            when (respCmd) {
-                AdbConstants.DENT -> {
-                    // Read 8 bytes for mode (uint32), size (uint64 not supported in V1: still uint32), mtime (uint32)
-                    readFully(input, lenBuf, 0, 4)
-                    val mode = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-
-                    readFully(input, lenBuf, 0, 4)
-                    val size = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-
-                    readFully(input, lenBuf, 0, 4)
-                    val mtime = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-
-                    // Next 4 is name length, then name data
-                    readFully(input, lenBuf, 0, 4)
-                    val nameLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
-                    val nameBytes = ByteArray(nameLen)
-                    readFully(input, nameBytes, 0, nameLen)
-                    val name = String(nameBytes, StandardCharsets.UTF_8)
-                    entries += SyncDirEntry(name = name, mode = mode, mtime = mtime)
+            readFully(input, lenBuf, 0, 4)
+            when (val respCmd = String(lenBuf, 0, 4, StandardCharsets.US_ASCII)) {
+                AdbConstants.DENT -> entries += readDentV1(input, lenBuf)
+                AdbConstants.DNT2 -> readDentV2(input, lenBuf)?.let { entries += it }
+                AdbConstants.DONE -> {
+                    skipFully(input, doneTailBytes)
+                    return entries
                 }
-                AdbConstants.DONE -> break
                 AdbConstants.FAIL -> throw IOException("List failed: ${readFailMessage(input)}")
-                else -> throw IOException("Unexpected list response: ${respCmd}")
+                else -> throw IOException("Unexpected list response: $respCmd (${cmdHex(lenBuf)})")
             }
         }
-        return entries
+    }
+
+    private fun readDentV1(input: InputStream, lenBuf: ByteArray): SyncDirEntry {
+        readFully(input, lenBuf, 0, 4)
+        val mode = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+        readFully(input, lenBuf, 0, 4)
+        // size (uint32) — unused for listing
+
+        readFully(input, lenBuf, 0, 4)
+        val mtime = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+        readFully(input, lenBuf, 0, 4)
+        val nameLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+        val nameBytes = ByteArray(nameLen)
+        readFully(input, nameBytes, 0, nameLen)
+        return SyncDirEntry(
+            name = parseEntryName(nameBytes, nameLen),
+            mode = mode,
+            mtime = mtime,
+        )
+    }
+
+    /** sync_dent_v2 on the wire */
+    private fun readDentV2(input: InputStream, lenBuf: ByteArray): SyncDirEntry? {
+        readFully(input, lenBuf, 0, 4)
+        val errorCode = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+        skipFully(input, 8) // dev
+        skipFully(input, 8) // ino
+
+        readFully(input, lenBuf, 0, 4)
+        val mode = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+
+        skipFully(input, 4) // nlink
+        skipFully(input, 4) // uid
+        skipFully(input, 4) // gid
+        skipFully(input, 8) // size
+        skipFully(input, 8) // atime
+        val mtime = readInt64Le(input).toInt()
+        skipFully(input, 8) // ctime
+
+        readFully(input, lenBuf, 0, 4)
+        val nameLen = ByteBuffer.wrap(lenBuf).order(ByteOrder.LITTLE_ENDIAN).int
+        val nameBytes = ByteArray(nameLen)
+        readFully(input, nameBytes, 0, nameLen)
+
+        if (errorCode != 0) {
+            Log.d(TAG, "Skipping sync list entry with error code $errorCode")
+            return null
+        }
+        return SyncDirEntry(
+            name = parseEntryName(nameBytes, nameLen),
+            mode = mode,
+            mtime = mtime,
+        )
     }
 
     private fun sendRecv(out: OutputStream, remotePath: String) {
@@ -264,6 +306,26 @@ class AdbSync(
     private fun isRegularFile(mode: Int): Boolean {
         return (mode and S_IFMT) == S_IFREG
     }
+
+    private fun readInt64Le(input: InputStream): Long {
+        val buf = ByteArray(8)
+        readFully(input, buf, 0, 8)
+        return ByteBuffer.wrap(buf).order(ByteOrder.LITTLE_ENDIAN).long
+    }
+
+    private fun skipFully(input: InputStream, length: Int) {
+        if (length <= 0) return
+        val buf = ByteArray(min(length, 8192))
+        var remaining = length
+        while (remaining > 0) {
+            val chunk = min(remaining, buf.size)
+            readFully(input, buf, 0, chunk)
+            remaining -= chunk
+        }
+    }
+
+    private fun cmdHex(cmd: ByteArray): String =
+        cmd.joinToString(" ") { "%02x".format(it) }
 
     private fun readFully(input: InputStream, buffer: ByteArray, offset: Int, length: Int) {
         var off = offset

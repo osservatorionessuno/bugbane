@@ -131,10 +131,16 @@ class Bugreport : Module {
             "/data/user/0/com.android.shell/files/bugreports"
         )
         for (dir in candidateDirs) {
-            val ls = shell.exec("""ls -1t "$dir"/*.zip 2>/dev/null | head -n 1 || true""").trim()
-            if (ls.isNotEmpty() && ls.startsWith("/")) {
-                Log.i(TAG, "Found newest bugreport ZIP in $dir: $ls")
-                return ls
+            var newest: String? = null
+            shell.execForEachLine("""ls -1t "$dir"/*.zip 2>/dev/null | head -n 1 || true""") { line ->
+                val trimmed = line.trim()
+                if (newest == null && trimmed.isNotEmpty() && trimmed.startsWith("/")) {
+                    newest = trimmed
+                }
+            }
+            if (newest != null) {
+                Log.i(TAG, "Found newest bugreport ZIP in $dir: $newest")
+                return newest
             }
         }
         return null
