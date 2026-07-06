@@ -38,8 +38,8 @@ import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.libmvt.common.AlertLevel
 import org.json.JSONObject
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.OutputStream
 import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
@@ -67,8 +67,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     var processing by remember { mutableStateOf(ProcessingState.OFF) }
     var passphrase by remember { mutableStateOf<String?>(null) }
     var showPassDialog by remember { mutableStateOf(false) }
-    var generatedFile by remember { mutableStateOf<File?>(null) }
-    
+
     // Bottom sheet state
     val screenHeight = configuration.screenHeightDp.dp
     val sheetState = rememberModalBottomSheetState(
@@ -98,25 +97,23 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
-        if (uri != null && generatedFile != null) {
+        val pass = passphrase
+        if (uri != null && pass != null) {
             scope.launch(Dispatchers.IO) {
+                processing = ProcessingState.EXPORTING
+                // Stream the verbatim re-wrap straight into the chosen destination
                 context.contentResolver.openOutputStream(uri)?.use { out ->
-                    FileInputStream(generatedFile!!).use { it.copyTo(out) }
+                    exportEncryptedArchive(acquisitionDir, pass, out)
                 }
+                processing = ProcessingState.OFF
+                showPassDialog = true
             }
-            showPassDialog = true
         }
     }
 
     fun startExport() {
-        scope.launch {
-            processing = ProcessingState.EXPORTING
-            val (file, pass) = createEncryptedArchive(context, acquisitionDir)
-            generatedFile = file
-            passphrase = pass
-            processing = ProcessingState.OFF
-            exportLauncher.launch(file.name)
-        }
+        passphrase = Utils.generatePassphrase()
+        exportLauncher.launch("acquisition.zip.age")
     }
 
     fun startShare() {
@@ -730,6 +727,19 @@ private fun loadScans(acquisitionDir: File): List<ScanSummary> {
             null
         }
     }?.sortedByDescending { it.started } ?: emptyList()
+}
+
+/**
+ * Verbatim re-wrap the at-rest acquisition archive to a passphrase recipient,
+ * streaming straight into [out]. Only the ~200-byte age header is rewritten.
+ */
+private fun exportEncryptedArchive(sourceDir: File, pass: String, out: OutputStream) {
+    // 2^15 scrypt; the (generated, high-entropy) passphrase is what protects it.
+    val recipient = ScryptRecipient(pass.toByteArray(), logN = 15)
+    val vault = AcquisitionRunner.acquisitionKeyVault()
+    File(sourceDir, ARCHIVE_FILE).inputStream().use { src ->
+        AgeExporter.export(src, vault, recipient, out)
+    }
 }
 
 private suspend fun createEncryptedArchive(context: Context, sourceDir: File): Pair<File, String> {
