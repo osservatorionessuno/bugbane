@@ -36,6 +36,7 @@ import org.osservatorionessuno.qf.AcquisitionScanner
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.share.AcquisitionShareProvider
 import org.osservatorionessuno.bugbane.share.AcquisitionExport
+import org.osservatorionessuno.bugbane.share.EXPORT_FILE_NAME
 import org.osservatorionessuno.libmvt.common.AlertLevel
 import org.json.JSONObject
 import java.io.File
@@ -106,7 +107,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
 
     fun startExport() {
         passphrase = Utils.generatePassphrase()
-        exportLauncher.launch("acquisition.zip.age")
+        exportLauncher.launch(EXPORT_FILE_NAME)
     }
 
     fun startShare() {
@@ -117,7 +118,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             context,
             File(acquisitionDir, ARCHIVE_FILE),
             pass,
-            "acquisition.zip.age",
+            EXPORT_FILE_NAME,
         )
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/octet-stream"
@@ -131,7 +132,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             // from the chooser (at launch) — the ciphertext is never exposed to
             // other apps, and the decryption passphrase rides in EXTRA_TEXT, which
             // only the chosen app receives.
-            clipData = ClipData.newRawUri("acquisition.zip.age", uri)
+            clipData = ClipData.newRawUri(EXPORT_FILE_NAME, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(intent, null))

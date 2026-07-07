@@ -7,6 +7,12 @@ import java.io.File
 import java.io.OutputStream
 
 /**
+ * File name presented for an exported/shared acquisition. The `.zip.age` suffix
+ * reflects the payload: an age file whose plaintext is a ZIP (`age -d … | unzip`).
+ */
+const val EXPORT_FILE_NAME: String = "acquisition.zip.age"
+
+/**
  * Passphrase re-wrap of an at-rest acquisition archive: rewrites the ~200-byte
  * age header to a scrypt recipient and copies the encrypted payload verbatim.
  * Shared by the file export ([writeTo] into the SAF destination) and the share
