@@ -29,27 +29,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.qf.AcquisitionScanner
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.share.AcquisitionShareProvider
+import org.osservatorionessuno.bugbane.share.AcquisitionExport
 import org.osservatorionessuno.libmvt.common.AlertLevel
 import org.json.JSONObject
 import java.io.File
-import java.io.FileOutputStream
-import java.io.OutputStream
 import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 import org.osservatorionessuno.bugbane.utils.Utils
-import org.osservatorionessuno.qf.AcquisitionRunner
-import org.osservatorionessuno.qf.crypto.AgeExporter
-import org.osservatorionessuno.qf.crypto.age.Age
-import org.osservatorionessuno.qf.crypto.age.ScryptRecipient
 import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,7 +96,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 processing = ProcessingState.EXPORTING
                 // Stream the verbatim re-wrap straight into the chosen destination
                 context.contentResolver.openOutputStream(uri)?.use { out ->
-                    exportEncryptedArchive(acquisitionDir, pass, out)
+                    AcquisitionExport.writeTo(File(acquisitionDir, ARCHIVE_FILE), pass, out)
                 }
                 processing = ProcessingState.OFF
                 showPassDialog = true
@@ -117,26 +110,31 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     }
 
     fun startShare() {
-        scope.launch {
-            processing = ProcessingState.SHARING
-            val (file, pass) = createEncryptedArchive(context, acquisitionDir)
-            processing = ProcessingState.OFF
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file
+        // No upfront work: the archive is re-wrapped lazily as the share target
+        // reads the streaming content URI, so nothing is staged on disk first.
+        val pass = Utils.generatePassphrase()
+        val uri = AcquisitionShareProvider.enqueue(
+            context,
+            File(acquisitionDir, ARCHIVE_FILE),
+            pass,
+            "acquisition.zip.age",
+        )
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/octet-stream"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(
+                Intent.EXTRA_TEXT,
+                context.getString(org.osservatorionessuno.bugbane.R.string.acquisition_share_message, pass)
             )
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/octet-stream"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(
-                    Intent.EXTRA_TEXT,
-                    context.getString(org.osservatorionessuno.bugbane.R.string.acquisition_share_message, pass)
-                )
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(Intent.createChooser(intent, null))
+            // The read grant only reliably follows a URI in ClipData; EXTRA_STREAM
+            // alone isn't covered. This grants read only to the app the user picks
+            // from the chooser (at launch) — the ciphertext is never exposed to
+            // other apps, and the decryption passphrase rides in EXTRA_TEXT, which
+            // only the chosen app receives.
+            clipData = ClipData.newRawUri("acquisition.zip.age", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+        context.startActivity(Intent.createChooser(intent, null))
     }
 
     fun startAnalysis() {
@@ -729,43 +727,8 @@ private fun loadScans(acquisitionDir: File): List<ScanSummary> {
     }?.sortedByDescending { it.started } ?: emptyList()
 }
 
-/**
- * Verbatim re-wrap the at-rest acquisition archive to a passphrase recipient,
- * streaming straight into [out]. Only the ~200-byte age header is rewritten.
- */
-private fun exportEncryptedArchive(sourceDir: File, pass: String, out: OutputStream) {
-    // 2^15 scrypt; the (generated, high-entropy) passphrase is what protects it.
-    val recipient = ScryptRecipient(pass.toByteArray(), logN = 15)
-    val vault = AcquisitionRunner.acquisitionKeyVault()
-    File(sourceDir, ARCHIVE_FILE).inputStream().use { src ->
-        AgeExporter.export(src, vault, recipient, out)
-    }
-}
-
-private suspend fun createEncryptedArchive(context: Context, sourceDir: File): Pair<File, String> {
-    return withContext(Dispatchers.IO) {
-        val pass = Utils.generatePassphrase()
-
-        // 2^15 scrypt; the (generated, high-entropy) passphrase is what protects it.
-        val recipient = ScryptRecipient(pass.toByteArray(), logN = 15)
-
-        val archiveFile = File(sourceDir, ARCHIVE_FILE)
-        
-        // Encrypted acquisition: verbatim re-wrap — re-target the device-bound
-        // archive to a passphrase recipient without decrypting the payload.
-        val dest = File.createTempFile("acquisition", ".zip.age", context.cacheDir)
-        val vault = AcquisitionRunner.acquisitionKeyVault()
-        archiveFile.inputStream().use { src ->
-            FileOutputStream(dest).use { out -> AgeExporter.export(src, vault, recipient, out) }
-        }
-        
-        dest to pass
-    }
-}
-
 enum class ProcessingState {
     OFF,
     EXPORTING,
     SCANNING,
-    SHARING,
 }

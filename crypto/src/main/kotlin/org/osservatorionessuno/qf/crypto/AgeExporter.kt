@@ -24,4 +24,19 @@ object AgeExporter {
         AgeFormat.write(out, recipient.wrap(fileKey), fileKey)
         atRest.copyTo(out)                              // payload, verbatim
     }
+
+    /**
+     * Exact byte length [export] would produce for an at-rest archive of
+     * [atRestTotalSize] bytes re-wrapped to [recipient] — without decrypting or
+     * copying the payload. Since the payload is copied verbatim, the result is
+     * (new header) + (payload = total − old header). Useful to answer an
+     * `OpenableColumns.SIZE` query when streaming the export to a share target.
+     */
+    fun exportedSize(atRest: InputStream, vault: KeyVault, recipient: AgeRecipient, atRestTotalSize: Long): Long {
+        val header = AgeFormat.parse(atRest)
+        val fileKey = KeyVaultIdentity(vault).unwrap(header.stanzas)
+            ?: throw IllegalStateException("no bugbane recipient stanza in archive")
+        val newHeaderSize = AgeFormat.serializeHeader(recipient.wrap(fileKey), fileKey).size.toLong()
+        return newHeaderSize + (atRestTotalSize - header.headerBytes)
+    }
 }

@@ -111,11 +111,12 @@ class AndroidKeystoreKeyVault private constructor(
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
-                .setUserAuthenticationRequired(strongBox)
-                .apply {
-                    setUserConfirmationRequired(strongBox)
-                    setIsStrongBoxBacked(strongBox)
-                }
+                // Auto-unlock for now (see class KDoc); tiered per-key user auth
+                // (SE credential / TEE passphrase) is tracked as a separate PR.
+                // Coupling auth to the StrongBox flag made key creation crash on
+                // devices/emulators with no enrolled biometric.
+                .setUserAuthenticationRequired(false)
+                .setIsStrongBoxBacked(strongBox)
                 .build()
             generator.init(spec)
             return generator.generateKey()

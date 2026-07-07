@@ -99,6 +99,24 @@ class EncryptedArchiveTest {
     }
 
     @Test
+    fun `exportedSize equals the actual exported byte count`() {
+        val vault = InMemoryKeyVault()
+        val atRest = encrypt(vault, entries())
+        val pass = "correct horse battery staple".toByteArray()
+
+        val predicted = AgeExporter.exportedSize(
+            ByteArrayInputStream(atRest), vault, ScryptRecipient(pass, logN = 10), atRest.size.toLong(),
+        )
+        val actual = ByteArrayOutputStream().also {
+            AgeExporter.export(ByteArrayInputStream(atRest), vault, ScryptRecipient(pass, logN = 10), it)
+        }.size().toLong()
+
+        // The share provider answers OpenableColumns.SIZE from exportedSize before
+        // streaming the export; a mismatch silently truncates/pads the shared file.
+        assertEquals(actual, predicted)
+    }
+
+    @Test
     fun `verbatim age export copies payload and decrypts under recipient key`() {
         val vault = InMemoryKeyVault()
         val atRest = encrypt(vault, entries())
