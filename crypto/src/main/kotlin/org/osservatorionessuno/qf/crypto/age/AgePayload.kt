@@ -60,8 +60,13 @@ class AgePayload private constructor(
         val ct = ByteArray(clen)
         readFully(cipherStart + idx * CIPHER, ct)
         // spec STREAM: chunk idx is decrypted under the counter nonce; the final chunk
-        // carries the last-flag, so a truncated payload fails to authenticate.
-        val pt = AgePrimitives.chachaOpen(streamKey, streamNonce(idx, last), ct, 0, clen)
+        // carries the last-flag, so a truncated payload fails to authenticate. Surface
+        // any decrypt/auth failure as AgeFormatException, never a raw cipher exception.
+        val pt = try {
+            AgePrimitives.chachaOpen(streamKey, streamNonce(idx, last), ct, 0, clen)
+        } catch (e: Exception) {
+            throw AgeFormatException("age payload chunk $idx failed to authenticate")
+        }
         cached = pt; cachedIdx = idx
         return pt
     }
@@ -99,6 +104,12 @@ class AgePayload private constructor(
 
             val cipherStart = bodyStart + AgeFormat.PAYLOAD_NONCE_SIZE
             val cipherLen = data.size - cipherStart
+            // age STREAM always has at least one chunk and every chunk carries a
+            // 16-byte tag, so the smallest valid payload is a single empty (tag-only)
+            // chunk. Reject anything shorter, otherwise a stripped payload
+            // (cipherLen == 0) would masquerade as a valid empty archive — the header
+            // MAC does not cover the payload.
+            if (cipherLen < TAG) throw AgeFormatException("truncated age payload")
             val numChunks: Long
             val lastCipherLen: Int
             if (cipherLen % CIPHER == 0L) {
@@ -106,6 +117,8 @@ class AgePayload private constructor(
             } else {
                 numChunks = cipherLen / CIPHER + 1; lastCipherLen = (cipherLen % CIPHER).toInt()
             }
+            // A final chunk shorter than its tag is malformed (would underflow length).
+            if (lastCipherLen < TAG) throw AgeFormatException("truncated final age chunk")
             val length = (numChunks - 1) * PLAIN + (lastCipherLen - TAG)
             return AgePayload(data, streamKey, cipherStart, numChunks, lastCipherLen, length)
         }

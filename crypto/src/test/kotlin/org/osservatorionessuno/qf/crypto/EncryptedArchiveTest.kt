@@ -3,8 +3,10 @@ package org.osservatorionessuno.qf.crypto
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.osservatorionessuno.qf.crypto.age.AgeFormatException
 import org.osservatorionessuno.qf.crypto.age.AgePayload
 import org.osservatorionessuno.qf.crypto.age.ScryptIdentity
 import org.osservatorionessuno.qf.crypto.age.ScryptRecipient
@@ -96,6 +98,18 @@ class EncryptedArchiveTest {
         assertArrayEquals(bodyOf(atRest), bodyOf(exportBytes), "payload copied verbatim")
         val recovered = decryptZip(exportBytes, listOf(ScryptIdentity(pass)))
         entries().forEach { e -> assertArrayEquals(e.open().readBytes(), recovered[e.name], e.name) }
+    }
+
+    @Test
+    fun `a stripped payload is rejected, not read as an empty archive`() {
+        val vault = InMemoryKeyVault()
+        val atRest = encrypt(vault, entries())
+        // Keep the header + 16-byte payload nonce only — i.e. zero STREAM chunks.
+        val payloadStart = atRest.size - bodyOf(atRest).size
+        val truncated = atRest.copyOfRange(0, payloadStart + 16)
+        assertThrows(AgeFormatException::class.java) {
+            AgePayload.open(ByteArrayRandomAccess(truncated), listOf(KeyVaultIdentity(vault)))
+        }
     }
 
     @Test

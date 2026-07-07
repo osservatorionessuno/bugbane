@@ -55,7 +55,8 @@ class AcquisitionShareProvider : ContentProvider() {
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         if (mode != "r") throw FileNotFoundException("read-only share URI: $uri")
-        val export = resolve(uri)
+        val id = uri.lastPathSegment
+        val export = id?.let { pending[it] } ?: throw FileNotFoundException("unknown share URI: $uri")
         val pipe = ParcelFileDescriptor.createReliablePipe()
         val readSide = pipe[0]
         val writeSide = pipe[1]
@@ -70,6 +71,9 @@ class AcquisitionShareProvider : ContentProvider() {
                 // receiver closed early / IO error — no partial file persisted
             } finally {
                 writeSide.close()
+                // Drop the entry once the transfer ends so the (cleartext) passphrase
+                // doesn't linger in the process heap past the share.
+                pending.remove(id)
             }
         }.apply { name = "acq-share-export"; isDaemon = true }.start()
         return readSide
