@@ -206,4 +206,9 @@
     <string name="mvt_dumpsys_receivers_intercept_data_sms_title">Found a receiver to intercept incoming data SMS messages: %1$s</string>
     <string name="mvt_dumpsys_receivers_intercept_phone_state_title">Found a receiver monitoring telephony state/incoming calls: %1$s</string>
     <string name="mvt_dumpsys_receivers_intercept_outgoing_call_title">Found a receiver monitoring outgoing calls: %1$s</string>
+
+    <!-- Acquisition completion notification -->
+    <string name="notification_channel_acquisition">Acquisitions</string>
+    <string name="notification_acquisition_complete_title">Acquisition complete</string>
+    <string name="notification_acquisition_complete_text">Tap to view the results</string>
 </resources>

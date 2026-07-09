@@ -76,7 +76,7 @@ class AcquisitionRunner(
         fun onModuleProgress(name: String, bytes: Long)
         fun onModuleComplete(name: String, completed: Int, total: Int)
         fun isCancelled(): Boolean
-        fun onFinished(cancelled: Boolean)
+        fun onFinished(cancelled: Boolean, output: File?)
     }
 
     /**
@@ -178,7 +178,7 @@ class AcquisitionRunner(
         }
 
         Log.i(TAG, "Acquisition complete in ${acquisitionDir.absolutePath}")
-        listener?.onFinished(false)
+        listener?.onFinished(cancelled, acquisitionDir)
         return acquisitionDir
     }
 }
