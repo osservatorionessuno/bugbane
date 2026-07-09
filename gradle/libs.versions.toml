@@ -7,19 +7,17 @@ espressoCore          = "3.7.0"
 lifecycleRuntimeKtx   = "2.9.3"
 activityCompose       = "1.10.1"
 composeBom            = "2025.08.01"
-navigationCompose     = "2.9.3"
 junitJupiter          = "5.13.4"
 protobuf              = "4.32.0"
 protobufPlugin        = "0.9.5"
-conscrypt             = "2.5.3"
-libadb                = "3.0.0"
-sunSecurityAndroid    = "1.1"
+libadb                = "3.2.0"
+bouncycastle          = "1.84"
 work                  = "2.10.3"
 javaDiffUtils         = "4.15"
 kage                  = "0.3.0"
 json                  = "20250517"
 accompanist-permissions = "0.37.3"
-libmvt                = "0.0.3"
+libmvt                = "208e15bbac"
 libohttp              = "1.0.0"
 libohttpHpkeBc        = "1.0.1"
 libbhttp              = "1.0.0"
@@ -27,6 +25,7 @@ libbhttp              = "1.0.0"
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
 kotlin-android        = { id = "org.jetbrains.kotlin.android",       version.ref = "kotlin" }
+kotlin-jvm            = { id = "org.jetbrains.kotlin.jvm",           version.ref = "kotlin" }
 kotlin-compose        = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 junit5                = { id = "de.mannodermaus.android-junit5",     version = "1.13.1.0" }
 protobuf              = { id = "com.google.protobuf",                version.ref = "protobufPlugin" }
@@ -45,13 +44,11 @@ androidx-ui-tooling-preview       = { group = "androidx.compose.ui",         nam
 androidx-ui-test-manifest         = { group = "androidx.compose.ui",         name = "ui-test-manifest" }
 androidx-ui-test-junit4           = { group = "androidx.compose.ui",         name = "ui-test-junit4" }
 androidx-material3                = { group = "androidx.compose.material3",  name = "material3" }
-androidx-navigation-compose       = { group = "androidx.navigation",         name = "navigation-compose",     version.ref = "navigationCompose" }
 androidx-foundation               = { group = "androidx.compose.foundation", name = "foundation" }
 compose-material-icons-extended   = { group = "androidx.compose.material",   name = "material-icons-extended" }
 google-accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
-libadb-android                    = { group = "com.github.MuntashirAkon",    name = "libadb-android",         version.ref = "libadb" }
-sun-security-android              = { group = "com.github.MuntashirAkon",    name = "sun-security-android",   version.ref = "sunSecurityAndroid" }
-conscrypt-android                 = { group = "org.conscrypt",                name = "conscrypt-android",      version.ref = "conscrypt" }
+libadb-android                    = { group = "com.github.osservatorionessuno", name = "libadb-android-bc", version.ref = "libadb" }
+bouncycastle-pkix                 = { group = "org.bouncycastle",             name = "bcpkix-jdk15to18",       version.ref = "bouncycastle" }
 protobuf-javalite                 = { group = "com.google.protobuf",          name = "protobuf-javalite",      version.ref = "protobuf" }
 protoc                            = { group = "com.google.protobuf",          name = "protoc",                 version.ref = "protobuf" }
 junit-jupiter-api                 = { group = "org.junit.jupiter",            name = "junit-jupiter-api",      version.ref = "junitJupiter" }

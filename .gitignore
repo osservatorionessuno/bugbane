@@ -10,3 +10,4 @@ local.properties
 .DS_Store
 *.code-workspace
 .kotlin/
+bin/

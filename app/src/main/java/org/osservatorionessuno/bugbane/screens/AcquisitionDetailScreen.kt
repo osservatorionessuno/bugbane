@@ -29,25 +29,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.qf.AcquisitionScanner
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.share.AcquisitionShareProvider
+import org.osservatorionessuno.bugbane.share.AcquisitionExport
+import org.osservatorionessuno.bugbane.share.EXPORT_FILE_NAME
 import org.osservatorionessuno.libmvt.common.AlertLevel
 import org.json.JSONObject
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
-import kage.Age
-import kage.crypto.scrypt.ScryptRecipient
 import org.osservatorionessuno.bugbane.utils.Utils
+import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,8 +61,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     var processing by remember { mutableStateOf(ProcessingState.OFF) }
     var passphrase by remember { mutableStateOf<String?>(null) }
     var showPassDialog by remember { mutableStateOf(false) }
-    var generatedFile by remember { mutableStateOf<File?>(null) }
-    
+
     // Bottom sheet state
     val screenHeight = configuration.screenHeightDp.dp
     val sheetState = rememberModalBottomSheetState(
@@ -95,48 +91,51 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
-        if (uri != null && generatedFile != null) {
+        val pass = passphrase
+        if (uri != null && pass != null) {
             scope.launch(Dispatchers.IO) {
+                processing = ProcessingState.EXPORTING
+                // Stream the verbatim re-wrap straight into the chosen destination
                 context.contentResolver.openOutputStream(uri)?.use { out ->
-                    FileInputStream(generatedFile!!).use { it.copyTo(out) }
+                    AcquisitionExport.writeTo(File(acquisitionDir, ARCHIVE_FILE), pass, out)
                 }
+                processing = ProcessingState.OFF
+                showPassDialog = true
             }
-            showPassDialog = true
         }
     }
 
     fun startExport() {
-        scope.launch {
-            processing = ProcessingState.EXPORTING
-            val (file, pass) = createEncryptedArchive(context, acquisitionDir)
-            generatedFile = file
-            passphrase = pass
-            processing = ProcessingState.OFF
-            exportLauncher.launch(file.name)
-        }
+        passphrase = Utils.generatePassphrase()
+        exportLauncher.launch(EXPORT_FILE_NAME)
     }
 
     fun startShare() {
-        scope.launch {
-            processing = ProcessingState.SHARING
-            val (file, pass) = createEncryptedArchive(context, acquisitionDir)
-            processing = ProcessingState.OFF
-            val uri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                file
+        // No upfront work: the archive is re-wrapped lazily as the share target
+        // reads the streaming content URI, so nothing is staged on disk first.
+        val pass = Utils.generatePassphrase()
+        val uri = AcquisitionShareProvider.enqueue(
+            context,
+            File(acquisitionDir, ARCHIVE_FILE),
+            pass,
+            EXPORT_FILE_NAME,
+        )
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/octet-stream"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(
+                Intent.EXTRA_TEXT,
+                context.getString(org.osservatorionessuno.bugbane.R.string.acquisition_share_message, pass)
             )
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/octet-stream"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(
-                    Intent.EXTRA_TEXT,
-                    context.getString(org.osservatorionessuno.bugbane.R.string.acquisition_share_message, pass)
-                )
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(Intent.createChooser(intent, null))
+            // The read grant only reliably follows a URI in ClipData; EXTRA_STREAM
+            // alone isn't covered. This grants read only to the app the user picks
+            // from the chooser (at launch) — the ciphertext is never exposed to
+            // other apps, and the decryption passphrase rides in EXTRA_TEXT, which
+            // only the chosen app receives.
+            clipData = ClipData.newRawUri(EXPORT_FILE_NAME, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+        context.startActivity(Intent.createChooser(intent, null))
     }
 
     fun startAnalysis() {
@@ -729,35 +728,8 @@ private fun loadScans(acquisitionDir: File): List<ScanSummary> {
     }?.sortedByDescending { it.started } ?: emptyList()
 }
 
-private suspend fun createEncryptedArchive(context: Context, sourceDir: File): Pair<File, String> {
-    return withContext(Dispatchers.IO) {
-        val pass = Utils.generatePassphrase()
-        val dest = File.createTempFile("acquisition", ".zip.age", context.cacheDir)
-        val plainZip = File.createTempFile("acquisition", ".zip", context.cacheDir)
-        // 256MB goes OOM
-        val workFactor = 15
-        ZipOutputStream(FileOutputStream(plainZip)).use { zipOut ->
-            sourceDir.walkTopDown().filter { it.isFile }.forEach { file ->
-                val entryName = file.relativeTo(sourceDir).path
-                val entry = ZipEntry(entryName).apply { time = file.lastModified() }
-                zipOut.putNextEntry(entry)
-                file.inputStream().use { it.copyTo(zipOut) }
-                zipOut.closeEntry()
-            }
-        }
-        FileOutputStream(dest).use { fileOut ->
-            FileInputStream(plainZip).use { plainIn ->
-                Age.encryptStream(listOf(ScryptRecipient(pass.toByteArray(), workFactor = workFactor)), plainIn, fileOut)
-            }
-        }
-        plainZip.delete()
-        dest to pass
-    }
-}
-
 enum class ProcessingState {
     OFF,
     EXPORTING,
     SCANNING,
-    SHARING,
 }

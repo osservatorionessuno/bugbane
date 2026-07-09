@@ -6,9 +6,13 @@ import org.json.JSONObject
 import org.osservatorionessuno.bugbane.utils.Utils
 import org.osservatorionessuno.bugbane.utils.initLibmvtLogging
 import org.osservatorionessuno.libmvt.android.ForensicRunner
+import org.osservatorionessuno.libmvt.android.ArtifactInput
 import org.osservatorionessuno.libmvt.common.Indicators
 import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.bugbane.utils.AndroidStringResolver
+import org.osservatorionessuno.libmvt.common.Artifact
+import org.osservatorionessuno.qf.storage.EncryptedAcquisitionReader
+import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
 import java.io.File
 import java.time.Instant
 import java.util.UUID
@@ -37,18 +41,31 @@ object AcquisitionScanner {
             indicatorHashes += hash
         }
 
-        val runner = ForensicRunner(AndroidStringResolver(context));
+        val runner = ForensicRunner(AndroidStringResolver(context))
         runner.setIndicators(indicators)
-        val detections = runner.streamLegacyAnalysisFromDirectory(acquisitionDir);
 
         val results = JSONArray()
-        for ((key, value) in detections) {
-            for (detected in value.detected) {
-                val obj = JSONObject()
-                obj.put("level", detected.level.name)
-                obj.put("title", detected.title)
-                obj.put("context", detected.context)
-                results.put(obj)
+        fun collect(artifact: Artifact?) {
+            artifact?.detected?.forEach { detected ->
+                results.put(JSONObject().apply {
+                    put("level", detected.level.name)
+                    put("title", detected.title)
+                    put("context", detected.context)
+                })
+            }
+        }
+
+
+        if (File(acquisitionDir, ARCHIVE_FILE).exists()) {
+            // Encrypted acquisition: decrypt + unzip in one bounded-memory pass and
+            // analyze each artifact from its stream — no plaintext is written to disk.
+            val vault = AcquisitionRunner.acquisitionKeyVault()
+            val reader = EncryptedAcquisitionReader(acquisitionDir, vault)
+            reader.forEachArtifact { artifact ->
+                if (artifact.path in ForensicRunner.MODULES_MAP.keys) {
+                    val input = ArtifactInput(artifact.path, artifact.inputStream)
+                    collect(runCatching { runner.streamFileAnalysis(input) }.getOrNull())
+                }
             }
         }
 

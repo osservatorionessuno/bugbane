@@ -2,16 +2,15 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.util.Log
-import org.json.JSONArray
 import org.osservatorionessuno.qf.Module
-import org.osservatorionessuno.qf.Utils
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import java.io.File
+import org.osservatorionessuno.qf.ArtifactProtobuf
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Checks for common rooting binaries/apps in PATH and saves the found paths.
- * Output: root_binaries.json  (JSON array of strings)
+ * Output: root_binaries.pb  (length-delimited protobuf string records)
  */
 class RootBinaries : Module {
     override val name: String = "root_binaries"
@@ -34,7 +33,7 @@ class RootBinaries : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
         // Shell output bytes aren't meaningful progress here; keep null.
@@ -66,6 +65,10 @@ class RootBinaries : Module {
 
         val unique = found.distinct()
         Log.i(TAG, "Found ${unique.size} root-related binaries")
-        File(outDir, "root_binaries.json").writeText(Utils.toJsonString(JSONArray(unique)))
+        writer.useArtifact("root_binaries.pb") { output ->
+            for (path in unique) {
+                ArtifactProtobuf.writeDelimitedStringRecord(output, path)
+            }
+        }
     }
 }

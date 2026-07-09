@@ -4,7 +4,7 @@ import android.content.Context
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import java.io.File
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Collect Android settings namespaces: system, secure, global.
@@ -16,14 +16,15 @@ class Settings : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
         val namespaces = listOf("system", "secure", "global")
         val shell = AdbShell(manager, progress = progress)
-        for (ns in namespaces) {
-            val outFile = File(outDir, "settings_${ns}.txt")
-            shell.execToFile("cmd settings list $ns", outFile)
+        for (namespace in namespaces) {
+            writer.useArtifact("settings_${namespace}.txt") { output ->
+                shell.execToStream("cmd settings list $namespace", output)
+            }
         }
     }
 }

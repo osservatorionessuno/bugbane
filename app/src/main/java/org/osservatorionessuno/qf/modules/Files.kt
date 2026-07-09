@@ -6,9 +6,8 @@ import android.util.JsonWriter
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import java.io.BufferedWriter
-import java.io.File
-import java.io.OutputStreamWriter
+import org.osservatorionessuno.qf.ArtifactProtobuf
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 class Files : Module {
     override val name = "files"
@@ -16,7 +15,7 @@ class Files : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
         val sh = AdbShell(manager, progress = progress)
@@ -44,25 +43,18 @@ class Files : Module {
 
         val seen = HashSet<String>()
 
-        val outFile = File(outDir, "files.json")
-        JsonWriter(BufferedWriter(OutputStreamWriter(outFile.outputStream(), Charsets.UTF_8))).use { jw ->
-            jw.setIndent(" ")
-            jw.beginArray()
-
+        writer.useArtifact("files.pb") { output ->
             for (folder in folders) {
                 val cmd = if (supportsPrintf)
                     """find ${shQuote(folder)} -type f -printf '%T@ %m %s %u %g %p\n' 2>/dev/null"""
                 else
                     """find ${shQuote(folder)} -type f -print 2>/dev/null"""
 
-                val out = runCatching { sh.exec(cmd) }.getOrDefault("")
-                if (out.isBlank()) continue
-
                 if (supportsPrintf) {
                     // "%T@ %m %s %u %g %p"
-                    out.lineSequence().forEach { line ->
+                    runCatching { sh.execForEachLine(cmd) { line ->
                         val parts = line.trim().split(Regex("\\s+"), limit = 6)
-                        if (parts.size < 6) return@forEach
+                        if (parts.size < 6) return@execForEachLine
                         val mtime = parts[0].toDoubleOrNull()
                         val mode  = parts[1]
                         val size  = parts[2].toLongOrNull()
@@ -70,21 +62,20 @@ class Files : Module {
                         val group = parts[4]
                         val path  = parts[5]
                         if (seen.add(path)) {
-                            writeEntry(jw, path, mtime, mode, size, user, group)
+                            ArtifactProtobuf.writeDelimitedFileRecord(output, path, mtime, mode, size, user, group)
                         }
-                    }
+                    } }
                 } else {
-                    out.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.forEach { path ->
+                    runCatching { sh.execForEachLine(cmd) { line ->
+                        val path = line.trim()
+                        if (path.isEmpty()) return@execForEachLine
                         if (seen.add(path)) {
-                            writeEntry(jw, path, null, null, null, null, null)
+                            ArtifactProtobuf.writeDelimitedFileRecord(output, path, null, null, null, null, null)
                         }
-                    }
+                    } }
                 }
-
-                jw.flush()
+                output.flush()
             }
-
-            jw.endArray()
         }
     }
 

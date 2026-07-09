@@ -4,7 +4,7 @@ import android.content.Context
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import java.io.File
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Sample module that collects logcat output.
@@ -15,13 +15,23 @@ class Logcat : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
-        val shell = AdbShell(manager, progress = progress)
-        shell.execToFile("logcat -d -b all \"*:V\"", File(outDir, "logcat.txt"))
+        // logcat -d can dump large buffers and stay quiet while the device reads them
+        val shell = AdbShell(
+            manager = manager,
+            progress = progress,
+            timeoutMs = 5 * 60_000L,
+            inactivityMs = 30_000L,
+        )
+        writer.useArtifact("logcat.txt") { output ->
+            shell.execToStream("logcat -d -b all \"*:V\"", output)
+        }
         try {
-            shell.execToFile("logcat -L -b all \"*:V\"", File(outDir, "logcat_old.txt"))
+            writer.useArtifact("logcat_old.txt") { output ->
+                shell.execToStream("logcat -L -b all \"*:V\"", output)
+            }
         } catch (_: Throwable) {
             // best-effort
         }

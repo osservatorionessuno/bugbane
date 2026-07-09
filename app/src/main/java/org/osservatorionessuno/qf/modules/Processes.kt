@@ -4,7 +4,7 @@ import android.content.Context
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import java.io.File
+import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Collects the list of running processes using `ps -A`.
@@ -16,10 +16,12 @@ class Processes : Module {
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
-        outDir: File,
+        writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
         val shell = AdbShell(manager, progress = progress)
-        shell.execToFile("ps -A", File(outDir, "processes.txt"))
+        writer.useArtifact("processes.txt") { output ->
+            shell.execToStream("ps -A", output)
+        }
     }
 }

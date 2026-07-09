@@ -6,7 +6,6 @@ import java.io.File
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
-import org.json.JSONObject
 import org.osservatorionessuno.bugbane.BuildConfig
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.qf.modules.Env
@@ -25,6 +24,10 @@ import org.osservatorionessuno.qf.modules.Packages
 import org.osservatorionessuno.qf.modules.RootBinaries
 import org.osservatorionessuno.qf.modules.Temp
 import org.osservatorionessuno.cadb.AdbShell
+import org.osservatorionessuno.qf.storage.AcquisitionIndex
+import org.osservatorionessuno.qf.storage.EncryptedAcquisitionWriter
+import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
+import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault.StrongBoxPolicy
 
 private const val TAG = "AcquisitionRunner"
 
@@ -57,6 +60,13 @@ class AcquisitionRunner(
         Temp()
     )
 ) {
+
+    companion object {
+        const val ACQUISITION_KEY_ALIAS = "bugbane.acquisition.kek"
+
+        fun acquisitionKeyVault(): AndroidKeystoreKeyVault =
+            AndroidKeystoreKeyVault.getOrCreateKeyVault(ACQUISITION_KEY_ALIAS, StrongBoxPolicy.PREFER)
+    }
 
     /**
      * Listener used to report progress and check for cancellation.
@@ -114,47 +124,58 @@ class AcquisitionRunner(
         val total = modules.size
         var completedCount = 0
 
-        for (module in modules) {
-            if (listener?.isCancelled() == true) {
-                Log.i(TAG, "Acquisition cancelled before module ${module.name}")
-                listener.onFinished(true)
-                return acquisitionDir
+        var index = AcquisitionIndex(
+            uuid = acquisitionDir.name,
+            status = AcquisitionIndex.STATUS_RUNNING,
+            created = started.toString(),
+            completed = null,
+            androidqfVersion = BuildConfig.VERSION_NAME,
+            storagePath = acquisitionDir.absolutePath,
+            tmpDir = tmpDir,
+            sdcard = sdCard,
+            cpu = cpu,
+            analysisDir = AcquisitionIndex.ANALYSIS_DIR,
+        )
+
+        val vault = AcquisitionRunner.acquisitionKeyVault()
+        val writer = EncryptedAcquisitionWriter(acquisitionDir, vault)
+
+        var cancelled = false
+        writer.use {
+            for (module in modules) {
+                if (listener?.isCancelled() == true) {
+                    Log.i(TAG, "Acquisition cancelled before module ${module.name}")
+                    cancelled = true
+                    break
+                }
+
+                var moduleBytes = 0L
+                val progressCb: (Long) -> Unit = { delta ->
+                    moduleBytes += delta
+                    listener?.onModuleProgress(module.name, moduleBytes)
+                    Unit
+                }
+                Log.i(TAG, "Running module ${module.name}")
+                listener?.onModuleStart(module.name, completedCount, total)
+                try {
+                    module.run(context, manager, writer, progressCb)
+                    Log.i(TAG, "Module ${module.name} finished")
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Module ${module.name} failed", t)
+                    // TODO: display error message to the user
+                }
+                completedCount++
+                listener?.onModuleComplete(module.name, completedCount, total)
             }
 
-            var moduleBytes = 0L
-            val progressCb: (Long) -> Unit = { delta ->
-                moduleBytes += delta
-                listener?.onModuleProgress(module.name, moduleBytes)
-                Unit
+            val completed = Instant.now()
+            index = if (cancelled) {
+                index.markAsCancelled(completed)
+            } else {
+                index.markAsComplete(completed)
             }
-            Log.i(TAG, "Running module ${module.name}")
-            listener?.onModuleStart(module.name, completedCount, total)
-            try {
-                if (!acquisitionDir.exists()) acquisitionDir.mkdirs()
-                module.run(context, manager, acquisitionDir, progressCb)
-                Log.i(TAG, "Module ${module.name} finished")
-            } catch (t: Throwable) {
-                Log.e(TAG, "Module ${module.name} failed", t)
-                // TODO: display error message to the user
-            }
-            completedCount++
-            listener?.onModuleComplete(module.name, completedCount, total)
+            writer.writeIndex(index)
         }
-
-        val completed = Instant.now()
-        val metadata = JSONObject().apply {
-            put("uuid", acquisitionDir.name)
-            // TODO: here we should use a better key, for exampple "bugbane_version"
-            put("androidqf_version", BuildConfig.VERSION_NAME)
-            put("storage_path", acquisitionDir.absolutePath)
-            put("started", started.toString())
-            put("completed", completed.toString())
-            put("tmp_dir", tmpDir)
-            put("sdcard", sdCard)
-            put("cpu", cpu)
-            put("streaming_mode", false)
-        }
-        File(acquisitionDir, "acquisition.json").writeText(Utils.toJsonString(metadata))
 
         Log.i(TAG, "Acquisition complete in ${acquisitionDir.absolutePath}")
         listener?.onFinished(false)
