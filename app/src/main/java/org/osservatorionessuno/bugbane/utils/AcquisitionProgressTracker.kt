@@ -12,14 +12,19 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.MainActivity
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.cadb.AdbManager
 import org.osservatorionessuno.qf.AcquisitionRunner
+import org.osservatorionessuno.qf.AcquisitionScanner
 import java.io.File
 
 private const val TAG = "AcquisitionProgressTracker"
@@ -59,6 +64,12 @@ object AcquisitionProgressTracker {
     private val _showDisableReminder = MutableStateFlow(false)
     val showDisableReminder: StateFlow<Boolean> = _showDisableReminder.asStateFlow()
 
+    /** The acquisition directory whose first analysis is currently running. */
+    private val _analyzing = MutableStateFlow<File?>(null)
+    val analyzing: StateFlow<File?> = _analyzing.asStateFlow()
+
+    private val analysisScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     fun start(context: Context, adbManager: AdbManager, baseDir: File) {
         val appContext = context.applicationContext
         _modules.value = emptyList()
@@ -95,11 +106,32 @@ object AcquisitionProgressTracker {
                 if (cancelled || output == null) return
                 _showDisableReminder.value = true
                 _pendingAcquisition.value = output
-                if (!isAppInForeground()) {
-                    postFinishedNotification(appContext)
-                }
+                autoAnalyze(appContext, output)
             }
         })
+    }
+
+    /**
+     * Run the first analysis automatically. When the app is in the
+     * background the completion notification is deferred until the analysis
+     * is done, so tapping it lands on the results.
+     */
+    private fun autoAnalyze(context: Context, acquisitionDir: File) {
+        _analyzing.value = acquisitionDir
+        analysisScope.launch {
+            var analyzed = false
+            try {
+                AcquisitionScanner.scan(context, acquisitionDir)
+                analyzed = true
+            } catch (t: Throwable) {
+                Log.e(TAG, "Automatic analysis failed", t)
+            } finally {
+                _analyzing.value = null
+            }
+            if (!isAppInForeground()) {
+                postFinishedNotification(context, analyzed)
+            }
+        }
     }
 
     /** Called by the UI once it has navigated to the finished acquisition. */
@@ -118,7 +150,7 @@ object AcquisitionProgressTracker {
         return state.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
     }
 
-    private fun postFinishedNotification(context: Context) {
+    private fun postFinishedNotification(context: Context, analyzed: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -147,7 +179,12 @@ object AcquisitionProgressTracker {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_bugbane_zoom)
             .setContentTitle(context.getString(R.string.notification_acquisition_complete_title))
-            .setContentText(context.getString(R.string.notification_acquisition_complete_text))
+            .setContentText(
+                context.getString(
+                    if (analyzed) R.string.notification_acquisition_complete_analyzed_text
+                    else R.string.notification_acquisition_complete_text
+                )
+            )
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
