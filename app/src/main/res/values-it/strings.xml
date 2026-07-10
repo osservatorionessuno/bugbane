@@ -103,7 +103,6 @@
     <string name="analysis_spyware_warning_title">In questa analisi sono stati trovati possibili indicatori di spyware. Per supporto, valuta di contattare una linea di aiuto fidata.</string>
     <string name="analysis_spyware_warning_button">Apri sito di supporto</string>
     <string name="slideshow_wireless_title">Abilita Wireless Debugging</string>
-    <string name="scan_cancelling_button">Cancellazione...</string>
     <string name="settings_indicators_desc">Gli indicatori di compromissione (IoCs) sono utilizzati per identificare i segni di infezioni o sorveglianza sui dispositivi Android. Essi vengono aggiornati periodicamente per garantire l\'accuratezza dell\'analisi.</string>
     <string name="settings_about">Informazioni su di noi &amp; Crediti</string>
     <string name="settings_about_desc">Bugbane è un progetto open-source sviluppato da Osservatorio Nessuno OdV.</string>
