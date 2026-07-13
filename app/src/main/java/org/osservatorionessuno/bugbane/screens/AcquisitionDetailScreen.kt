@@ -72,6 +72,23 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     var selectedScans by remember { mutableStateOf<Set<ScanSummary>>(emptySet()) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
+    // A fresh acquisition's first analysis starts automatically (see
+    // AcquisitionProgressTracker). Mirror it here as if the analyze button
+    // had been pressed, and load its results once it completes.
+    val autoAnalyzing =
+        org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker.analyzing.collectAsState()
+    var wasAutoAnalyzing by remember { mutableStateOf(false) }
+    LaunchedEffect(autoAnalyzing.value) {
+        if (autoAnalyzing.value?.absolutePath == acquisitionDir.absolutePath) {
+            wasAutoAnalyzing = true
+            processing = ProcessingState.SCANNING
+        } else if (wasAutoAnalyzing) {
+            wasAutoAnalyzing = false
+            scans = withContext(Dispatchers.IO) { loadScans(acquisitionDir) }
+            processing = ProcessingState.OFF
+        }
+    }
+
     LaunchedEffect(acquisitionDir) {
         size = Utils.calculateSize(acquisitionDir)
         val metaFile = File(acquisitionDir, "acquisition.json")

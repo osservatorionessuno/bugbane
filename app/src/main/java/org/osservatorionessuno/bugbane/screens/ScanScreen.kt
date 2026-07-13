@@ -24,7 +24,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
@@ -32,10 +31,10 @@ import org.osservatorionessuno.bugbane.AcquisitionActivity
 import org.osservatorionessuno.bugbane.components.LayeredProgressIndicator
 import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
 import org.osservatorionessuno.cadb.AdbState
+import org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker
 import org.osservatorionessuno.bugbane.utils.AppState
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
 import org.osservatorionessuno.bugbane.utils.Utils
-import org.osservatorionessuno.qf.AcquisitionRunner
 import java.io.File
 
 private const val TAG = "ScanScreen"
@@ -43,7 +42,6 @@ private const val BETA_COUNTDOWN_SECONDS = 10
 
 @Composable
 fun ScanScreen() {
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     val application = LocalContext.current.applicationContext as Application
@@ -52,76 +50,36 @@ fun ScanScreen() {
     val appState = viewModel.configurationState.collectAsStateWithLifecycle()
     val adbManager = viewModel.adbManager
     val adbState = adbManager.adbState.collectAsStateWithLifecycle()
-    
-    var showDisableDialog by remember { mutableStateOf(false) }
-    var completedModules by remember { mutableStateOf(0) }
-    var totalModules by remember { mutableStateOf(0) }
-    val progressLogs = remember { mutableStateListOf<String>() }
-    val moduleLogIndex = remember { mutableStateMapOf<String, Int>() }
-    val moduleBytes = remember { mutableStateMapOf<String, Long>() }
-    
+
+    // Progress lives in an application-scoped tracker so it survives this
+    // screen (or the whole activity) being recreated mid-acquisition.
+    val modules = AcquisitionProgressTracker.modules.collectAsStateWithLifecycle()
+    val completedModules = AcquisitionProgressTracker.completedModules.collectAsStateWithLifecycle()
+    val totalModules = AcquisitionProgressTracker.totalModules.collectAsStateWithLifecycle()
+    val pendingAcquisition = AcquisitionProgressTracker.pendingAcquisition.collectAsStateWithLifecycle()
+    val showDisableDialog = AcquisitionProgressTracker.showDisableReminder.collectAsStateWithLifecycle()
+
     val isBetaVersion = context.packageName.contains("beta", ignoreCase = true)
     var showBetaWarningDialog by remember { mutableStateOf(false) }
     var betaCountdown by remember { mutableStateOf(BETA_COUNTDOWN_SECONDS) }
     var betaButtonEnabled by remember { mutableStateOf(false) }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    
+
     fun startAcquisition() {
-        val baseDir = File(context.filesDir, "acquisitions")
-        progressLogs.clear()
-        moduleLogIndex.clear()
-        moduleBytes.clear()
-        completedModules = 0
-        totalModules = 0
-        adbManager.runQuickForensics(baseDir, object : AcquisitionRunner.ProgressListener {
-            override fun onModuleStart(name: String, completed: Int, total: Int) {
-                coroutineScope.launch {
-                    totalModules = total
-                    moduleLogIndex[name] = progressLogs.size
-                    moduleBytes[name] = 0L
-                    progressLogs.add(context.getString(R.string.scan_module_running, name, Utils.formatBytes(0L)))
-                }
-            }
+        AcquisitionProgressTracker.start(context, adbManager, File(context.filesDir, "acquisitions"))
+    }
 
-            override fun onModuleProgress(name: String, bytes: Long) {
-                coroutineScope.launch {
-                    val idx = moduleLogIndex[name] ?: return@launch
-                    moduleBytes[name] = bytes
-                    progressLogs[idx] = context.getString(R.string.scan_module_running, name, Utils.formatBytes(bytes))
-                }
-            }
-
-            override fun onModuleComplete(name: String, completed: Int, total: Int) {
-                coroutineScope.launch {
-                    completedModules = completed
-                    val idx = moduleLogIndex[name]
-                    val finalBytes = moduleBytes[name] ?: 0L
-                    if (idx != null) {
-                        progressLogs[idx] = context.getString(R.string.scan_module_completed, name, Utils.formatBytes(finalBytes))
-                    } else {
-                        progressLogs.add(context.getString(R.string.scan_module_completed, name, Utils.formatBytes(finalBytes)))
-                    }
-                }
-            }
-
-            override fun isCancelled(): Boolean = adbManager.isQuickForensicsCancelled
-
-            override fun onFinished(cancelled: Boolean) {
-                coroutineScope.launch {
-                    if (!cancelled) {
-                        val latest = baseDir.listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.lastModified() }
-                        if (latest != null) {
-                            val intent = Intent(context, AcquisitionActivity::class.java).apply {
-                                putExtra(AcquisitionActivity.EXTRA_PATH, latest.absolutePath)
-                            }
-                            context.startActivity(intent)
-                        }
-                        showDisableDialog = true
-                    }
-                }
-            }
-        })
+    // Navigate to a freshly finished acquisition. This also fires when the
+    // screen is recreated (or the app is reopened from the completion
+    // notification) while a finished acquisition is still pending.
+    LaunchedEffect(pendingAcquisition.value) {
+        val pending = pendingAcquisition.value ?: return@LaunchedEffect
+        AcquisitionProgressTracker.consumePendingAcquisition(context)
+        val intent = Intent(context, AcquisitionActivity::class.java).apply {
+            putExtra(AcquisitionActivity.EXTRA_PATH, pending.absolutePath)
+        }
+        context.startActivity(intent)
     }
 
     Column(
@@ -141,8 +99,8 @@ fun ScanScreen() {
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 LayeredProgressIndicator(
-                                    totalModules = totalModules,
-                                    completedModules = completedModules,
+                                    totalModules = totalModules.value,
+                                    completedModules = completedModules.value,
                                     size = 128.dp,
                                     strokeWidth = 8.dp
                                 )
@@ -154,8 +112,14 @@ fun ScanScreen() {
                                 .fillMaxHeight()
                                 .padding(16.dp),
                         ) {
-                            items(progressLogs) { log ->
-                                Text(log)
+                            items(modules.value) { module ->
+                                Text(
+                                    stringResource(
+                                        if (module.done) R.string.scan_module_completed else R.string.scan_module_running,
+                                        module.name,
+                                        Utils.formatBytes(module.bytes)
+                                    )
+                                )
                             }
                         }
                     }
@@ -169,8 +133,8 @@ fun ScanScreen() {
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 LayeredProgressIndicator(
-                                    totalModules = totalModules,
-                                    completedModules = completedModules,
+                                    totalModules = totalModules.value,
+                                    completedModules = completedModules.value,
                                     size = 128.dp,
                                     strokeWidth = 8.dp
                                 )
@@ -182,8 +146,14 @@ fun ScanScreen() {
                                 .fillMaxWidth()
                                 .padding(16.dp),
                         ) {
-                            items(progressLogs) { log ->
-                                Text(log)
+                            items(modules.value) { module ->
+                                Text(
+                                    stringResource(
+                                        if (module.done) R.string.scan_module_completed else R.string.scan_module_running,
+                                        module.name,
+                                        Utils.formatBytes(module.bytes)
+                                    )
+                                )
                             }
                         }
                     }
@@ -281,7 +251,7 @@ fun ScanScreen() {
                 }
 
                 // Disable Development Tools Dialog
-                if (showDisableDialog) {
+                if (showDisableDialog.value) {
                     Card(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -310,7 +280,7 @@ fun ScanScreen() {
                                 Button(
                                     onClick = {
                                         ConfigurationManager.openDeveloperOptions(context)
-                                        showDisableDialog = false
+                                        AcquisitionProgressTracker.dismissDisableReminder()
                                     },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.error
@@ -320,7 +290,7 @@ fun ScanScreen() {
                                 }
 
                                 IconButton(
-                                    onClick = { showDisableDialog = false }
+                                    onClick = { AcquisitionProgressTracker.dismissDisableReminder() }
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
