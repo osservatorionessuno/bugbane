@@ -10,6 +10,15 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Currently used only to fetch IOCs -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Package visibility (Android 11+): needed to read the Mainline train date
+         (modulemetadata versionName) for the ADB vulnerability check. -->
+    <queries>
+        <package android:name="com.google.android.modulemetadata" />
+        <package android:name="com.google.android.adbd" />
+        <package android:name="com.android.adbd" />
+    </queries>
+
     <application
         android:name=".BugbaneApplication"
         android:allowBackup="true"
