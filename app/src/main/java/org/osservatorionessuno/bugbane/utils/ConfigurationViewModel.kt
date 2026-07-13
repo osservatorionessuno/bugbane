@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.MainActivity
+import org.osservatorionessuno.bugbane.security.DeviceVulnerabilityChecker
 import org.osservatorionessuno.cadb.AdbManager
 import org.osservatorionessuno.cadb.AdbState
 import kotlin.concurrent.atomics.AtomicInt
@@ -162,6 +163,12 @@ class ConfigurationViewModel private constructor(
         // (The order here informs the onboarding order)
         if (!notificationsEnabled) return AppState.NeedNotificationPermission
         if (!isConnectedToWifi) return AppState.NeedWifi
+        // Before enabling any debugging surface (bugbane is about to turn on
+        // wireless debugging), warn devices still exposed to the wireless-ADB
+        // bypass (CVE-2026-0073), once, until acknowledged.
+        if (DeviceVulnerabilityChecker.isAtRisk(appContext) && !appProgress.hasAckedAdbWarning) {
+            return AppState.NeedAdbVulnerabilityWarning
+        }
         if (!developerOptionsEnabled) return AppState.NeedDeveloperOptions
         if ((!wirelessDebuggingEnabled || needAdb) && !appProgress.hasCompletedOnboarding) return AppState.NeedWirelessDebuggingAndPair
 
@@ -212,6 +219,11 @@ class ConfigurationViewModel private constructor(
 
             AppState.NeedWelcomeScreen -> {
                 appManager.setHasSeenWelcomeScreen()
+            }
+
+            AppState.NeedAdbVulnerabilityWarning -> {
+                // The warning page renders in the slideshow; "Continue" acknowledges it.
+                appManager.setAckedAdbWarning()
             }
 
             AppState.NeedWifi,

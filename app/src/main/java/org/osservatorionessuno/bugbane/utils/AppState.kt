@@ -9,6 +9,10 @@ enum class AppState(val step: Int) {
     NeedNotificationPermission(1),
     DeviceUnsupported(1), // Alternative to step 1: device isn't compatible
     NeedWifi(2),
+    // Shown before developer options, only on devices still exposed to the
+    // wireless-ADB bypass (CVE-2026-0073). Shares step 3 so it adds no extra
+    // progress dot for unaffected users who never see it.
+    NeedAdbVulnerabilityWarning(3),
     NeedDeveloperOptions(3),
 
     // Step 4: ADB/Wireless ADB/Pairing

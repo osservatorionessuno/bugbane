@@ -11,14 +11,18 @@ import kotlinx.coroutines.flow.asStateFlow
 
 object SlideshowManager {
     private lateinit var appContext: Context
-    data class AppProgress(val hasCompletedOnboarding: Boolean, val hasSeenWelcomeScreen: Boolean)
-    private var _appProgress: MutableStateFlow<AppProgress> = MutableStateFlow(AppProgress(false, false))
+    data class AppProgress(
+        val hasCompletedOnboarding: Boolean,
+        val hasSeenWelcomeScreen: Boolean,
+        val hasAckedAdbWarning: Boolean,
+    )
+    private var _appProgress: MutableStateFlow<AppProgress> = MutableStateFlow(AppProgress(false, false, false))
     var appProgress: StateFlow<AppProgress> = _appProgress.asStateFlow()
     private lateinit var sharedPrefs: SharedPreferences
     private var sharedPrefsListener: SharedPreferences.OnSharedPreferenceChangeListener =
         SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
             when (key) {
-                Keys.KEY_HAS_SEEN_HOMEPAGE, Keys.KEY_HAS_SEEN_WELCOME_SCREEN -> {
+                Keys.KEY_HAS_SEEN_HOMEPAGE, Keys.KEY_HAS_SEEN_WELCOME_SCREEN, Keys.KEY_ACKED_ADB_WARNING -> {
                     checkState()
                 }
             }
@@ -49,12 +53,20 @@ object SlideshowManager {
             hasSeenWelcomeScreen = sharedPrefs.getBoolean(
                 Keys.KEY_HAS_SEEN_WELCOME_SCREEN,
                 false
+            ),
+            hasAckedAdbWarning = sharedPrefs.getBoolean(
+                Keys.KEY_ACKED_ADB_WARNING,
+                false
             )
         )
         if (_appProgress.value != newState) {
             Log.d("SlideshowManager", "update appprogress (onboardcomplete=${newState.hasCompletedOnboarding}, welcomecomplete=${newState.hasSeenWelcomeScreen})")
             _appProgress.value = newState
         }
+    }
+
+    fun setAckedAdbWarning() {
+        sharedPrefs.edit { putBoolean(Keys.KEY_ACKED_ADB_WARNING, true) }
     }
 
     fun hasSeenHomepage(): Boolean {
@@ -97,4 +109,7 @@ object Keys {
 
     // Skips the beta warning countdown after the user has acknowledged it once
     const val KEY_BETA_WARNING_ACKNOWLEDGED = "beta_warning_acknowledged"
+
+    // Set once the user has acknowledged the ADB vulnerability warning
+    const val KEY_ACKED_ADB_WARNING = "acked_adb_warning"
 }

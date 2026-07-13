@@ -30,6 +30,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.flow.collectLatest
+import org.osservatorionessuno.bugbane.components.AdbVulnerabilityWarningPage
 import org.osservatorionessuno.bugbane.components.SlideshowPage
 import org.osservatorionessuno.bugbane.ui.theme.Theme
 import org.osservatorionessuno.bugbane.utils.AppState
@@ -203,13 +204,19 @@ fun SlideshowScreen(
             modifier = Modifier.weight(1f),
             userScrollEnabled = false
         ) { pageIndex ->
-            SlideshowPage(
-                state = state.value,
-                onClickContinue = {
-                    Log.d(TAG, "onClickContinue with state $state")
-                    viewModel.onChangeStateRequest(state.value)
-                }
-            )
+            if (state.value == AppState.NeedAdbVulnerabilityWarning) {
+                AdbVulnerabilityWarningPage(
+                    onContinue = { viewModel.onChangeStateRequest(state.value) }
+                )
+            } else {
+                SlideshowPage(
+                    state = state.value,
+                    onClickContinue = {
+                        Log.d(TAG, "onClickContinue with state $state")
+                        viewModel.onChangeStateRequest(state.value)
+                    }
+                )
+            }
         }
     }
 }
