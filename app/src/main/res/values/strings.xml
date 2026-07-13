@@ -33,6 +33,13 @@
     The application acquires data using ADB Wireless Debugging, which is available only when Developer Options are enabled.</string>
     <string name="slideshow_button_text_enable">Enable</string>
 
+    <!-- ADB wireless-debugging vulnerability warning (CVE-2026-0073) -->
+    <string name="adb_vuln_title">Your device needs an update</string>
+    <string name="adb_vuln_description">This device is missing a security update for a serious flaw in Android\'s wireless debugging (CVE-2026-0073). Because Bugbane works by turning on wireless debugging, on an unpatched device an attacker on the same network could gain access without any action from you. Please install system updates before continuing.</string>
+    <string name="adb_vuln_network_warning">If you continue without updating, you MUST do so only on a network you fully trust — ideally your own personal hotspot — and never on public or shared Wi-Fi.</string>
+    <string name="adb_vuln_update_button">Check for updates</string>
+    <string name="adb_vuln_continue_button">I understand, continue anyway</string>
+
     <string name="slideshow_wireless_and_pair_title">Enable Wireless Debugging and Pair</string>
     <string name="slideshow_wireless_and_pair_description">Connect to Wi-Fi, enable ADB Wireless Debugging, tap “Pair device with pairing code,” then enter the code in the Bugbane notification.</string>
     <string name="slideshow_wireless_and_pair_button">Pair</string>
