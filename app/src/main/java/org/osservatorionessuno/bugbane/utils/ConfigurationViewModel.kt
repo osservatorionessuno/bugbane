@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.MainActivity
+import org.osservatorionessuno.bugbane.security.AdbExposureNotifier
 import org.osservatorionessuno.bugbane.security.DeviceVulnerabilityChecker
 import org.osservatorionessuno.cadb.AdbManager
 import org.osservatorionessuno.cadb.AdbState
@@ -104,6 +105,16 @@ class ConfigurationViewModel private constructor(
                     // AdbPairingRequiredException, there's no point in autoconnecting til we fix it
                     autoConnectAttempts.store(_MAX_AUTOCONNECT_ATTEMPTS)
                 }
+
+                // Surface (or clear) the "wireless debugging is on and this device
+                // is unpatched" warning as the relevant state changes.
+                AdbExposureNotifier.update(
+                    appContext,
+                    vulnerable = DeviceVulnerabilityChecker.isAtRisk(appContext),
+                    wirelessDebuggingOn = settings.wirelessDebuggingEnabled,
+                    acquiring = adbState == AdbState.ConnectedAcquiring || adbState == AdbState.Cancelling,
+                    onboardingComplete = appProgress.hasCompletedOnboarding,
+                )
 
                 checkState(
                     settings.notificationsEnabled,
