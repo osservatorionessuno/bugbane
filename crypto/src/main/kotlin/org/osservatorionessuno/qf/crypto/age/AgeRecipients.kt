@@ -27,9 +27,14 @@ class X25519Recipient(private val publicKey: ByteArray) : AgeRecipient {
     }
 }
 
-class X25519Identity(private val secretKey: ByteArray) : AgeIdentity {
+class X25519Identity(private val secretKey: ByteArray) : DestroyableAgeIdentity {
     private val publicKey = AgePrimitives.x25519Base(secretKey)
     fun recipient(): X25519Recipient = X25519Recipient(publicKey)
+
+    /** The X25519 public key acquisitions are encrypted to. Safe to store in the clear. */
+    fun publicKeyBytes(): ByteArray = publicKey.copyOf()
+
+    override fun destroy() = secretKey.fill(0)
 
     override fun unwrap(stanzas: List<AgeStanza>): ByteArray? {
         for (s in stanzas) {
@@ -45,6 +50,25 @@ class X25519Identity(private val secretKey: ByteArray) : AgeIdentity {
     }
 
     companion object { fun generate(): X25519Identity = X25519Identity(AgePrimitives.randomBytes(32)) }
+}
+
+/**
+ * Identity backed by an already-known file key — e.g. one retained in memory
+ * right after writing the archive, so the writer's session can read it back
+ * without unlocking any identity. Ignores the stanzas entirely; safe because
+ * [AgePayload.open] verifies the header MAC with the returned key and rejects
+ * any file this key does not belong to.
+ */
+class FileKeyIdentity(fileKey: ByteArray) : DestroyableAgeIdentity {
+    private val fileKey = fileKey.copyOf()
+
+    init {
+        require(fileKey.size == AgeFormat.FILE_KEY_SIZE) { "invalid file key size ${fileKey.size}" }
+    }
+
+    override fun unwrap(stanzas: List<AgeStanza>): ByteArray? = fileKey.copyOf()
+
+    override fun destroy() = fileKey.fill(0)
 }
 
 /**

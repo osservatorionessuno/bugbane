@@ -15,8 +15,17 @@ object Age {
      * [out] (header + nonce written eagerly, payload STREAM-encrypted on the fly).
      * Push-based: e.g. `ZipOutputStream(Age.encryptingStream(recipients, file))` —
      * no background thread or pipe needed.
+     *
+     * [onFileKey] receives a copy of the freshly generated file key, for callers
+     * that legitimately hold the plaintext anyway and want to keep (bounded)
+     * decryption ability without unlocking an identity — see FileKeyIdentity.
+     * The receiver owns the copy and should zero it when done.
      */
-    fun encryptingStream(recipients: List<AgeRecipient>, out: OutputStream): OutputStream {
+    fun encryptingStream(
+        recipients: List<AgeRecipient>,
+        out: OutputStream,
+        onFileKey: ((ByteArray) -> Unit)? = null,
+    ): OutputStream {
         require(recipients.isNotEmpty()) { "no recipients" }
         // spec "Payload": file = header ++ nonce ++ STREAM[HKDF[nonce, "payload"](file key)](plaintext).
         // The 16-byte file key (random) is wrapped into each recipient stanza; the random
@@ -24,6 +33,7 @@ object Age {
         val fileKey = AgePrimitives.randomBytes(AgeFormat.FILE_KEY_SIZE)
         val stanzas = recipients.flatMap { it.wrap(fileKey) }
         AgeFormat.write(out, stanzas, fileKey)
+        onFileKey?.invoke(fileKey.copyOf())
         val nonce = AgePrimitives.randomBytes(AgeFormat.PAYLOAD_NONCE_SIZE)
         out.write(nonce)
         val streamKey = AgePrimitives.hkdf(nonce, fileKey, PAYLOAD_INFO, 32)

@@ -184,8 +184,9 @@ object AcquisitionProgressTracker {
         analysisScope.launch {
             var analyzed = false
             try {
-                AcquisitionScanner.scan(context, acquisitionDir)
-                analyzed = true
+                // The file key was cached while writing, so the first analysis
+                // decrypts without any biometric/passphrase prompt.
+                analyzed = AcquisitionScanner.scanFromSessionCache(context, acquisitionDir) != null
             } catch (t: Throwable) {
                 Log.e(TAG, "Automatic analysis failed", t)
             } finally {

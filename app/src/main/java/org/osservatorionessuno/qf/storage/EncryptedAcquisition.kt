@@ -10,7 +10,8 @@ import org.osservatorionessuno.qf.Utils
 import org.osservatorionessuno.libmvt.common.ReopenableInput
 import org.osservatorionessuno.qf.crypto.AgeZipArchiveReader
 import org.osservatorionessuno.qf.crypto.AgeZipArchiveWriter
-import org.osservatorionessuno.qf.crypto.KeyVault
+import org.osservatorionessuno.qf.crypto.age.AgeIdentity
+import org.osservatorionessuno.qf.crypto.age.AgeRecipient
 
 /** Single encrypted archive holding every artifact of an acquisition. */
 const val ARCHIVE_FILE: String = "acquisition.age"
@@ -19,14 +20,18 @@ const val ARCHIVE_FILE: String = "acquisition.age"
     Writes artifacts as entries of one encrypted+compressed archive (a standard
     ZIP inside age) in the acquisition directory. The ZIP only exists as a
     transient stream inside the age encryptor, so artifact plaintext never
-    touches disk; the file key is wrapped by [vault].
+    touches disk; the file key is wrapped to [recipients] (the device acquisition
+    identity — encrypting needs no secret and never prompts). [onFileKey] receives
+    a copy of the fresh file key so the writer's session can read the archive back
+    without unlocking the identity (see SessionKeyCache).
 */
 class EncryptedAcquisitionWriter(
     private val acquisitionDir: File,
-    vault: KeyVault,
+    recipients: List<AgeRecipient>,
+    onFileKey: ((ByteArray) -> Unit)? = null,
     reserveBytes: Long = ACQUISITION_FREE_SPACE_RESERVE_BYTES,
 ) : ArtifactSink {
-    private val writer = AgeZipArchiveWriter(FileOutputStream(File(acquisitionDir, ARCHIVE_FILE)), vault)
+    private val writer = AgeZipArchiveWriter(FileOutputStream(File(acquisitionDir, ARCHIVE_FILE)), recipients, onFileKey)
     private val writtenPaths = mutableSetOf<String>()
     private var indexWritten = false
     private val hashManifest = ByteArrayOutputStream()
@@ -88,12 +93,12 @@ class EncryptedAcquisitionWriter(
 */
 class EncryptedAcquisitionReader(
     private val acquisitionDir: File,
-    private val vault: KeyVault,
+    private val identities: List<AgeIdentity>,
 ) : ArtifactReader {
     override fun forEachArtifact(block: (AcquisitionArtifact) -> Unit) {
         val archive = File(acquisitionDir, ARCHIVE_FILE)
         if (!archive.exists()) return
-        AgeZipArchiveReader.forEachEntry(archive, vault) { name, modifiedTime, open ->
+        AgeZipArchiveReader.forEachEntry(archive, identities) { name, modifiedTime, open ->
             val reopenable = ReopenableInput.of(name) { open() }
             block(AcquisitionArtifact(path = name, modifiedTime = modifiedTime, reopenable = reopenable))
         }
@@ -126,8 +131,8 @@ class EncryptedAcquisitionReader(
 }
 
 /** Read [METADATA_FILE] from the archive, falling back to a legacy sidecar file. */
-fun readAcquisitionIndex(acquisitionDir: File, vault: KeyVault): AcquisitionIndex? {
-    EncryptedAcquisitionReader(acquisitionDir, vault).use { reader ->
+fun readAcquisitionIndex(acquisitionDir: File, identities: List<AgeIdentity>): AcquisitionIndex? {
+    EncryptedAcquisitionReader(acquisitionDir, identities).use { reader ->
         reader.readIndex()?.let { return it }
     }
     val legacy = File(acquisitionDir, METADATA_FILE)

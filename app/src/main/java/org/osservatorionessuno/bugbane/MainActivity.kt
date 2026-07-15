@@ -47,6 +47,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         PRNGFixes.apply()
 
+        // Delete acquisitions written to an ephemeral key that was never sealed by
+        // a password (the process died before the mandatory step) — their key is
+        // gone, so they can never be read.
+        org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault.sweepOrphans(this)
+
         // Fetch indicators on first launch and schedule daily background updates
         setupIndicatorsUpdates()
 
@@ -56,7 +61,7 @@ class MainActivity : ComponentActivity() {
                 val appState = configViewModel.configurationState.collectAsStateWithLifecycle()
                 val appProgress: State<SlideshowManager.AppProgress> = configViewModel.appManager.appProgress.collectAsStateWithLifecycle()
 
-                if (appProgress.value.hasCompletedOnboarding) {
+                if (appProgress.value.hasCompletedOnboarding && appProgress.value.hasAcquisitionProtection) {
                     MainContent()
                 } else {
                     // Avoid flicker before the slideshow while compose is calculating the appstate

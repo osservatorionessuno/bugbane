@@ -156,6 +156,10 @@ class ConfigurationViewModel private constructor(
         // TODO: This can be defined in the manifest if it's just about API level
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return AppState.DeviceUnsupported
         if (!appProgress.hasSeenWelcomeScreen) return AppState.NeedWelcomeScreen
+        // Before anything else: on devices that use the fingerprint gate, lock the
+        // acquisition key to the device now (one prompt). Devices without it defer
+        // the password to after the first acquisition, so this passes for them.
+        if (!appProgress.hasAcquisitionProtection) return AppState.NeedAcquisitionProtection
 
         // Wireless debug + usb debug were separate settings from Android 11-14
         val needAdb = (!adbEnabled && Build.VERSION.SDK_INT > Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
@@ -243,6 +247,11 @@ class ConfigurationViewModel private constructor(
 
             AppState.NeedBetaWarning -> {
                 appManager.setAckedBetaWarning()
+            }
+
+            AppState.NeedAcquisitionProtection -> {
+                // Setup happens inside AcquisitionProtectionPage (it needs an
+                // Activity for the biometric prompt) and refreshes progress itself.
             }
 
             AppState.NeedWifi,

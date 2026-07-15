@@ -27,8 +27,8 @@ import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.qf.storage.AcquisitionIndex
 import org.osservatorionessuno.qf.storage.EncryptedAcquisitionWriter
 import org.osservatorionessuno.qf.storage.InsufficientStorageException
-import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
-import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault.StrongBoxPolicy
+import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
+import org.osservatorionessuno.qf.crypto.SessionKeyCache
 
 private const val TAG = "AcquisitionRunner"
 
@@ -47,8 +47,6 @@ class AcquisitionRunner(
 ) {
 
     companion object {
-        const val ACQUISITION_KEY_ALIAS = "bugbane.acquisition.kek"
-
         // The space-hungry modules run last, so low storage only ever costs
         // them and never the smaller high-value modules.
         val DEFAULT_MODULES: List<Module> = listOf(
@@ -73,9 +71,6 @@ class AcquisitionRunner(
         )
 
         val MODULE_NAMES: List<String> = DEFAULT_MODULES.map { it.name }
-
-        fun acquisitionKeyVault(): AndroidKeystoreKeyVault =
-            AndroidKeystoreKeyVault.getOrCreateKeyVault(ACQUISITION_KEY_ALIAS, StrongBoxPolicy.PREFER)
     }
 
     /**
@@ -149,8 +144,22 @@ class AcquisitionRunner(
             analysisDir = AcquisitionIndex.ANALYSIS_DIR,
         )
 
-        val vault = AcquisitionRunner.acquisitionKeyVault()
-        val writer = EncryptedAcquisitionWriter(acquisitionDir, vault)
+        // Encrypting only needs the public acquisition identity: no secret is
+        // unlocked, so no biometric/passphrase prompt during an acquisition. The
+        // fresh file key is cached so the first analysis right after acquiring
+        // doesn't prompt either (see SessionKeyCache).
+        val recipient = AcquisitionIdentityVault.recipient(context)
+        // On devices with no secure lock the acquisition is encrypted to an
+        // in-memory ephemeral key until the user sets a password; record it so an
+        // unsealed archive is swept if the process dies before that happens.
+        if (AcquisitionIdentityVault.hasPendingEphemeral()) {
+            AcquisitionIdentityVault.markUnsealed(context, acquisitionDir)
+        }
+        val writer = EncryptedAcquisitionWriter(
+            acquisitionDir,
+            listOf(recipient),
+            onFileKey = { SessionKeyCache.put(context, acquisitionDir, it) },
+        )
 
         var cancelled = false
         try {
