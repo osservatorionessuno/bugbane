@@ -119,8 +119,10 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 unlocking = false
             }
 
-            AcquisitionIdentityVault.Tier.STRONGBOX_PASSPHRASE -> launchBiometric {
-                pendingUnlock = PendingUnlock(AcquisitionIdentityVault.unlockStrongBoxOuter(context), onUnlocked)
+            AcquisitionIdentityVault.Tier.STRONGBOX_PASSPHRASE,
+            AcquisitionIdentityVault.Tier.TEE_PASSPHRASE,
+            -> launchBiometric {
+                pendingUnlock = PendingUnlock(AcquisitionIdentityVault.unlockStackedOuter(context), onUnlocked)
             }
 
             null -> {

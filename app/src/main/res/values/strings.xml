@@ -219,6 +219,18 @@
     <string name="settings_change_password_success">Acquisition password changed</string>
     <string name="settings_change_password_error">Couldn\'t change the password</string>
 
+    <!-- Settings: manage protection factors -->
+    <string name="settings_protection_title">Protection factors</string>
+    <string name="settings_add_password">Add a password</string>
+    <string name="settings_add_password_desc">Require a password in addition to your fingerprint or screen lock. Both will be needed to open acquisitions.</string>
+    <string name="settings_remove_password">Remove password</string>
+    <string name="settings_remove_password_desc">Keep only the fingerprint / screen-lock requirement.</string>
+    <string name="settings_remove_fingerprint">Remove fingerprint requirement</string>
+    <string name="settings_remove_fingerprint_desc">Protect with the password alone. Unlike the fingerprint, this survives removing your screen lock — do it before removing the lock if you want to keep your acquisitions.</string>
+    <string name="settings_protection_confirm_remove">Remove</string>
+    <string name="settings_protection_updated">Protection updated</string>
+    <string name="settings_protection_error">Couldn\'t update protection</string>
+
     <!-- Scan details strings -->
     <string name="analysis_details_title">Analysis Details</string>
     <string name="analysis_details_artifact">Level</string>
