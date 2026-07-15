@@ -1,15 +1,12 @@
 package org.osservatorionessuno.qf.crypto
 
-import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
-import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 
 /**
@@ -17,8 +14,7 @@ import javax.crypto.spec.GCMParameterSpec
  *
  * The key-encryption-key (KEK) is a non-exportable AES-256-GCM key generated in
  * hardware — **StrongBox** (a discrete secure element, e.g. Titan M2) when the
- * device has one, otherwise the **TEE**. The backing is reflected in
- * [stanzaType] (`bugbane-se` / `bugbane-tee`).
+ * device has one, otherwise the **TEE**.
  *
  * Keys created with `requireAuth` demand a **per-operation** user authentication
  * (biometric if enrolled, else the lock-screen credential): [wrap]/[unwrap] will
@@ -28,7 +24,6 @@ import javax.crypto.spec.GCMParameterSpec
  */
 class AndroidKeystoreKeyVault private constructor(
     private val key: SecretKey,
-    override val stanzaType: String,
 ) : KeyVault {
 
     override fun wrap(fileKey: ByteArray): ByteArray = finishWrap(beginWrap(), fileKey)
@@ -80,9 +75,6 @@ class AndroidKeystoreKeyVault private constructor(
         private const val TRANSFORM = "AES/GCM/NoPadding"
         private const val GCM_TAG_BITS = 128
 
-        const val STANZA_STRONGBOX = "bugbane-se"
-        const val STANZA_TEE = "bugbane-tee"
-
         /**
          * Load or create a vault for [alias]. [requireAuth] (creation-time only)
          * gates every key operation behind a fresh biometric/credential
@@ -96,7 +88,7 @@ class AndroidKeystoreKeyVault private constructor(
             requireAuth: Boolean = false,
         ): AndroidKeystoreKeyVault {
             val key = getOrCreateKey(alias, strongBoxPolicy, requireAuth)
-            return AndroidKeystoreKeyVault(key, stanzaTypeOf(key))
+            return AndroidKeystoreKeyVault(key)
         }
 
         /** Whether a key for [alias] already exists (never creates one). */
@@ -169,19 +161,6 @@ class AndroidKeystoreKeyVault private constructor(
                 .build()
             generator.init(spec)
             return generator.generateKey()
-        }
-
-        /** Determine whether [key] lives in StrongBox (SE) or the TEE. */
-        private fun stanzaTypeOf(key: SecretKey): String {
-            val factory = SecretKeyFactory.getInstance(key.algorithm, KEYSTORE)
-            val info = factory.getKeySpec(key, KeyInfo::class.java) as KeyInfo
-            val strongBox = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                info.securityLevel == KeyProperties.SECURITY_LEVEL_STRONGBOX
-            } else {
-                // Pre-31 can't distinguish SE from TEE; treat as TEE (the safer warning).
-                false
-            }
-            return if (strongBox) STANZA_STRONGBOX else STANZA_TEE
         }
     }
 }

@@ -10,6 +10,7 @@ import org.osservatorionessuno.libmvt.common.GroupedDetection
 import org.osservatorionessuno.libmvt.common.Indicators
 import org.osservatorionessuno.libmvt.common.ReopenableInput
 import org.osservatorionessuno.libmvt.common.StringResolver
+import org.osservatorionessuno.qf.crypto.age.X25519Identity
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -53,10 +54,10 @@ class LibmvtIntegrationTest {
             "acquisition.json" to """{"streaming_mode":true}""".toByteArray(),
         )
 
-        val vault = InMemoryKeyVault()
+        val id = X25519Identity.generate()
         val archiveFile = File.createTempFile("libmvt-test-", ".age").also { file ->
             ByteArrayOutputStream().also { out ->
-                AgeZipArchiveWriter(out, vault).use { writer ->
+                AgeZipArchiveWriter(out, listOf(id.recipient())).use { writer ->
                     for ((n, b) in artifactBytes) {
                         writer.putEntry(n).use { sink ->
                             ByteArrayInputStream(b).use { it.copyTo(sink) }
@@ -71,7 +72,7 @@ class LibmvtIntegrationTest {
         val viaEncrypted = LinkedHashMap<String, Artifact>()
         var sawGetprop = false
 
-        AgeZipArchiveReader.forEachEntry(archiveFile, vault) { name, _, open ->
+        AgeZipArchiveReader.forEachEntry(archiveFile, listOf(id)) { name, _, open ->
                 if (ForensicRunner.findModuleIndices(name).isEmpty()) return@forEachEntry
                 val reopenable = ReopenableInput.of(name) { open() }
                 runner().streamFileAnalysis(reopenable)?.let { viaEncrypted[name] = it }

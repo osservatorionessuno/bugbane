@@ -33,8 +33,6 @@ internal class FileRandomAccess(file: File) : RandomAccessData {
  * without writing any plaintext to disk.
  */
 class SeekableArchive(private val file: File, identities: List<AgeIdentity>) : Closeable {
-    constructor(file: File, vault: KeyVault) : this(file, listOf(KeyVaultIdentity(vault)))
-
     private val access = FileRandomAccess(file)
     private val zip = ZipFile(AgePayloadChannel(AgePayload.open(access, identities)))
 

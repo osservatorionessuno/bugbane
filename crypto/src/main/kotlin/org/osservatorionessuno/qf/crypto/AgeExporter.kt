@@ -26,9 +26,6 @@ object AgeExporter {
         atRest.copyTo(out)                              // payload, verbatim
     }
 
-    fun export(atRest: InputStream, vault: KeyVault, recipient: AgeRecipient, out: OutputStream) =
-        export(atRest, listOf(KeyVaultIdentity(vault)), recipient, out)
-
     /**
      * Exact byte length [export] would produce for an at-rest archive of
      * [atRestTotalSize] bytes re-wrapped to [recipient] — without decrypting or
@@ -42,9 +39,6 @@ object AgeExporter {
         val newHeaderSize = AgeFormat.serializeHeader(recipient.wrap(fileKey), fileKey).size.toLong()
         return newHeaderSize + (atRestTotalSize - header.headerBytes)
     }
-
-    fun exportedSize(atRest: InputStream, vault: KeyVault, recipient: AgeRecipient, atRestTotalSize: Long): Long =
-        exportedSize(atRest, listOf(KeyVaultIdentity(vault)), recipient, atRestTotalSize)
 
     private fun unwrap(identities: List<AgeIdentity>, stanzas: List<AgeStanza>): ByteArray =
         identities.firstNotNullOfOrNull { it.unwrap(stanzas) }

@@ -1,6 +1,5 @@
 package org.osservatorionessuno.bugbane.share
 
-import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
 import org.osservatorionessuno.qf.crypto.AgeExporter
 import org.osservatorionessuno.qf.crypto.age.AgeIdentity
 import org.osservatorionessuno.qf.crypto.age.ScryptRecipient
@@ -29,20 +28,17 @@ object AcquisitionExport {
     private fun recipient(passphrase: String) =
         ScryptRecipient(passphrase.toByteArray(), logN = SCRYPT_LOG_N)
 
-    private fun identities(identity: AgeIdentity): List<AgeIdentity> =
-        listOf(identity) + AcquisitionIdentityVault.legacyIdentities()
-
     /** Stream [archive] re-wrapped to [passphrase] into [out]. */
     fun writeTo(archive: File, identity: AgeIdentity, passphrase: String, out: OutputStream) {
         archive.inputStream().use { src ->
-            AgeExporter.export(src, identities(identity), recipient(passphrase), out)
+            AgeExporter.export(src, listOf(identity), recipient(passphrase), out)
         }
     }
 
     /** Exact byte length [writeTo] would produce for [archive], without copying the payload. */
     fun size(archive: File, identity: AgeIdentity, passphrase: String): Long {
         return archive.inputStream().use { src ->
-            AgeExporter.exportedSize(src, identities(identity), recipient(passphrase), archive.length())
+            AgeExporter.exportedSize(src, listOf(identity), recipient(passphrase), archive.length())
         }
     }
 }

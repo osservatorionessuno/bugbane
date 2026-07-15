@@ -14,7 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.bugbane.R
-import org.osservatorionessuno.qf.crypto.age.AgeIdentity
 import org.osservatorionessuno.qf.crypto.age.X25519Identity
 import org.osservatorionessuno.qf.crypto.age.X25519Recipient
 import java.io.File
@@ -62,9 +61,6 @@ object AcquisitionIdentityVault {
     private const val TEE_AUTH_KEY_ALIAS = "bugbane.acquisition.identity.tee.auth"
     private const val TEE_BIND_KEY_ALIAS = "bugbane.acquisition.identity.tee"
     private const val HW_PROBE_ALIAS = "bugbane.hwprobe"
-
-    /** Transparent KEK used before the identity scheme; kept only to read old archives. */
-    private const val LEGACY_KEK_ALIAS = "bugbane.acquisition.kek"
 
     private const val SECRET_SIZE = 32
 
@@ -271,14 +267,6 @@ object AcquisitionIdentityVault {
         clearUnsealed(context)
         return deleted
     }
-
-    /** Identity for archives wrapped by the legacy transparent KEK, if that key still exists. */
-    fun legacyIdentities(): List<AgeIdentity> =
-        if (AndroidKeystoreKeyVault.keyExists(LEGACY_KEK_ALIAS)) {
-            listOf(KeyVaultIdentity(AndroidKeystoreKeyVault.getOrCreateKeyVault(LEGACY_KEK_ALIAS, AndroidKeystoreKeyVault.StrongBoxPolicy.PREFER)))
-        } else {
-            emptyList()
-        }
 
     // --------------------------------------------------------------- setup
 

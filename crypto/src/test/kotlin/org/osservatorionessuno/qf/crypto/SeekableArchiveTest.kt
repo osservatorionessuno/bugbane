@@ -3,6 +3,7 @@ package org.osservatorionessuno.qf.crypto
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.osservatorionessuno.qf.crypto.age.X25519Identity
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 
@@ -18,9 +19,9 @@ class SeekableArchiveTest {
         Entry("z/getprop.txt") { ByteArrayInputStream(lastText) },
     )
 
-    private fun encrypt(vault: KeyVault, entries: List<Entry>): java.io.File {
+    private fun encrypt(id: X25519Identity, entries: List<Entry>): java.io.File {
         val bytes = ByteArrayOutputStream().also { out ->
-            AgeZipArchiveWriter(out, vault).use { writer ->
+            AgeZipArchiveWriter(out, listOf(id.recipient())).use { writer ->
                 for (e in entries) {
                     writer.putEntry(e.name, e.modifiedTime).use { sink ->
                         e.open().use { it.copyTo(sink, 64 * 1024) }
@@ -33,10 +34,10 @@ class SeekableArchiveTest {
 
     @Test
     fun `seek reads a single file straight from the encrypted envelope`() {
-        val vault = InMemoryKeyVault()
-        val archive = encrypt(vault, entries())
+        val id = X25519Identity.generate()
+        val archive = encrypt(id, entries())
 
-        SeekableArchive(archive, vault).use { arc ->
+        SeekableArchive(archive, listOf(id)).use { arc ->
             // central directory parsed from the encrypted envelope
             assertEquals(setOf("a/first.txt", "big.bin", "z/getprop.txt"), arc.names())
             assertArrayEquals(lastText, arc.open("z/getprop.txt").use { it.readBytes() })
@@ -47,14 +48,14 @@ class SeekableArchiveTest {
 
     @Test
     fun `forEachEntry agrees with SeekableArchive`() {
-        val vault = InMemoryKeyVault()
-        val archive = encrypt(vault, entries())
+        val id = X25519Identity.generate()
+        val archive = encrypt(id, entries())
 
         val viaReader = LinkedHashMap<String, ByteArray>()
-        AgeZipArchiveReader.forEachEntry(archive, vault) { name, _, open ->
+        AgeZipArchiveReader.forEachEntry(archive, listOf(id)) { name, _, open ->
             viaReader[name] = open().use { it.readBytes() }
         }
-        SeekableArchive(archive, vault).use { arc ->
+        SeekableArchive(archive, listOf(id)).use { arc ->
             for (name in viaReader.keys) {
                 assertArrayEquals(viaReader[name], arc.open(name).use { it.readBytes() }, name)
             }
