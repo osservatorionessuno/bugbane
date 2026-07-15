@@ -110,6 +110,11 @@ fun SettingsScreen() {
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // Add/remove a protection factor (only where there's a fingerprint gate to
+        // add a password to, or a two-factor setup to drop a factor from).
+        ManageProtectionCard()
+        Spacer(modifier = Modifier.height(16.dp))
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -255,13 +260,8 @@ private fun ChangeAcquisitionPasswordCard(tier: AcquisitionIdentityVault.Tier) {
         working = true
         scope.launch {
             try {
-                val changed = when (tier) {
-                    AcquisitionIdentityVault.Tier.PASSPHRASE ->
-                        AcquisitionIdentityVault.changePassphrase(context, current.toByteArray(), new.toByteArray())
-                    AcquisitionIdentityVault.Tier.STRONGBOX_PASSPHRASE ->
-                        AcquisitionIdentityVault.changeStrongBoxPassphrase(context, current.toByteArray(), new.toByteArray())
-                    else -> false
-                }
+                val changed =
+                    AcquisitionIdentityVault.changePassword(context, current.toByteArray(), new.toByteArray())
                 if (changed) {
                     showDialog = false
                     Toast.makeText(context, R.string.settings_change_password_success, Toast.LENGTH_SHORT).show()
@@ -289,7 +289,7 @@ private fun ChangeAcquisitionPasswordCard(tier: AcquisitionIdentityVault.Tier) {
                     if (tooShort) stringResource(R.string.set_password_too_short, MIN_ACQUISITION_PASSWORD_LENGTH) else null, !working)
                 PasswordField(confirmation, { confirmation = it }, stringResource(R.string.set_password_confirm_label),
                     if (mismatch) stringResource(R.string.set_password_mismatch) else null, !working)
-                if (tier == AcquisitionIdentityVault.Tier.STRONGBOX_PASSPHRASE) {
+                if (tier.usesBiometric) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = stringResource(R.string.settings_change_password_two_prompts),
@@ -309,6 +309,197 @@ private fun ChangeAcquisitionPasswordCard(tier: AcquisitionIdentityVault.Tier) {
             TextButton(onClick = { showDialog = false }, enabled = !working) {
                 Text(stringResource(android.R.string.cancel))
             }
+        },
+    )
+}
+
+private enum class ProtectionAction { ADD_PASSWORD, REMOVE_PASSWORD, REMOVE_FINGERPRINT }
+
+/**
+ * Add or remove a protection factor. Shown only where there's a fingerprint gate: a
+ * biometric-only tier can add a password (→ two-factor), and a two-factor tier can
+ * drop either factor — never both. [AcquisitionIdentityVault.removeFingerprint] leaves
+ * a password that survives lock removal; [AcquisitionIdentityVault.removePassword]
+ * leaves the fingerprint. The keypair is preserved, so acquisitions stay readable.
+ */
+@Composable
+private fun ManageProtectionCard() {
+    val context = LocalContext.current
+    var version by remember { mutableStateOf(0) }
+    val tier = remember(version) { AcquisitionIdentityVault.tier(context) }
+    if (tier == null || !tier.usesBiometric) return
+
+    var action by remember { mutableStateOf<ProtectionAction?>(null) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = stringResource(R.string.settings_protection_title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            if (!tier.usesPassphrase) {
+                ProtectionActionRow(R.string.settings_add_password, R.string.settings_add_password_desc) {
+                    action = ProtectionAction.ADD_PASSWORD
+                }
+            } else {
+                ProtectionActionRow(R.string.settings_remove_password, R.string.settings_remove_password_desc) {
+                    action = ProtectionAction.REMOVE_PASSWORD
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                ProtectionActionRow(R.string.settings_remove_fingerprint, R.string.settings_remove_fingerprint_desc) {
+                    action = ProtectionAction.REMOVE_FINGERPRINT
+                }
+            }
+        }
+    }
+
+    val close = { changed: Boolean -> action = null; if (changed) version++ }
+    when (action) {
+        ProtectionAction.ADD_PASSWORD ->
+            AddPasswordDialog(twoPrompts = tier.usesBiometric, onDone = close)
+        ProtectionAction.REMOVE_PASSWORD ->
+            ConfirmWithPasswordDialog(R.string.settings_remove_password, tier.usesBiometric,
+                run = { AcquisitionIdentityVault.removePassword(context, it) }, onDone = close)
+        ProtectionAction.REMOVE_FINGERPRINT ->
+            ConfirmWithPasswordDialog(R.string.settings_remove_fingerprint, tier.usesBiometric,
+                run = { AcquisitionIdentityVault.removeFingerprint(context, it) }, onDone = close)
+        null -> {}
+    }
+}
+
+@Composable
+private fun ProtectionActionRow(titleRes: Int, descRes: Int, onClick: () -> Unit) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(titleRes),
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+        )
+    }
+    Spacer(modifier = Modifier.height(6.dp))
+    Text(
+        text = stringResource(descRes),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+    )
+}
+
+/** Confirm a factor removal by entering the current acquisition password. */
+@Composable
+private fun ConfirmWithPasswordDialog(
+    titleRes: Int,
+    twoPrompts: Boolean,
+    run: suspend (ByteArray) -> Boolean,
+    onDone: (changed: Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var current by remember { mutableStateOf("") }
+    var wrongCurrent by remember { mutableStateOf(false) }
+    var working by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!working) onDone(false) },
+        title = { Text(stringResource(titleRes)) },
+        text = {
+            Column {
+                PasswordField(current, { current = it; wrongCurrent = false },
+                    stringResource(R.string.settings_change_password_current),
+                    if (wrongCurrent) stringResource(R.string.acquisition_unlock_password_wrong) else null, !working)
+                if (twoPrompts) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(stringResource(R.string.settings_change_password_two_prompts),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !working && current.isNotEmpty(), onClick = {
+                working = true
+                scope.launch {
+                    try {
+                        if (run(current.toByteArray())) {
+                            Toast.makeText(context, R.string.settings_protection_updated, Toast.LENGTH_SHORT).show()
+                            onDone(true)
+                        } else {
+                            wrongCurrent = true
+                        }
+                    } catch (_: AcquisitionIdentityVault.UserAuthenticationException) {
+                        // biometric prompt dismissed — keep the dialog open
+                    } catch (_: Exception) {
+                        Toast.makeText(context, R.string.settings_protection_error, Toast.LENGTH_LONG).show()
+                    } finally {
+                        working = false
+                    }
+                }
+            }) {
+                if (working) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Text(stringResource(R.string.settings_protection_confirm_remove))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onDone(false) }, enabled = !working) { Text(stringResource(android.R.string.cancel)) }
+        },
+    )
+}
+
+/** Add a password to a biometric-only identity (→ two-factor). */
+@Composable
+private fun AddPasswordDialog(twoPrompts: Boolean, onDone: (changed: Boolean) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var new by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var working by remember { mutableStateOf(false) }
+    val tooShort = new.isNotEmpty() && new.length < MIN_ACQUISITION_PASSWORD_LENGTH
+    val mismatch = confirmation.isNotEmpty() && confirmation != new
+    val valid = new.length >= MIN_ACQUISITION_PASSWORD_LENGTH && confirmation == new
+
+    AlertDialog(
+        onDismissRequest = { if (!working) onDone(false) },
+        title = { Text(stringResource(R.string.settings_add_password)) },
+        text = {
+            Column {
+                PasswordField(new, { new = it }, stringResource(R.string.settings_change_password_new),
+                    if (tooShort) stringResource(R.string.set_password_too_short, MIN_ACQUISITION_PASSWORD_LENGTH) else null, !working)
+                PasswordField(confirmation, { confirmation = it }, stringResource(R.string.set_password_confirm_label),
+                    if (mismatch) stringResource(R.string.set_password_mismatch) else null, !working)
+                if (twoPrompts) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(stringResource(R.string.settings_change_password_two_prompts),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !working && valid, onClick = {
+                working = true
+                scope.launch {
+                    try {
+                        if (AcquisitionIdentityVault.addPassword(context, new.toByteArray())) {
+                            Toast.makeText(context, R.string.settings_protection_updated, Toast.LENGTH_SHORT).show()
+                            onDone(true)
+                        }
+                    } catch (_: AcquisitionIdentityVault.UserAuthenticationException) {
+                        // biometric prompt dismissed — keep the dialog open
+                    } catch (_: Exception) {
+                        Toast.makeText(context, R.string.settings_protection_error, Toast.LENGTH_LONG).show()
+                    } finally {
+                        working = false
+                    }
+                }
+            }) {
+                if (working) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Text(stringResource(R.string.settings_add_password))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onDone(false) }, enabled = !working) { Text(stringResource(android.R.string.cancel)) }
         },
     )
 }

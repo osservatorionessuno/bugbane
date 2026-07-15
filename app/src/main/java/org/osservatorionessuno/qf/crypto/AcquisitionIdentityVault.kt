@@ -68,16 +68,22 @@ object AcquisitionIdentityVault {
     private const val TIER_TEE_AUTH: Byte = 2
     private const val TIER_PASSPHRASE: Byte = 3
     private const val TIER_STRONGBOX_PASSPHRASE: Byte = 4
+    private const val TIER_TEE_PASSPHRASE: Byte = 5
 
     enum class Tier(internal val tag: Byte) {
         STRONGBOX(TIER_STRONGBOX),
         TEE_AUTH(TIER_TEE_AUTH),
         PASSPHRASE(TIER_PASSPHRASE),
         STRONGBOX_PASSPHRASE(TIER_STRONGBOX_PASSPHRASE),
+        TEE_PASSPHRASE(TIER_TEE_PASSPHRASE),
         ;
 
-        val usesBiometric: Boolean get() = this == STRONGBOX || this == TEE_AUTH || this == STRONGBOX_PASSPHRASE
-        val usesPassphrase: Boolean get() = this == PASSPHRASE || this == STRONGBOX_PASSPHRASE
+        /** Has an auth-gated keystore layer (fingerprint/credential) — every tier but pure passphrase. */
+        val usesBiometric: Boolean get() = this != PASSPHRASE
+
+        /** Has an Argon2id password layer. */
+        val usesPassphrase: Boolean get() =
+            this == PASSPHRASE || this == STRONGBOX_PASSPHRASE || this == TEE_PASSPHRASE
     }
 
     /** Thrown when the user cancels or fails the biometric/credential prompt. */
@@ -99,7 +105,7 @@ object AcquisitionIdentityVault {
     }
 
     fun passwordPromptKind(context: Context): PasswordPromptKind = when (tier(context)) {
-        Tier.PASSPHRASE, Tier.STRONGBOX_PASSPHRASE -> PasswordPromptKind.NONE
+        Tier.PASSPHRASE, Tier.STRONGBOX_PASSPHRASE, Tier.TEE_PASSPHRASE -> PasswordPromptKind.NONE
         Tier.STRONGBOX -> PasswordPromptKind.SE_OPTIONAL
         Tier.TEE_AUTH -> PasswordPromptKind.TEE_ENCOURAGED
         null -> if (hasPendingEphemeral()) PasswordPromptKind.MANDATORY else PasswordPromptKind.NONE
@@ -306,24 +312,20 @@ object AcquisitionIdentityVault {
     }
 
     /**
-     * Migrate an existing [Tier.TEE_AUTH] identity to [Tier.PASSPHRASE]: unlock once
-     * (biometric), re-seal under the passphrase, and drop the auth-gated key — so the
-     * fingerprint is no longer used. Argon2id runs on [Dispatchers.Default].
+     * Add a password to a biometric-only identity, making it two-factor: the
+     * fingerprint/credential gate **and** the password are then both required
+     * ([Tier.STRONGBOX]→[Tier.STRONGBOX_PASSPHRASE], [Tier.TEE_AUTH]→[Tier.TEE_PASSPHRASE]).
+     * Two biometric prompts (unwrap the identity, then re-wrap). Argon2id on
+     * [Dispatchers.Default]. Returns false if the current tier can't take a password.
      */
-    suspend fun migrateTeeAuthToPassphrase(activity: Context, passphrase: ByteArray) {
-        val secret = openOuter(activity, Tier.TEE_AUTH)
-        sealAndStore(activity, Tier.PASSPHRASE, secret, passphrase)
-        AndroidKeystoreKeyVault.deleteKey(TEE_AUTH_KEY_ALIAS)
-    }
-
-    /**
-     * Add a passphrase to an existing [Tier.STRONGBOX] identity → [Tier.STRONGBOX_PASSPHRASE]:
-     * Argon2id seal inside, re-wrapped under the StrongBox key. Two biometric prompts
-     * (unwrap, then re-wrap — per-operation auth). Argon2id on [Dispatchers.Default].
-     */
-    suspend fun addStrongBoxPassphrase(activity: Context, passphrase: ByteArray) {
-        val secret = openOuter(activity, Tier.STRONGBOX)
-        sealAndStore(activity, Tier.STRONGBOX_PASSPHRASE, secret, passphrase)
+    suspend fun addPassword(activity: Context, passphrase: ByteArray): Boolean {
+        val from = tier(activity) ?: return false
+        val target = when (from) {
+            Tier.STRONGBOX -> Tier.STRONGBOX_PASSPHRASE
+            Tier.TEE_AUTH -> Tier.TEE_PASSPHRASE
+            else -> return false // already has a password, or is password-only
+        }
+        return reseal(activity, from, target, oldPassphrase = null, newPassphrase = passphrase)
     }
 
     // --------------------------------------------------------------- unlock
@@ -338,12 +340,16 @@ object AcquisitionIdentityVault {
     }
 
     /**
-     * First half of a [Tier.STRONGBOX_PASSPHRASE] unlock: one prompt unwraps the
-     * outer StrongBox layer and returns the Argon2id-sealed inner blob. Feed it to
-     * [openPassphraseInner] (retryable without further prompts); zero it when done.
+     * First half of a stacked two-factor unlock ([Tier.STRONGBOX_PASSPHRASE] /
+     * [Tier.TEE_PASSPHRASE]): one prompt unwraps the outer auth-gated layer and returns
+     * the Argon2id-sealed inner blob. Feed it to [openPassphraseInner] (retryable
+     * without further prompts); zero it when done.
      */
-    suspend fun unlockStrongBoxOuter(activity: Context): ByteArray =
-        openOuter(activity, Tier.STRONGBOX_PASSPHRASE)
+    suspend fun unlockStackedOuter(activity: Context): ByteArray {
+        val tier = tier(activity)
+        check(tier != null && tier.usesBiometric && tier.usesPassphrase) { "not a two-factor tier" }
+        return openOuter(activity, tier)
+    }
 
     /** Open an Argon2id inner blob with the passphrase. Null on wrong passphrase. Runs on [Dispatchers.Default]. */
     suspend fun openPassphraseInner(inner: ByteArray, passphrase: ByteArray): X25519Identity? =
@@ -397,31 +403,43 @@ object AcquisitionIdentityVault {
     fun isRecoveryPending(context: Context): Boolean =
         !isInitialized(context) && prefs(context).getBoolean(KEY_RECOVERY_PENDING, false)
 
-    // ------------------------------------------------------ change passphrase
+    // ------------------------------------------------- manage protection factors
 
-    /** Change the passphrase on [Tier.PASSPHRASE]. False if [old] is wrong. Argon2id on [Dispatchers.Default]. */
-    suspend fun changePassphrase(context: Context, old: ByteArray, new: ByteArray): Boolean {
-        val inner = openOuter(context, Tier.PASSPHRASE)
-        val secret = withContext(Dispatchers.Default) { PassphraseKeyWrap.open(inner, old) } ?: return false
-        // Same identity, so re-sealing rewrites the whole file with an unchanged pubkey.
-        sealAndStore(context, Tier.PASSPHRASE, secret, new)
-        return true
+    /**
+     * Change the password on a passphrase tier ([Tier.PASSPHRASE], [Tier.STRONGBOX_PASSPHRASE],
+     * [Tier.TEE_PASSPHRASE]). False if [old] is wrong. On a two-factor tier this prompts
+     * twice (unwrap, then re-wrap). Argon2id on [Dispatchers.Default].
+     */
+    suspend fun changePassword(activity: Context, old: ByteArray, new: ByteArray): Boolean {
+        val tier = tier(activity)?.takeIf { it.usesPassphrase } ?: return false
+        return reseal(activity, tier, tier, old, new)
     }
 
     /**
-     * Change the passphrase on [Tier.STRONGBOX_PASSPHRASE]. False if [old] is wrong.
-     * Two biometric prompts (unwrap, then re-wrap). Argon2id on [Dispatchers.Default].
+     * Remove the password from a two-factor tier, keeping the fingerprint gate
+     * ([Tier.STRONGBOX_PASSPHRASE]→[Tier.STRONGBOX], [Tier.TEE_PASSPHRASE]→[Tier.TEE_AUTH]).
+     * False if [old] is wrong.
      */
-    suspend fun changeStrongBoxPassphrase(activity: Context, old: ByteArray, new: ByteArray): Boolean {
-        val inner = openOuter(activity, Tier.STRONGBOX_PASSPHRASE)
-        val secret = withContext(Dispatchers.Default) { PassphraseKeyWrap.open(inner, old) }
-            ?: run { inner.fill(0); return false }
-        try {
-            sealAndStore(activity, Tier.STRONGBOX_PASSPHRASE, secret, new)
-        } finally {
-            inner.fill(0)
+    suspend fun removePassword(activity: Context, old: ByteArray): Boolean {
+        val from = tier(activity) ?: return false
+        val target = when (from) {
+            Tier.STRONGBOX_PASSPHRASE -> Tier.STRONGBOX
+            Tier.TEE_PASSPHRASE -> Tier.TEE_AUTH
+            else -> return false
         }
-        return true
+        return reseal(activity, from, target, old, newPassphrase = null)
+    }
+
+    /**
+     * Remove the fingerprint requirement from a two-factor tier, keeping the password
+     * ([Tier.STRONGBOX_PASSPHRASE]/[Tier.TEE_PASSPHRASE]→[Tier.PASSPHRASE]). Unlike the
+     * two-factor tiers, the result **survives a screen-lock removal** (no auth-gated
+     * key), so this is the deliberate downgrade to run *before* removing a lock. Keeps
+     * the same password. False if [old] is wrong.
+     */
+    suspend fun removeFingerprint(activity: Context, old: ByteArray): Boolean {
+        val from = tier(activity)?.takeIf { it.usesBiometric && it.usesPassphrase } ?: return false
+        return reseal(activity, from, Tier.PASSPHRASE, old, newPassphrase = old)
     }
 
     // ------------------------------------------------------------- internals
@@ -448,8 +466,50 @@ object AcquisitionIdentityVault {
     /** Keystore vault backing [tier]'s outer wrap layer. */
     private fun keystoreVaultFor(tier: Tier): AndroidKeystoreKeyVault = when (tier) {
         Tier.STRONGBOX, Tier.STRONGBOX_PASSPHRASE -> strongBoxVault()
-        Tier.TEE_AUTH -> teeAuthVault()
+        Tier.TEE_AUTH, Tier.TEE_PASSPHRASE -> teeAuthVault()
         Tier.PASSPHRASE -> teeBindVault()
+    }
+
+    /**
+     * Move the identity from [from] to [target] without changing the keypair (the
+     * public key — and thus every acquisition's readability — is preserved): unlock the
+     * secret from [from] (needs [oldPassphrase] on a passphrase tier), re-seal it into
+     * [target] (needs [newPassphrase] on a passphrase target), and drop any auth-gated
+     * keystore key the target no longer uses. Backs add/remove/change of factors. False
+     * if [oldPassphrase] is wrong.
+     */
+    private suspend fun reseal(
+        activity: Context,
+        from: Tier,
+        target: Tier,
+        oldPassphrase: ByteArray?,
+        newPassphrase: ByteArray?,
+    ): Boolean {
+        val secret = unlockSecret(activity, from, oldPassphrase) ?: return false
+        sealAndStore(activity, target, secret, newPassphrase) // takes ownership of secret
+        pruneKeystore(target)
+        return true
+    }
+
+    /** Recover the raw X25519 secret for [tier]; null on a wrong [passphrase]. Prompts iff auth-gated. */
+    private suspend fun unlockSecret(activity: Context, tier: Tier, passphrase: ByteArray?): ByteArray? {
+        val outer = openOuter(activity, tier)
+        if (!tier.usesPassphrase) return outer
+        val secret = withContext(Dispatchers.Default) { PassphraseKeyWrap.open(outer, passphrase!!) }
+        outer.fill(0)
+        return secret
+    }
+
+    /** Delete the auth-gated keystore key(s) the now-current [tier] doesn't use (after dropping a factor). */
+    private fun pruneKeystore(tier: Tier) {
+        val keep = when (tier) {
+            Tier.STRONGBOX, Tier.STRONGBOX_PASSPHRASE -> STRONGBOX_KEY_ALIAS
+            Tier.TEE_AUTH, Tier.TEE_PASSPHRASE -> TEE_AUTH_KEY_ALIAS
+            Tier.PASSPHRASE -> null // uses the (non-auth) device-bind key, kept
+        }
+        for (alias in listOf(STRONGBOX_KEY_ALIAS, TEE_AUTH_KEY_ALIAS)) {
+            if (alias != keep) AndroidKeystoreKeyVault.deleteKey(alias)
+        }
     }
 
     /**
