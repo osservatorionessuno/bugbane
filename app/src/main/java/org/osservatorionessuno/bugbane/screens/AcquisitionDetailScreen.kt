@@ -719,30 +719,29 @@ private fun loadScans(acquisitionDir: File): List<ScanSummary> {
                 hashes.sort()
                 Utils.sha256(hashes.joinToString(""))
             }
-            val resultsArray = obj.optJSONArray("results")
-            val level = if (resultsArray != null) {
-                var highestLevel = AlertLevel.LOG
-                for (i in 0 until resultsArray.length()) {
-                    val resultObj = resultsArray.getJSONObject(i)
-                    val levelStr = resultObj.optString("level", "").uppercase()
-                    try {
-                        val level = AlertLevel.valueOf(levelStr)
-                        if (level.ordinal > highestLevel.ordinal) {
-                            highestLevel = level
-                        }
-                    } catch (_: Exception) {
-                        // Ignore unknown levels
-                    }
-                }
-                highestLevel
-            } else {
-                AlertLevel.LOG
-            }
+            val level = highestLevelFromScan(obj)
             ScanSummary(file, started, hash, level)
         } catch (_: Exception) {
             null
         }
     }?.sortedByDescending { it.started } ?: emptyList()
+}
+
+private fun highestLevelFromScan(obj: JSONObject): AlertLevel {
+    val arr = obj.optJSONArray("groupedResults") ?: return AlertLevel.LOG
+    var highestLevel = AlertLevel.LOG
+    for (i in 0 until arr.length()) {
+        val levelStr = arr.getJSONObject(i).optString("level", "").uppercase()
+        try {
+            val level = AlertLevel.valueOf(levelStr)
+            if (level.ordinal > highestLevel.ordinal) {
+                highestLevel = level
+            }
+        } catch (_: Exception) {
+            // Ignore unknown levels
+        }
+    }
+    return highestLevel
 }
 
 enum class ProcessingState {
