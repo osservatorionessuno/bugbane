@@ -41,6 +41,8 @@ import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
 import org.osservatorionessuno.qf.crypto.SessionKeyCache
 import org.osservatorionessuno.qf.crypto.age.DestroyableAgeIdentity
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.components.AcquisitionIdentityLostDialog
+import org.osservatorionessuno.bugbane.utils.AcquisitionRecovery
 import org.osservatorionessuno.bugbane.share.AcquisitionShareProvider
 import org.osservatorionessuno.bugbane.share.AcquisitionExport
 import org.osservatorionessuno.bugbane.share.EXPORT_FILE_NAME
@@ -658,23 +660,13 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     }
 
     // Screen lock removed → the auth-gated key is permanently invalidated and the
-    // acquisitions can't be decrypted. Explain it (deletion is acceptable) and let
-    // the user reset protection so the app is usable again. Non-dismissible: the
-    // identity is dead, so there's nothing to go back to.
+    // acquisitions can't be decrypted. Explain it, then reset protection: discard
+    // the dead identity, drop its unreadable acquisitions, and route the user to
+    // re-establish protection. Non-dismissible: the identity is dead, so there's
+    // nothing to go back to.
     if (identityLost) {
-        AlertDialog(
-            onDismissRequest = { },
-            title = { Text(stringResource(R.string.acquisition_identity_lost_title)) },
-            text = { Text(stringResource(R.string.acquisition_identity_lost_message)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    AcquisitionIdentityVault.discardIdentity(context)
-                    identityLost = false
-                    (context as? android.app.Activity)?.finish()
-                }) {
-                    Text(stringResource(R.string.acquisition_identity_lost_reset))
-                }
-            },
+        AcquisitionIdentityLostDialog(
+            onReset = { AcquisitionRecovery.begin(context) },
         )
     }
 
