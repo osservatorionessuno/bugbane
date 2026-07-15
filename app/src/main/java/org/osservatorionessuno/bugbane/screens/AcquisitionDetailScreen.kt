@@ -108,24 +108,27 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 unlocking = false
             }
         }
-        when (AcquisitionIdentityVault.tier(context)) {
-            AcquisitionIdentityVault.Tier.STRONGBOX,
-            AcquisitionIdentityVault.Tier.TEE_AUTH,
-            -> launchBiometric { onUnlocked(AcquisitionIdentityVault.unlockWithBiometric(context)) }
+        val tier = AcquisitionIdentityVault.tier(context)
+        when {
+            tier == AcquisitionIdentityVault.Tier.STRONGBOX ||
+                tier == AcquisitionIdentityVault.Tier.TEE_AUTH ->
+                launchBiometric { onUnlocked(AcquisitionIdentityVault.unlockWithBiometric(context)) }
 
-            AcquisitionIdentityVault.Tier.PASSPHRASE -> {
-                // The password dialog now guards re-entry; release the async guard.
-                pendingUnlock = PendingUnlock(null, onUnlocked)
-                unlocking = false
+            tier != null && tier.usesPassphrase -> launchBiometric {
+                // Unwrap the outer layer (a fingerprint prompt on a two-factor tier; silent
+                // on password-only). If the session already has the derived key, finish
+                // without a password prompt; otherwise raise the dialog with the inner blob.
+                val inner = AcquisitionIdentityVault.unlockPassphraseOuter(context)
+                val cached = AcquisitionIdentityVault.tryCachedPassphrase(inner)
+                if (cached != null) {
+                    inner.fill(0)
+                    onUnlocked(cached)
+                } else {
+                    pendingUnlock = PendingUnlock(inner, stacked = tier.usesBiometric, onUnlocked)
+                }
             }
 
-            AcquisitionIdentityVault.Tier.STRONGBOX_PASSPHRASE,
-            AcquisitionIdentityVault.Tier.TEE_PASSPHRASE,
-            -> launchBiometric {
-                pendingUnlock = PendingUnlock(AcquisitionIdentityVault.unlockStackedOuter(context), onUnlocked)
-            }
-
-            null -> {
+            else -> {
                 Toast.makeText(context, R.string.acquisition_unlock_failed, Toast.LENGTH_LONG).show()
                 unlocking = false
             }
@@ -594,8 +597,9 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
         fun attempt() {
             checking = true
             scope.launch {
-                val identity = pending.inner?.let { AcquisitionIdentityVault.openPassphraseInner(it, password.toByteArray()) }
-                    ?: AcquisitionIdentityVault.unlockWithPassphrase(context, password.toByteArray())
+                val identity = AcquisitionIdentityVault.openPassphraseWithPassword(
+                    context, pending.inner, password.toByteArray(),
+                )
                 checking = false
                 if (identity == null) {
                     wrongPassword = true
@@ -612,9 +616,9 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             title = { Text(stringResource(R.string.acquisition_unlock_password_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // On the stacked tier the biometric prompt already ran; make it
+                    // On a two-factor tier the fingerprint prompt already ran; make it
                     // clear this second step is expected, not a repeat request.
-                    if (pending.inner != null) {
+                    if (pending.stacked) {
                         Text(
                             text = stringResource(R.string.acquisition_unlock_password_stacked_hint),
                             style = MaterialTheme.typography.bodyMedium,
@@ -949,10 +953,16 @@ enum class ProcessingState {
 }
 
 /**
- * A read action waiting on the acquisition passphrase. [inner] is the
- * already-unwrapped Argon2id blob on the stacked StrongBox tier (so password
- * retries need no further biometric prompt), null on the pure passphrase tier.
+ * A read action waiting on the acquisition password. [inner] is the already-unwrapped
+ * Argon2id blob (the outer layer was opened first — a fingerprint prompt on a
+ * two-factor tier, a silent device-bind unwrap on the password-only tier), so password
+ * retries need no further prompt. [stacked] is true when that outer step was a
+ * fingerprint (a two-factor tier), used only to tailor the dialog copy.
  */
-class PendingUnlock(val inner: ByteArray?, val onUnlocked: (DestroyableAgeIdentity) -> Unit) {
-    fun dispose() = inner?.fill(0)
+class PendingUnlock(
+    val inner: ByteArray,
+    val stacked: Boolean,
+    val onUnlocked: (DestroyableAgeIdentity) -> Unit,
+) {
+    fun dispose() = inner.fill(0)
 }

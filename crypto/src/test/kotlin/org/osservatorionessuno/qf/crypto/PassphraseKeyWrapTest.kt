@@ -20,6 +20,23 @@ class PassphraseKeyWrapTest {
     }
 
     @Test
+    fun `deriveKey then openWithKey equals open, and the key is reusable`() {
+        val secret = randomSecret()
+        val blob = PassphraseKeyWrap.seal(secret, "correct horse battery staple".toByteArray())
+        // Derive once (the slow step), then open the blob repeatedly with the cached key.
+        val key = PassphraseKeyWrap.deriveKey(blob, "correct horse battery staple".toByteArray())
+        assertArrayEquals(secret, PassphraseKeyWrap.openWithKey(blob, key))
+        assertArrayEquals(secret, PassphraseKeyWrap.openWithKey(blob, key))
+    }
+
+    @Test
+    fun `a key derived from the wrong passphrase does not open`() {
+        val blob = PassphraseKeyWrap.seal(randomSecret(), "right".toByteArray())
+        val wrongKey = PassphraseKeyWrap.deriveKey(blob, "wrong".toByteArray())
+        assertNull(PassphraseKeyWrap.openWithKey(blob, wrongKey))
+    }
+
+    @Test
     fun `wrong passphrase returns null`() {
         val blob = PassphraseKeyWrap.seal(randomSecret(), "right".toByteArray())
         assertNull(PassphraseKeyWrap.open(blob, "wrong".toByteArray()))

@@ -50,7 +50,16 @@ object PassphraseKeyWrap {
     }
 
     /** Open a blob produced by [seal]; returns null on a wrong passphrase (or tampered blob). */
-    fun open(blob: ByteArray, passphrase: ByteArray): ByteArray? {
+    fun open(blob: ByteArray, passphrase: ByteArray): ByteArray? =
+        openWithKey(blob, deriveKey(blob, passphrase))
+
+    /**
+     * Run Argon2id over [passphrase] with the parameters embedded in [blob], returning
+     * the 32-byte wrap key. This is the slow, memory-hard step — split out so a caller
+     * may cache the key (see the acquisition password cache) and re-open without
+     * re-deriving. The returned key alone does not open the blob without [openWithKey].
+     */
+    fun deriveKey(blob: ByteArray, passphrase: ByteArray): ByteArray {
         require(blob.size > HEADER_SIZE) { "passphrase wrap blob too short" }
         require(blob[0] == VERSION) { "unsupported passphrase wrap version ${blob[0]}" }
         val tCost = blob[1].toInt() and 0xFF
@@ -61,11 +70,14 @@ object PassphraseKeyWrap {
             "unsafe argon2 parameters (m=$memoryKiB KiB, t=$tCost, p=$parallelism)"
         }
         val salt = blob.copyOfRange(7, HEADER_SIZE)
-        val key = argon2id(passphrase, salt, memoryKiB, tCost, parallelism)
-        return runCatching {
+        return argon2id(passphrase, salt, memoryKiB, tCost, parallelism)
+    }
+
+    /** Open [blob] with a wrap key from [deriveKey]; null if the key is wrong or the blob was tampered. */
+    fun openWithKey(blob: ByteArray, key: ByteArray): ByteArray? =
+        runCatching {
             AgePrimitives.chachaOpen(key, ZERO_NONCE, blob, HEADER_SIZE, blob.size - HEADER_SIZE)
         }.getOrNull()
-    }
 
     internal fun argon2id(
         passphrase: ByteArray,

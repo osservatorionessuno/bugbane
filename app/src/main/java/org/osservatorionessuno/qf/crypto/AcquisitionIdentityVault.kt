@@ -340,24 +340,62 @@ object AcquisitionIdentityVault {
     }
 
     /**
-     * First half of a stacked two-factor unlock ([Tier.STRONGBOX_PASSPHRASE] /
-     * [Tier.TEE_PASSPHRASE]): one prompt unwraps the outer auth-gated layer and returns
-     * the Argon2id-sealed inner blob. Feed it to [openPassphraseInner] (retryable
-     * without further prompts); zero it when done.
+     * Unlock the outer auth-gated layer of a passphrase tier and return the Argon2id
+     * inner blob. Prompts for the fingerprint on a two-factor tier
+     * ([Tier.STRONGBOX_PASSPHRASE] / [Tier.TEE_PASSPHRASE]); on [Tier.PASSPHRASE] it's a
+     * silent device-bind unwrap. Feed the result to [tryCachedPassphrase] then, on a
+     * miss, [openPassphraseWithPassword]; zero it when done.
      */
-    suspend fun unlockStackedOuter(activity: Context): ByteArray {
+    suspend fun unlockPassphraseOuter(activity: Context): ByteArray {
         val tier = tier(activity)
-        check(tier != null && tier.usesBiometric && tier.usesPassphrase) { "not a two-factor tier" }
+        check(tier != null && tier.usesPassphrase) { "not a passphrase tier" }
         return openOuter(activity, tier)
     }
 
-    /** Open an Argon2id inner blob with the passphrase. Null on wrong passphrase. Runs on [Dispatchers.Default]. */
-    suspend fun openPassphraseInner(inner: ByteArray, passphrase: ByteArray): X25519Identity? =
-        withContext(Dispatchers.Default) { PassphraseKeyWrap.open(inner, passphrase) }?.let { X25519Identity(it) }
+    /**
+     * Open the [inner] blob with the typed [passphrase] and cache the Argon2id-derived
+     * key for the session, so later reads skip re-entry and re-derivation. Null on a
+     * wrong passphrase. Argon2id on [Dispatchers.Default]. Cache policy is set by tier:
+     * process-lifetime for two-factor (the fingerprint still gates every read), else a
+     * bounded, screen-off-evicted window (see [PassphraseKeyCache]).
+     */
+    suspend fun openPassphraseWithPassword(context: Context, inner: ByteArray, passphrase: ByteArray): X25519Identity? {
+        val key = withContext(Dispatchers.Default) { PassphraseKeyWrap.deriveKey(inner, passphrase) }
+        val secret = PassphraseKeyWrap.openWithKey(inner, key)
+        if (secret == null) {
+            key.fill(0)
+            return null
+        }
+        cachePassphraseKey(context, key) // copies then zeroes key
+        return X25519Identity(secret)
+    }
 
-    /** Unlock a [Tier.PASSPHRASE] identity with the passphrase. Null on wrong passphrase. Runs on [Dispatchers.Default]. */
-    suspend fun unlockWithPassphrase(context: Context, passphrase: ByteArray): X25519Identity? =
-        openPassphraseInner(openOuter(context, Tier.PASSPHRASE), passphrase)
+    /**
+     * Open the [inner] blob with the session-cached derived key, if any — no prompt, no
+     * Argon2. Null when nothing is cached or the cached key no longer fits (then evicted).
+     */
+    fun tryCachedPassphrase(inner: ByteArray): X25519Identity? {
+        val key = PassphraseKeyCache.get() ?: return null
+        val secret = PassphraseKeyWrap.openWithKey(inner, key)
+        key.fill(0)
+        if (secret == null) {
+            PassphraseKeyCache.evict()
+            return null
+        }
+        return X25519Identity(secret)
+    }
+
+    private fun cachePassphraseKey(context: Context, key: ByteArray) {
+        if (tier(context)?.usesBiometric == true) {
+            // Two-factor: a fresh fingerprint gates every read, so the cached key is
+            // inert alone — keep it for the session, no screen-off eviction.
+            PassphraseKeyCache.put(context, key, ttlMs = null, evictScreenOff = false)
+        } else {
+            // Password-only: the password is the sole factor — bound it tightly.
+            PassphraseKeyCache.put(context, key, ttlMs = PassphraseKeyCache.DEFAULT_TTL_MS, evictScreenOff = true)
+        }
+        key.fill(0) // put copied it
+    }
 
     // --------------------------------------------- screen-lock invalidation
 
@@ -385,6 +423,7 @@ object AcquisitionIdentityVault {
         AndroidKeystoreKeyVault.deleteKey(TEE_BIND_KEY_ALIAS)
         prefs(context).edit().remove(KEY_UNSEALED).remove(KEY_PROMPT_DISMISSED).apply()
         pendingSecret = null
+        PassphraseKeyCache.evict()
     }
 
     /**
@@ -546,8 +585,8 @@ object AcquisitionIdentityVault {
 
     /**
      * Open [tier]'s outer keystore layer and return what's beneath: the raw secret for
-     * a biometric-only tier, or the Argon2id blob for a passphrase tier (feed that to
-     * [openPassphraseInner]). Prompts once iff the tier is auth-gated.
+     * a biometric-only tier, or the Argon2id blob for a passphrase tier (opened with the
+     * password). Prompts once iff the tier is auth-gated.
      */
     private suspend fun openOuter(activity: Context, tier: Tier): ByteArray {
         val blob = sealedBlob(activity, tier.tag)
@@ -580,6 +619,8 @@ object AcquisitionIdentityVault {
         writeAtomically(identityFile(context), publicKey + sealedBlob)
         // An identity now exists, so any pending recovery is resolved.
         prefs(context).edit().remove(KEY_RECOVERY_PENDING).apply()
+        // A re-seal may have changed the password; the cached derived key is now stale.
+        PassphraseKeyCache.evict()
     }
 
     /** Whole identity file if present and well-formed (public key + at least a tier byte). */
