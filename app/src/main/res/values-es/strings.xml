@@ -116,14 +116,10 @@
     <string name="mvt_packages_root_package_message">Encontrado en paquete raíz instalado: %1$s</string>
     <string name="mvt_getprop_security_patch_title">Actualización de seguridad</string>
     <string name="mvt_getprop_security_patch_message">Este teléfono no ha recibido actualizaciones de seguridad desde hace más de seis meses (última actualización: %1$s).</string>
-    <string name="mvt_mounts_root_title">Partición del sistema montada como solo‐lectura</string>
-    <string name="mvt_mounts_root_message">La partición /system está montada como lectura‐escritura (rw)</string>
     <string name="mvt_mounts_system_title">Partición del sistema montada como lectura‐escritura</string>
     <string name="mvt_mounts_system_message">Partición del sistema %1$s está montada como lectura‐escritura (rw). Esto puede indicar modificaciones del sistema.</string>
     <string name="mvt_mounts_suspicious_title">Opciones de montaje sospechosas</string>
     <string name="mvt_mounts_suspicious_message">Opciones de montaje sospechosas encontradas para %1$s: %2$s</string>
-    <string name="mvt_mounts_data_title">Partición de datos</string>
-    <string name="mvt_mounts_data_message">Partición de datos %1$s montada como %2$s con las opciones: %3$s</string>
     <string name="mvt_dangerous_settings_title">Ajustes peligrosos</string>
     <string name="mvt_dangerous_settings_message">%1$s está puesto a %2$s</string>
     <string name="mvt_tombstone_crashes_uid_title">Cuelgue potencialmente sospechoso</string>
