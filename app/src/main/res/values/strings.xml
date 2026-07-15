@@ -2,6 +2,7 @@
     <string name="app_name">Bugbane</string>
 
     <!-- Navigation strings -->
+    <string name="back">Back</string>
     <string name="main_nav_scan">Acquire</string>
     <string name="main_nav_acquisitions">Acquisitions</string>
     <string name="main_nav_settings">Settings</string>
@@ -155,6 +156,62 @@
     <string name="acquisition_share_message">Acquisition archive. Passphrase: %1$s</string>
     <string name="acquisition_passphrase_copy">Copy to clipboard</string>
     <string name="acquisition_passphrase_close">Close</string>
+
+    <!-- Acquisition protection: system prompts (biometric / credential) -->
+    <string name="acquisition_protect_prompt_title">Protect acquisitions</string>
+    <string name="acquisition_protect_prompt_subtitle">Confirm your screen lock to protect acquisition data on this device</string>
+    <string name="acquisition_unlock_prompt_title">Unlock acquisitions</string>
+    <string name="acquisition_unlock_prompt_subtitle">Confirm your screen lock to read this acquisition</string>
+
+    <!-- Acquisition protection: password unlock dialog -->
+    <string name="acquisition_unlock_password_title">Enter acquisition password</string>
+    <string name="acquisition_password_label">Acquisition password</string>
+    <string name="acquisition_unlock_password_wrong">Incorrect password</string>
+    <string name="acquisition_unlock_password_checking">Checking password…</string>
+    <string name="acquisition_unlock_password_stacked_hint">Screen lock confirmed. Now enter the acquisition password to finish unlocking.</string>
+    <string name="acquisition_unlock_button">Unlock</string>
+    <string name="acquisition_unlock_failed">Couldn\'t unlock acquisition storage</string>
+
+    <!-- Onboarding: acquisition protection step (fingerprint) -->
+    <string name="slideshow_protection_title">Protect your acquisitions</string>
+    <string name="slideshow_protection_biometric_description">Acquisitions are encrypted on this device. Locking the encryption key to your fingerprint or screen lock means that even a forensic tool with full access to this phone can\'t read them without you.\n\nChanging your PIN or password later is fine, but if you ever remove your screen lock the key is erased and acquisitions can\'t be recovered. To keep them across a lock removal, set an acquisition password in Settings.</string>
+    <string name="slideshow_protection_biometric_button">Protect with screen lock</string>
+    <string name="slideshow_protection_error">Couldn\'t set up acquisition protection. Please try again.</string>
+
+    <!-- Post-acquisition: set a password (tutorial-style screen) -->
+    <string name="set_password_title">Set an acquisition password</string>
+    <string name="set_password_mandatory_description">This device has no screen lock, so acquisitions can only be protected by a password you choose. You\'ll need it to open or export acquisitions later — it can\'t be recovered. If you leave without setting one, this acquisition is discarded.</string>
+    <string name="set_password_tee_description">Add a password for stronger protection. On this device a password keeps acquisitions safe even against a sophisticated forensic tool — beyond what the fingerprint alone can do.</string>
+    <string name="set_password_se_description">Optionally add a password on top of your fingerprint. It\'s asked together with your fingerprint when reading acquisitions, and protects them even against an attacker who fully compromises this phone or learns your PIN. It also keeps your acquisitions readable if you ever remove your screen lock.</string>
+
+    <!-- Screen lock removed: the biometric-gated key was permanently invalidated -->
+    <string name="acquisition_identity_lost_title">Acquisitions can no longer be unlocked</string>
+    <string name="acquisition_identity_lost_message">Your screen lock was removed, so the key that protected your acquisitions was erased by Android and they can no longer be decrypted. (Changing your PIN or password is fine — only removing the lock erases the key.)\n\nReset protection to keep using Bugbane. The old acquisitions are unreadable and can be deleted from the Acquisitions list.</string>
+    <string name="acquisition_identity_lost_reset">Reset protection</string>
+    <string name="set_password_field_label">Password</string>
+    <string name="set_password_confirm_label">Confirm password</string>
+    <string name="set_password_too_short">Use at least %1$d characters</string>
+    <string name="set_password_mismatch">Passwords don\'t match</string>
+    <string name="set_password_set_button">Set password</string>
+    <string name="set_password_skip_button">Not now</string>
+    <string name="set_password_skip_link">Continue without a password</string>
+    <string name="set_password_se_extra_prompts">You\'ll confirm your screen lock to save the password.</string>
+    <string name="set_password_error">Couldn\'t set the password. Please try again.</string>
+    <string name="set_password_skip_tee_title">Continue without a password?</string>
+    <string name="set_password_skip_tee_message">Without a password, acquisitions are protected only by your screen lock. A forensic tool that exploits this phone, or anyone who learns your PIN, may be able to read them. Make sure your screen lock is a strong PIN or password — at least 10 characters — and prefer letters and numbers over a short numeric PIN.</string>
+    <string name="set_password_skip_tee_confirm">Continue anyway</string>
+    <string name="set_password_skip_tee_cancel">Set a password</string>
+
+    <!-- Settings: change acquisition password -->
+    <string name="settings_change_password">Acquisition password</string>
+    <string name="settings_change_password_desc">Change the password that protects your acquisitions. Existing acquisitions stay readable; only the protection changes.</string>
+    <string name="settings_change_password_button">Change password</string>
+    <string name="settings_change_password_current">Current password</string>
+    <string name="settings_change_password_new">New password</string>
+    <string name="settings_change_password_confirm">Change</string>
+    <string name="settings_change_password_two_prompts">You\'ll confirm your screen lock twice.</string>
+    <string name="settings_change_password_success">Acquisition password changed</string>
+    <string name="settings_change_password_error">Couldn\'t change the password</string>
 
     <!-- Scan details strings -->
     <string name="analysis_details_title">Analysis Details</string>

@@ -30,6 +30,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import kotlinx.coroutines.flow.collectLatest
+import org.osservatorionessuno.bugbane.components.AcquisitionProtectionPage
 import org.osservatorionessuno.bugbane.components.AdbVulnerabilityWarningPage
 import org.osservatorionessuno.bugbane.components.BetaWarningPage
 import org.osservatorionessuno.bugbane.components.SlideshowPage
@@ -214,6 +215,11 @@ fun SlideshowScreen(
                     )
                     AppState.NeedBetaWarning -> BetaWarningPage(
                         onAcknowledge = { viewModel.onChangeStateRequest(state.value) }
+                    )
+                    AppState.NeedAcquisitionProtection -> AcquisitionProtectionPage(
+                        // The identity files are the source of truth; re-check so the
+                        // state machine advances once protection is in place.
+                        onProtected = { viewModel.appManager.checkState() }
                     )
                     else -> SlideshowPage(
                         state = state.value,

@@ -1,7 +1,9 @@
 package org.osservatorionessuno.bugbane.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
@@ -10,15 +12,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import android.content.Intent
+import android.widget.Toast
 import org.osservatorionessuno.bugbane.BuildConfig
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.components.MIN_ACQUISITION_PASSWORD_LENGTH
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.bugbane.update.IndicatorStore
+import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -93,6 +101,15 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Only the passphrase tiers have a password to change.
+        val passwordTier = remember {
+            AcquisitionIdentityVault.tier(context)?.takeIf { it.usesPassphrase }
+        }
+        if (passwordTier != null) {
+            ChangeAcquisitionPasswordCard(passwordTier)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -100,7 +117,7 @@ fun SettingsScreen() {
             Column(
                 modifier = Modifier.padding(20.dp)
             ) {
-                
+
                 // Reset Slideshow Button
                 Button(
                     onClick = {
@@ -180,4 +197,134 @@ fun SettingsScreen() {
             }
         }
     }
+}
+
+/**
+ * Change the acquisition password. Only re-wraps the identity — acquisitions are
+ * encrypted to the identity, not the password, so nothing is re-encrypted. On the
+ * stacked StrongBox tier this shows two biometric prompts (unwrap, then re-wrap).
+ */
+@Composable
+private fun ChangeAcquisitionPasswordCard(tier: AcquisitionIdentityVault.Tier) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var showDialog by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Button(
+                onClick = { showDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_change_password_button),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_change_password_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+        }
+    }
+
+    if (!showDialog) return
+
+    var current by remember { mutableStateOf("") }
+    var new by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var wrongCurrent by remember { mutableStateOf(false) }
+    var working by remember { mutableStateOf(false) }
+
+    val tooShort = new.isNotEmpty() && new.length < MIN_ACQUISITION_PASSWORD_LENGTH
+    val mismatch = confirmation.isNotEmpty() && confirmation != new
+    val valid = current.isNotEmpty() && new.length >= MIN_ACQUISITION_PASSWORD_LENGTH && confirmation == new
+
+    fun change() {
+        working = true
+        scope.launch {
+            try {
+                val changed = when (tier) {
+                    AcquisitionIdentityVault.Tier.PASSPHRASE ->
+                        AcquisitionIdentityVault.changePassphrase(context, current.toByteArray(), new.toByteArray())
+                    AcquisitionIdentityVault.Tier.STRONGBOX_PASSPHRASE ->
+                        AcquisitionIdentityVault.changeStrongBoxPassphrase(context, current.toByteArray(), new.toByteArray())
+                    else -> false
+                }
+                if (changed) {
+                    showDialog = false
+                    Toast.makeText(context, R.string.settings_change_password_success, Toast.LENGTH_SHORT).show()
+                } else {
+                    wrongCurrent = true
+                }
+            } catch (_: AcquisitionIdentityVault.UserAuthenticationException) {
+                // biometric prompt dismissed — keep the dialog open, nothing changed
+            } catch (_: Exception) {
+                Toast.makeText(context, R.string.settings_change_password_error, Toast.LENGTH_LONG).show()
+            } finally {
+                working = false
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!working) showDialog = false },
+        title = { Text(stringResource(R.string.settings_change_password)) },
+        text = {
+            Column {
+                PasswordField(current, { current = it; wrongCurrent = false }, stringResource(R.string.settings_change_password_current),
+                    if (wrongCurrent) stringResource(R.string.acquisition_unlock_password_wrong) else null, !working)
+                PasswordField(new, { new = it }, stringResource(R.string.settings_change_password_new),
+                    if (tooShort) stringResource(R.string.set_password_too_short, MIN_ACQUISITION_PASSWORD_LENGTH) else null, !working)
+                PasswordField(confirmation, { confirmation = it }, stringResource(R.string.set_password_confirm_label),
+                    if (mismatch) stringResource(R.string.set_password_mismatch) else null, !working)
+                if (tier == AcquisitionIdentityVault.Tier.STRONGBOX_PASSPHRASE) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.settings_change_password_two_prompts),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { change() }, enabled = !working && valid) {
+                if (working) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                else Text(stringResource(R.string.settings_change_password_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { showDialog = false }, enabled = !working) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun PasswordField(value: String, onValueChange: (String) -> Unit, label: String, error: String?, enabled: Boolean) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        supportingText = { if (error != null) Text(error) },
+        singleLine = true,
+        isError = error != null,
+        enabled = enabled,
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        modifier = Modifier.fillMaxWidth(),
+    )
 } 

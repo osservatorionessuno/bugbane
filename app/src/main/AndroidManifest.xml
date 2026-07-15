@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Currently used only to fetch IOCs -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Biometric/credential prompt gating the acquisition identity -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!-- Package visibility (Android 11+): needed to read the Mainline train date
          (modulemetadata versionName) for the ADB vulnerability check. -->

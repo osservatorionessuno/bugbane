@@ -12,6 +12,9 @@ import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.bugbane.utils.AndroidStringResolver
 import org.osservatorionessuno.libmvt.common.AbstractInput
 import org.osservatorionessuno.libmvt.common.Artifact
+import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
+import org.osservatorionessuno.qf.crypto.SessionKeyCache
+import org.osservatorionessuno.qf.crypto.age.AgeIdentity
 import org.osservatorionessuno.qf.storage.EncryptedAcquisitionReader
 import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
 import java.io.File
@@ -20,17 +23,41 @@ import java.util.LinkedHashMap
 import java.util.UUID
 
 object AcquisitionScanner {
-    fun scan(context: Context, acquisitionDir: File): File {
+    /**
+     * Analyze [acquisitionDir] decrypting with [identity] (plus any legacy
+     * identity for archives from before the identity scheme).
+     */
+    fun scan(context: Context, acquisitionDir: File, identity: AgeIdentity): File {
         initLibmvtLogging()
 
         // Make sure the indicators shipped in the APK are adopted before analysis, so a
         // device that has never updated online still analyzes against a real IOC set.
         org.osservatorionessuno.bugbane.update.BundledIndicators.seedIfStale(context)
         val indicatorsDir = IndicatorStore(context).indicatorsDir
-        return scanWithIndicators(context, acquisitionDir, indicatorsDir)
+        val identities = listOf(identity) + AcquisitionIdentityVault.legacyIdentities()
+        return scanWithIndicators(context, acquisitionDir, indicatorsDir, identities)
     }
 
-    private fun scanWithIndicators(context: Context, acquisitionDir: File, indicatorsDir: File): File {
+    /**
+     * Auto-analysis right after an acquisition: decrypt with the file key cached
+     * at write time (no prompt). Returns null if the cache is cold (e.g. the app
+     * was restarted) — the user can then re-run analysis, which unlocks the identity.
+     */
+    fun scanFromSessionCache(context: Context, acquisitionDir: File): File? {
+        val cached = SessionKeyCache.identityFor(acquisitionDir) ?: return null
+        return try {
+            scan(context, acquisitionDir, cached)
+        } finally {
+            cached.destroy()
+        }
+    }
+
+    private fun scanWithIndicators(
+        context: Context,
+        acquisitionDir: File,
+        indicatorsDir: File,
+        identities: List<AgeIdentity>,
+    ): File {
         val started = Instant.now()
         val indicators = Indicators()
         indicators.loadFromDirectory(indicatorsDir)
@@ -54,8 +81,7 @@ object AcquisitionScanner {
         if (File(acquisitionDir, ARCHIVE_FILE).exists()) {
             // Encrypted acquisition: decrypt + unzip in one bounded-memory pass and
             // analyze each artifact from its stream — no plaintext is written to disk.
-            val vault = AcquisitionRunner.acquisitionKeyVault()
-            EncryptedAcquisitionReader(acquisitionDir, vault).use { reader ->
+            EncryptedAcquisitionReader(acquisitionDir, identities).use { reader ->
                 reader.forEachArtifact { artifact ->
                     if (ForensicRunner.findModuleIndices(artifact.path).isEmpty()) return@forEachArtifact
                     // runCatching: a malformed artifact (exactly what a compromised device might
