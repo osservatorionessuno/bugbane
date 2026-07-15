@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.text.DateFormat
@@ -32,7 +33,7 @@ import org.osservatorionessuno.libmvt.common.AlertLevel
 
 @Composable
 fun ScanDetailScreen(
-    acquisitionDir: File, 
+    acquisitionDir: File,
     scanFile: File,
     modifier: Modifier = Modifier
 ) {
@@ -41,7 +42,7 @@ fun ScanDetailScreen(
     val supportUrl = stringResource(R.string.spyware_support_url)
     var acquisitionMeta by remember { mutableStateOf<JSONObject?>(null) }
     var scanMeta by remember { mutableStateOf<JSONObject?>(null) }
-    var results by remember { mutableStateOf(listOf<ScanResult>()) }
+    var results by remember { mutableStateOf(listOf<GroupedScanResult>()) }
 
     LaunchedEffect(acquisitionDir, scanFile) {
         val metaFile = File(acquisitionDir, "acquisition.json")
@@ -51,19 +52,8 @@ fun ScanDetailScreen(
         try {
             val obj = JSONObject(scanFile.readText())
             scanMeta = obj
-            val arr = obj.optJSONArray("results")
-            val tmp = mutableListOf<ScanResult>()
-            if (arr != null) {
-                for (i in 0 until arr.length()) {
-                    val o = arr.getJSONObject(i)
-                    tmp += ScanResult(
-                        o.optString("level"),
-                        o.optString("title"),
-                        o.optString("context")
-                    )
-                }
-            }
-            results = tmp
+            val arr = obj.optJSONArray("groupedResults") ?: JSONArray()
+            results = parseGroupedArray(arr)
         } catch (_: Exception) {
         }
     }
@@ -138,18 +128,18 @@ fun ScanDetailScreen(
             }
         }
 
-        Divider()
-        
-        ResultList(
+        HorizontalDivider()
+
+        GroupedResultList(
             results = results
-                .filter { 
+                .filter {
                     try {
                         AlertLevel.valueOf(it.level.uppercase()) != AlertLevel.LOG
                     } catch (_: IllegalArgumentException) {
                         true // Keep unknown levels
                     }
                 }
-                .sortedBy { 
+                .sortedBy {
                     try {
                         AlertLevel.valueOf(it.level.uppercase()).level
                     } catch (_: IllegalArgumentException) {
@@ -161,15 +151,53 @@ fun ScanDetailScreen(
     }
 }
 
-data class ScanResult(
+data class GroupedScanResult(
+    val id: String,
     val level: String,
     val title: String,
     val context: String,
+    val detections: List<DetectionEntry>,
 )
 
+data class DetectionEntry(
+    val value: List<String>,
+)
+
+private fun parseGroupedArray(arr: JSONArray): List<GroupedScanResult> = buildList {
+    for (i in 0 until arr.length()) {
+        val o = arr.getJSONObject(i)
+        val detectionsArr = o.optJSONArray("detections")
+        val detections = buildList {
+            if (detectionsArr != null) {
+                for (j in 0 until detectionsArr.length()) {
+                    val entry = detectionsArr.getJSONObject(j)
+                    val valueArr = entry.optJSONArray("value")
+                    val values = buildList {
+                        if (valueArr != null) {
+                            for (k in 0 until valueArr.length()) {
+                                add(valueArr.optString(k))
+                            }
+                        }
+                    }
+                    add(DetectionEntry(values))
+                }
+            }
+        }
+        add(
+            GroupedScanResult(
+                id = o.optString("id"),
+                level = o.optString("level"),
+                title = o.optString("title"),
+                context = o.optString("context"),
+                detections = detections,
+            ),
+        )
+    }
+}
+
 @Composable
-private fun ResultList(
-    results: List<ScanResult>,
+private fun GroupedResultList(
+    results: List<GroupedScanResult>,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -178,15 +206,20 @@ private fun ResultList(
         contentPadding = PaddingValues(8.dp)
     ) {
         items(results) { result ->
-            ExpandableResultItem(result = result)
+            ExpandableGroupedResultItem(result = result)
         }
     }
 }
 
 @Composable
-private fun ExpandableResultItem(result: ScanResult) {
+private fun ExpandableGroupedResultItem(result: GroupedScanResult) {
     var expanded by remember { mutableStateOf(false) }
-    
+    val titleText = if (result.detections.size > 1) {
+        "${result.title} (${result.detections.size})"
+    } else {
+        result.title
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -234,7 +267,7 @@ private fun ExpandableResultItem(result: ScanResult) {
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = result.title,
+                        text = titleText,
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
@@ -244,7 +277,7 @@ private fun ExpandableResultItem(result: ScanResult) {
                     modifier = Modifier.size(24.dp)
                 )
             }
-            
+
             AnimatedVisibility(
                 visible = expanded,
                 enter = fadeIn() + expandVertically(),
@@ -253,14 +286,25 @@ private fun ExpandableResultItem(result: ScanResult) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp)
+                        .padding(top = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Divider(modifier = Modifier.padding(bottom = 12.dp))
-                    Text(
-                        text = result.context,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    HorizontalDivider(modifier = Modifier.padding(bottom = 4.dp))
+                    if (result.context.isNotEmpty()) {
+                        Text(
+                            text = result.context,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    for (entry in result.detections) {
+                        if (entry.value.isEmpty()) continue
+                        Text(
+                            text = "• ${entry.value.joinToString(", ")}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

@@ -86,7 +86,7 @@ class AgePayload private constructor(
         private const val CIPHER_I = 65552
         private const val TAG = 16
 
-        fun open(data: RandomAccessData, identities: List<AgeIdentity>): AgePayload {
+        internal fun open(data: RandomAccessData, identities: List<AgeIdentity>): AgePayload {
             val head = ByteArray(minOf(data.size, 65536L).toInt())
             var r = 0
             while (r < head.size) { val n = data.readAt(r.toLong(), head, r, head.size - r); if (n < 0) break; r += n }

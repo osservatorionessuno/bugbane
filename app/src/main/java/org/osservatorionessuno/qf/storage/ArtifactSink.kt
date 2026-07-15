@@ -1,13 +1,13 @@
 package org.osservatorionessuno.qf.storage
 
 import java.io.Closeable
-import java.io.InputStream
 import java.io.OutputStream
+import org.osservatorionessuno.libmvt.common.ReopenableInput
 
 data class AcquisitionArtifact(
     val path: String,
     val modifiedTime: Long?,
-    val inputStream: InputStream,
+    val reopenable: ReopenableInput,
 )
 
 const val METADATA_FILE: String = "acquisition.json"

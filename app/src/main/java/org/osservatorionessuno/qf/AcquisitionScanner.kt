@@ -6,7 +6,7 @@ import org.json.JSONObject
 import org.osservatorionessuno.bugbane.utils.Utils
 import org.osservatorionessuno.bugbane.utils.initLibmvtLogging
 import org.osservatorionessuno.libmvt.android.ForensicRunner
-import org.osservatorionessuno.libmvt.android.ArtifactInput
+import org.osservatorionessuno.libmvt.common.GroupedDetection
 import org.osservatorionessuno.libmvt.common.Indicators
 import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.bugbane.utils.AndroidStringResolver
@@ -15,6 +15,7 @@ import org.osservatorionessuno.qf.storage.EncryptedAcquisitionReader
 import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
 import java.io.File
 import java.time.Instant
+import java.util.LinkedHashMap
 import java.util.UUID
 
 object AcquisitionScanner {
@@ -27,7 +28,7 @@ object AcquisitionScanner {
 
     private fun scanWithIndicators(context: Context, acquisitionDir: File, indicatorsDir: File): File {
         val started = Instant.now()
-        val indicators = Indicators();
+        val indicators = Indicators()
         indicators.loadFromDirectory(indicatorsDir)
 
         val indicatorsArr = JSONArray()
@@ -41,30 +42,22 @@ object AcquisitionScanner {
             indicatorHashes += hash
         }
 
-        val runner = ForensicRunner(AndroidStringResolver(context))
+        val resolver = AndroidStringResolver(context)
+        val runner = ForensicRunner(resolver)
         runner.setIndicators(indicators)
 
-        val results = JSONArray()
-        fun collect(artifact: Artifact?) {
-            artifact?.detected?.forEach { detected ->
-                results.put(JSONObject().apply {
-                    put("level", detected.level.name)
-                    put("title", detected.title)
-                    put("context", detected.context)
-                })
-            }
-        }
-
-
+        val artifacts = LinkedHashMap<String, Artifact>()
         if (File(acquisitionDir, ARCHIVE_FILE).exists()) {
             // Encrypted acquisition: decrypt + unzip in one bounded-memory pass and
             // analyze each artifact from its stream — no plaintext is written to disk.
             val vault = AcquisitionRunner.acquisitionKeyVault()
-            val reader = EncryptedAcquisitionReader(acquisitionDir, vault)
-            reader.forEachArtifact { artifact ->
-                if (artifact.path in ForensicRunner.MODULES_MAP.keys) {
-                    val input = ArtifactInput(artifact.path, artifact.inputStream)
-                    collect(runCatching { runner.streamFileAnalysis(input) }.getOrNull())
+            EncryptedAcquisitionReader(acquisitionDir, vault).use { reader ->
+                reader.forEachArtifact { artifact ->
+                    if (ForensicRunner.findModuleIndices(artifact.path).isEmpty()) return@forEachArtifact
+                    runner.streamFileAnalysis(artifact.reopenable)?.let { parsed ->
+                        // Assign all the modules' detections to the artifact
+                        artifacts[artifact.path] = parsed
+                    }
                 }
             }
         }
@@ -77,13 +70,14 @@ object AcquisitionScanner {
         val uuid = UUID.randomUUID().toString()
         val outFile = File(outDir, "${started.toString().replace(':', '-')}.json")
         indicatorHashes.sort()
+        val grouped = GroupedDetection.fromArtifacts(artifacts)
         val root = JSONObject()
         root.put("uuid", uuid)
         root.put("started", started.toString())
         root.put("completed", completed.toString())
         root.put("indicatorsHash", Utils.Companion.sha256(indicatorHashes.joinToString("")))
         root.put("indicators", indicatorsArr)
-        root.put("results", results)
+        root.put("groupedResults", GroupedDetection.toJsonArray(grouped, resolver))
 
         outFile.writeText(root.toString(1))
         return outFile

@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.osservatorionessuno.qf.crypto.age.AgeFormatException
-import org.osservatorionessuno.qf.crypto.age.AgePayload
 import org.osservatorionessuno.qf.crypto.age.ScryptIdentity
 import org.osservatorionessuno.qf.crypto.age.ScryptRecipient
 import org.osservatorionessuno.qf.crypto.age.X25519Identity
@@ -32,18 +31,26 @@ class EncryptedArchiveTest {
     )
 
     private fun encrypt(vault: KeyVault, entries: List<Entry>): ByteArray =
-        ByteArrayOutputStream().also { AgeZipArchiveReader.write(it, vault, entries) }.toByteArray()
+        ByteArrayOutputStream().also { out ->
+            AgeZipArchiveWriter(out, vault).use { writer ->
+                for (e in entries) {
+                    writer.putEntry(e.name, e.modifiedTime).use { sink ->
+                        e.open().use { it.copyTo(sink, 64 * 1024) }
+                    }
+                }
+            }
+        }.toByteArray()
 
     private fun readAll(bytes: ByteArray, vault: KeyVault): Map<String, ByteArray> {
         val map = LinkedHashMap<String, ByteArray>()
-        AgeZipArchiveReader.forEachEntry(ByteArrayRandomAccess(bytes), vault) { name, _, data ->
-            map[name] = data.readBytes()
+        AgeZipArchiveReader.forEachEntry(tempAgeFile(bytes), vault) { name, _, open ->
+            map[name] = open().use { it.readBytes() }
         }
         return map
     }
 
     private fun decryptZip(bytes: ByteArray, ids: List<AgeIdentity>): Map<String, ByteArray> =
-        unzip(AgePayload.open(ByteArrayRandomAccess(bytes), ids).stream().readBytes())
+        unzip(readAgeFile(tempAgeFile(bytes), ids))
 
     private fun unzip(zipBytes: ByteArray): Map<String, ByteArray> {
         val map = LinkedHashMap<String, ByteArray>()
@@ -71,7 +78,7 @@ class EncryptedArchiveTest {
         assertFalse(indexOf(atRest, "ro.product.model=Pixel 7".toByteArray()) >= 0, "plaintext leaked")
 
         // decrypted payload is a real ZIP that stock tools can read
-        val payload = AgePayload.open(ByteArrayRandomAccess(atRest), listOf(KeyVaultIdentity(vault))).stream().readBytes()
+        val payload = readAgeFile(tempAgeFile(atRest), listOf(KeyVaultIdentity(vault)))
         assertEquals(0x50, payload[0].toInt() and 0xFF) // 'P'
         assertEquals(0x4B, payload[1].toInt() and 0xFF) // 'K'
         assertEquals(setOf("acquisition.json", "getprop.txt", "dumpsys/large.bin"), unzip(payload).keys)
@@ -108,7 +115,7 @@ class EncryptedArchiveTest {
         val payloadStart = atRest.size - bodyOf(atRest).size
         val truncated = atRest.copyOfRange(0, payloadStart + 16)
         assertThrows(AgeFormatException::class.java) {
-            AgePayload.open(ByteArrayRandomAccess(truncated), listOf(KeyVaultIdentity(vault)))
+            readAgeFile(tempAgeFile(truncated), listOf(KeyVaultIdentity(vault)))
         }
     }
 

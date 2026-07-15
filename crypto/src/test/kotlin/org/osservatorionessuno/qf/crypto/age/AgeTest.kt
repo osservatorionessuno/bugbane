@@ -8,7 +8,8 @@ import kage.crypto.x25519.X25519Recipient as KageX25519Recipient
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
-import org.osservatorionessuno.qf.crypto.ByteArrayRandomAccess
+import org.osservatorionessuno.qf.crypto.FileRandomAccess
+import org.osservatorionessuno.qf.crypto.tempAgeFile
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -29,8 +30,14 @@ class AgeTest {
     private fun encrypt(recipients: List<AgeRecipient>, data: ByteArray): ByteArray =
         ByteArrayOutputStream().also { out -> Age.encryptingStream(recipients, out).use { it.write(data) } }.toByteArray()
 
-    private fun decrypt(bytes: ByteArray, ids: List<AgeIdentity>): ByteArray =
-        AgePayload.open(ByteArrayRandomAccess(bytes), ids).stream().readBytes()
+    private fun decrypt(bytes: ByteArray, ids: List<AgeIdentity>): ByteArray {
+        val access = FileRandomAccess(tempAgeFile(bytes))
+        try {
+            return AgePayload.open(access, ids).stream().readBytes()
+        } finally {
+            access.close()
+        }
+    }
 
     private fun kageDecrypt(bytes: ByteArray, id: kage.Identity): ByteArray =
         ByteArrayOutputStream().also { KageAge.decryptStream(listOf(id), ByteArrayInputStream(bytes), it) }.toByteArray()
@@ -42,8 +49,13 @@ class AgeTest {
             val ct = encrypt(listOf(ScryptRecipient(pass, logN = 10)), d)
             assertArrayEquals(d, decrypt(ct, listOf(ScryptIdentity(pass))), "size ${d.size}")
             if (d.size >= 1000) {
-                val p = AgePayload.open(ByteArrayRandomAccess(ct), listOf(ScryptIdentity(pass)))
-                assertArrayEquals(d.copyOfRange(d.size - 500, d.size), p.read((d.size - 500).toLong(), 500))
+                val access = FileRandomAccess(tempAgeFile(ct))
+                try {
+                    val p = AgePayload.open(access, listOf(ScryptIdentity(pass)))
+                    assertArrayEquals(d.copyOfRange(d.size - 500, d.size), p.read((d.size - 500).toLong(), 500))
+                } finally {
+                    access.close()
+                }
             }
         }
     }
@@ -88,7 +100,12 @@ class AgeTest {
     fun `malformed input throws AgeFormatException, never a raw panic`() {
         val garbage = ByteArray(100) { 0x41 } // "AAAA..."
         assertThrows(AgeFormatException::class.java) {
-            AgePayload.open(ByteArrayRandomAccess(garbage), listOf(ScryptIdentity("x".toByteArray())))
+            val access = FileRandomAccess(tempAgeFile(garbage))
+            try {
+                AgePayload.open(access, listOf(ScryptIdentity("x".toByteArray())))
+            } finally {
+                access.close()
+            }
         }
     }
 

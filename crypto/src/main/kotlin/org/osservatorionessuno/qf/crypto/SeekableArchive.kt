@@ -10,26 +10,12 @@ import java.nio.ByteBuffer
 import java.nio.channels.NonWritableChannelException
 import java.nio.channels.SeekableByteChannel
 
-/** Random-access byte source (memory or file) backing a [SeekableArchive]. */
-interface RandomAccessData : Closeable {
+internal interface RandomAccessData : Closeable {
     val size: Long
-    /** Read up to [len] bytes at absolute [pos]; returns bytes read, or -1 at EOF. */
     fun readAt(pos: Long, dst: ByteArray, off: Int, len: Int): Int
 }
 
-class ByteArrayRandomAccess(private val data: ByteArray) : RandomAccessData {
-    override val size: Long get() = data.size.toLong()
-    override fun readAt(pos: Long, dst: ByteArray, off: Int, len: Int): Int {
-        val p = pos.toInt()
-        val n = minOf(len, data.size - p)
-        if (n <= 0) return -1
-        System.arraycopy(data, p, dst, off, n)
-        return n
-    }
-    override fun close() {}
-}
-
-class FileRandomAccess(file: File) : RandomAccessData {
+internal class FileRandomAccess(file: File) : RandomAccessData {
     private val raf = RandomAccessFile(file, "r")
     override val size: Long get() = raf.length()
     @Synchronized
@@ -44,14 +30,10 @@ class FileRandomAccess(file: File) : RandomAccessData {
  * Random-access reader over a bugbane archive: decrypt and inflate a **single**
  * artifact straight from the encrypted envelope, without touching the rest and
  * without writing any plaintext to disk.
- *
- * The decrypted age payload (the ZIP bytes) is exposed as a [SeekableByteChannel]
- * via [AgePayload]; Apache Commons Compress'[ZipFile] does the central-directory
- * parsing, ZIP64 handling and inflation. Only the chunks spanning the requested
- * entry are decrypted.
  */
-class SeekableArchive(private val data: RandomAccessData, vault: KeyVault) : Closeable {
-    private val zip = ZipFile(AgePayloadChannel(AgePayload.open(data, listOf(KeyVaultIdentity(vault)))))
+class SeekableArchive(private val file: File, vault: KeyVault) : Closeable {
+    private val access = FileRandomAccess(file)
+    private val zip = ZipFile(AgePayloadChannel(AgePayload.open(access, listOf(KeyVaultIdentity(vault)))))
 
     fun names(): Set<String> {
         val out = LinkedHashSet<String>()
@@ -60,8 +42,6 @@ class SeekableArchive(private val data: RandomAccessData, vault: KeyVault) : Clo
         return out
     }
 
-    fun read(name: String): ByteArray = open(name).use { it.readBytes() }
-
     fun open(name: String): InputStream {
         val entry = zip.getEntry(name) ?: throw NoSuchElementException(name)
         return zip.getInputStream(entry)
@@ -69,7 +49,7 @@ class SeekableArchive(private val data: RandomAccessData, vault: KeyVault) : Clo
 
     override fun close() {
         zip.close()
-        data.close()
+        access.close()
     }
 }
 

@@ -4,13 +4,16 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.osservatorionessuno.libmvt.android.ArtifactInput
 import org.osservatorionessuno.libmvt.android.ForensicRunner
 import org.osservatorionessuno.libmvt.common.Artifact
+import org.osservatorionessuno.libmvt.common.GroupedDetection
 import org.osservatorionessuno.libmvt.common.Indicators
+import org.osservatorionessuno.libmvt.common.ReopenableInput
 import org.osservatorionessuno.libmvt.common.StringResolver
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.util.LinkedHashMap
 
 /**
  * End-to-end: the **real libMVT** analyzes artifacts read straight out of the
@@ -24,18 +27,22 @@ import java.io.ByteArrayOutputStream
 class LibmvtIntegrationTest {
 
     private val resolver = object : StringResolver {
-        override fun get(key: String): String = key
+        override fun get(name: String): String = name
     }
 
     private fun runner(): ForensicRunner =
         ForensicRunner(resolver).apply { setIndicators(Indicators()) }
 
-    private fun detections(a: Artifact?): List<String> =
-        a?.detected?.map { "${it.level}|${it.title}|${it.context}" } ?: emptyList()
+    private fun groupedKeys(artifacts: Map<String, Artifact>): List<String> =
+        GroupedDetection.fromArtifacts(artifacts).flatMap { group ->
+            group.detections.map { entry ->
+                "${group.id}|${entry.value}|${entry.file ?: ""}"
+            }
+        }.sorted()
 
     @Test
     fun `libMVT analyzes artifacts directly from the encrypted archive`() {
-        val artifacts = linkedMapOf(
+        val artifactBytes = linkedMapOf(
             "getprop.txt" to (
                 "[ro.build.version.sdk]: [33]\n" +
                     "[ro.product.model]: [Pixel 7]\n" +
@@ -47,33 +54,43 @@ class LibmvtIntegrationTest {
         )
 
         val vault = InMemoryKeyVault()
-        val archive = ByteArrayOutputStream().also { out ->
-            AgeZipArchiveReader.write(out, vault, artifacts.map { (n, b) -> Entry(n) { ByteArrayInputStream(b) } })
-        }.toByteArray()
+        val archiveFile = File.createTempFile("libmvt-test-", ".age").also { file ->
+            ByteArrayOutputStream().also { out ->
+                AgeZipArchiveWriter(out, vault).use { writer ->
+                    for ((n, b) in artifactBytes) {
+                        writer.putEntry(n).use { sink ->
+                            ByteArrayInputStream(b).use { it.copyTo(sink) }
+                        }
+                    }
+                }
+                file.writeBytes(out.toByteArray())
+            }
+            file.deleteOnExit()
+        }
 
+        val viaEncrypted = LinkedHashMap<String, Artifact>()
         var sawGetprop = false
-        AgeZipArchiveReader.forEachEntry(ByteArrayRandomAccess(archive), vault) { name, _, stream ->
-            if (name !in ForensicRunner.MODULES_MAP.keys) return@forEachEntry
 
-            // analyze straight from the encrypted archive's stream
-            val viaEncrypted = runCatching { runner().streamFileAnalysis(ArtifactInput(name, stream)) }
-            // reference: same parser, same bytes, plaintext stream
-            val viaPlain = runCatching {
-                runner().streamFileAnalysis(ArtifactInput(name, ByteArrayInputStream(artifacts[name])))
-            }
+        AgeZipArchiveReader.forEachEntry(archiveFile, vault) { name, _, open ->
+                if (ForensicRunner.findModuleIndices(name).isEmpty()) return@forEachEntry
+                val reopenable = ReopenableInput.of(name) { open() }
+                runner().streamFileAnalysis(reopenable)?.let { viaEncrypted[name] = it }
+                if (name == "getprop.txt") sawGetprop = true
+        }
 
-            assertEquals(viaPlain.isSuccess, viaEncrypted.isSuccess, "outcome parity for $name")
-            if (viaPlain.isSuccess) {
-                assertNotNull(viaEncrypted.getOrNull(), "encrypted analysis returned null for $name")
-                assertEquals(
-                    detections(viaPlain.getOrNull()),
-                    detections(viaEncrypted.getOrNull()),
-                    "detection parity for $name",
-                )
-            }
-            if (name == "getprop.txt") sawGetprop = true
+        val viaPlain = LinkedHashMap<String, Artifact>()
+        for (name in artifactBytes.keys) {
+            if (ForensicRunner.findModuleIndices(name).isEmpty()) continue
+            val reopenable = ReopenableInput.of(name) { ByteArrayInputStream(artifactBytes[name]) }
+            runner().streamFileAnalysis(reopenable)?.let { viaPlain[name] = it }
         }
 
         assertTrue(sawGetprop, "expected getprop.txt to be analyzed from the encrypted archive")
+        assertNotNull(viaEncrypted["getprop.txt"], "encrypted analysis returned null for getprop.txt")
+        assertEquals(
+            groupedKeys(viaPlain),
+            groupedKeys(viaEncrypted),
+            "grouped detection parity",
+        )
     }
 }

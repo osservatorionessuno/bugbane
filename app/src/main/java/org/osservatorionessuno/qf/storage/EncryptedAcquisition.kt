@@ -6,6 +6,7 @@ import java.io.IOException
 import java.io.OutputStream
 import org.json.JSONObject
 import org.osservatorionessuno.qf.Utils
+import org.osservatorionessuno.libmvt.common.ReopenableInput
 import org.osservatorionessuno.qf.crypto.AgeZipArchiveReader
 import org.osservatorionessuno.qf.crypto.AgeZipArchiveWriter
 import org.osservatorionessuno.qf.crypto.KeyVault
@@ -65,8 +66,9 @@ class EncryptedAcquisitionReader(
     override fun forEachArtifact(block: (AcquisitionArtifact) -> Unit) {
         val archive = File(acquisitionDir, ARCHIVE_FILE)
         if (!archive.exists()) return
-        AgeZipArchiveReader.forEachEntry(archive, vault) { name, modifiedTime, stream ->
-            block(AcquisitionArtifact(path = name, modifiedTime = modifiedTime, inputStream = stream))
+        AgeZipArchiveReader.forEachEntry(archive, vault) { name, modifiedTime, open ->
+            val reopenable = ReopenableInput.of(name) { open() }
+            block(AcquisitionArtifact(path = name, modifiedTime = modifiedTime, reopenable = reopenable))
         }
     }
 
@@ -75,7 +77,7 @@ class EncryptedAcquisitionReader(
         forEachArtifact { artifact ->
             if (artifact.path != METADATA_FILE) return@forEachArtifact
             index = AcquisitionIndex.fromJsonObject(
-                JSONObject(artifact.inputStream.bufferedReader().readText()),
+                JSONObject(artifact.reopenable.openStream().bufferedReader().readText()),
             )
         }
         return index

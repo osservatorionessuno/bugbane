@@ -10,6 +10,7 @@ import org.osservatorionessuno.qf.storage.ArtifactSink
 import org.osservatorionessuno.qf.storage.ArtifactReader
 import org.osservatorionessuno.qf.storage.AcquisitionArtifact
 import org.osservatorionessuno.qf.storage.AcquisitionIndex
+import org.osservatorionessuno.libmvt.common.ReopenableInput
 import org.osservatorionessuno.qf.Utils
 
 /*
@@ -69,15 +70,14 @@ class PlaintextAcquisitionReader(
             .filter { file -> file.isFile && !isReservedArtifact(acquisitionDir, file) }
             .forEach { file ->
                 val path = file.relativeTo(acquisitionDir).path.replace('\\', '/')
-                file.inputStream().use { input ->
-                    block(
-                        AcquisitionArtifact(
-                            path = path,
-                            modifiedTime = file.lastModified(),
-                            inputStream = input,
-                        ),
-                    )
-                }
+                val reopenable = ReopenableInput.of(path) { file.inputStream() }
+                block(
+                    AcquisitionArtifact(
+                        path = path,
+                        modifiedTime = file.lastModified(),
+                        reopenable = reopenable,
+                    ),
+                )
             }
     }
 
