@@ -277,33 +277,15 @@ object AcquisitionIdentityVault {
      * @throws android.security.keystore.StrongBoxUnavailableException fall back to [setupTeeAuth].
      * @throws UserAuthenticationException when the prompt is cancelled/fails.
      */
-    suspend fun setupStrongBox(activity: Context) =
-        setupAuthGated(activity, strongBoxVault(), TIER_STRONGBOX) { it }
+    suspend fun setupStrongBox(activity: Context) {
+        check(!isInitialized(activity)) { "acquisition identity already initialized" }
+        sealAndStore(activity, Tier.STRONGBOX, newSecret(), passphrase = null)
+    }
 
     /** [Tier.TEE_AUTH] setup (onboarding on TEE-only devices). One biometric/credential prompt. */
-    suspend fun setupTeeAuth(activity: Context) =
-        setupAuthGated(activity, teeAuthVault(), TIER_TEE_AUTH) { it }
-
-    private suspend fun setupAuthGated(
-        activity: Context,
-        vault: AndroidKeystoreKeyVault,
-        tierTag: Byte,
-        sealInner: suspend (ByteArray) -> ByteArray,
-    ) {
+    suspend fun setupTeeAuth(activity: Context) {
         check(!isInitialized(activity)) { "acquisition identity already initialized" }
-        val secret = newSecret()
-        try {
-            val inner = sealInner(secret)
-            val cipher = authenticate(
-                activity,
-                vault.beginWrap(),
-                activity.getString(R.string.acquisition_protect_prompt_title),
-                activity.getString(R.string.acquisition_protect_prompt_subtitle),
-            )
-            store(activity, publicKeyOf(secret), byteArrayOf(tierTag) + vault.finishWrap(cipher, inner))
-        } finally {
-            secret.fill(0)
-        }
+        sealAndStore(activity, Tier.TEE_AUTH, newSecret(), passphrase = null)
     }
 
     // ----------------------------------------------- password step (deferred)
@@ -316,13 +298,7 @@ object AcquisitionIdentityVault {
      * [Dispatchers.Default].
      */
     suspend fun sealPendingWithPassphrase(context: Context, passphrase: ByteArray) {
-        val secret = pendingSecret ?: newSecret()
-        try {
-            val sealed = withContext(Dispatchers.Default) { PassphraseKeyWrap.seal(secret, passphrase) }
-            store(context, publicKeyOf(secret), byteArrayOf(TIER_PASSPHRASE) + teeBindVault().wrap(sealed))
-        } finally {
-            secret.fill(0)
-        }
+        sealAndStore(context, Tier.PASSPHRASE, pendingSecret ?: newSecret(), passphrase)
         pendingSecret = null
         // Any acquisitions encrypted to this now-persisted identity are readable, so
         // they are no longer orphan candidates.
@@ -330,52 +306,36 @@ object AcquisitionIdentityVault {
     }
 
     /**
-     * Migrate an existing [Tier.TEE_AUTH] identity to [Tier.PASSPHRASE]: unlock
-     * once (biometric), Argon2id-seal, device-bind, and drop the auth-gated key —
-     * so the fingerprint is no longer used. Argon2id runs on [Dispatchers.Default].
+     * Migrate an existing [Tier.TEE_AUTH] identity to [Tier.PASSPHRASE]: unlock once
+     * (biometric), re-seal under the passphrase, and drop the auth-gated key — so the
+     * fingerprint is no longer used. Argon2id runs on [Dispatchers.Default].
      */
     suspend fun migrateTeeAuthToPassphrase(activity: Context, passphrase: ByteArray) {
-        val secret = authUnwrap(activity, teeAuthVault(), TIER_TEE_AUTH)
-        try {
-            val sealed = withContext(Dispatchers.Default) { PassphraseKeyWrap.seal(secret, passphrase) }
-            store(activity, publicKeyOf(secret), byteArrayOf(TIER_PASSPHRASE) + teeBindVault().wrap(sealed))
-            AndroidKeystoreKeyVault.deleteKey(TEE_AUTH_KEY_ALIAS)
-        } finally {
-            secret.fill(0)
-        }
+        val secret = openOuter(activity, Tier.TEE_AUTH)
+        sealAndStore(activity, Tier.PASSPHRASE, secret, passphrase)
+        AndroidKeystoreKeyVault.deleteKey(TEE_AUTH_KEY_ALIAS)
     }
 
     /**
      * Add a passphrase to an existing [Tier.STRONGBOX] identity → [Tier.STRONGBOX_PASSPHRASE]:
-     * Argon2id seal inside, re-wrapped under the StrongBox key. Two biometric
-     * prompts (unwrap, then re-wrap — per-operation auth). Argon2id on [Dispatchers.Default].
+     * Argon2id seal inside, re-wrapped under the StrongBox key. Two biometric prompts
+     * (unwrap, then re-wrap — per-operation auth). Argon2id on [Dispatchers.Default].
      */
     suspend fun addStrongBoxPassphrase(activity: Context, passphrase: ByteArray) {
-        val vault = strongBoxVault()
-        val secret = authUnwrap(activity, vault, TIER_STRONGBOX)
-        try {
-            val sealed = withContext(Dispatchers.Default) { PassphraseKeyWrap.seal(secret, passphrase) }
-            val cipher = authenticate(
-                activity,
-                vault.beginWrap(),
-                activity.getString(R.string.acquisition_protect_prompt_title),
-                activity.getString(R.string.acquisition_protect_prompt_subtitle),
-            )
-            store(activity, publicKeyOf(secret), byteArrayOf(TIER_STRONGBOX_PASSPHRASE) + vault.finishWrap(cipher, sealed))
-        } finally {
-            secret.fill(0)
-        }
+        val secret = openOuter(activity, Tier.STRONGBOX)
+        sealAndStore(activity, Tier.STRONGBOX_PASSPHRASE, secret, passphrase)
     }
 
     // --------------------------------------------------------------- unlock
 
     /** Unlock a [Tier.STRONGBOX] or [Tier.TEE_AUTH] identity with one biometric/credential prompt. */
-    suspend fun unlockWithBiometric(activity: Context): X25519Identity =
-        when (tier(activity)) {
-            Tier.STRONGBOX -> X25519Identity(authUnwrap(activity, strongBoxVault(), TIER_STRONGBOX))
-            Tier.TEE_AUTH -> X25519Identity(authUnwrap(activity, teeAuthVault(), TIER_TEE_AUTH))
-            else -> throw IllegalStateException("tier does not unlock with biometric alone")
+    suspend fun unlockWithBiometric(activity: Context): X25519Identity {
+        val tier = tier(activity)
+        check(tier != null && tier.usesBiometric && !tier.usesPassphrase) {
+            "tier does not unlock with biometric alone"
         }
+        return X25519Identity(openOuter(activity, tier))
+    }
 
     /**
      * First half of a [Tier.STRONGBOX_PASSPHRASE] unlock: one prompt unwraps the
@@ -383,17 +343,15 @@ object AcquisitionIdentityVault {
      * [openPassphraseInner] (retryable without further prompts); zero it when done.
      */
     suspend fun unlockStrongBoxOuter(activity: Context): ByteArray =
-        authUnwrap(activity, strongBoxVault(), TIER_STRONGBOX_PASSPHRASE)
+        openOuter(activity, Tier.STRONGBOX_PASSPHRASE)
 
     /** Open an Argon2id inner blob with the passphrase. Null on wrong passphrase. Runs on [Dispatchers.Default]. */
     suspend fun openPassphraseInner(inner: ByteArray, passphrase: ByteArray): X25519Identity? =
         withContext(Dispatchers.Default) { PassphraseKeyWrap.open(inner, passphrase) }?.let { X25519Identity(it) }
 
     /** Unlock a [Tier.PASSPHRASE] identity with the passphrase. Null on wrong passphrase. Runs on [Dispatchers.Default]. */
-    suspend fun unlockWithPassphrase(context: Context, passphrase: ByteArray): X25519Identity? {
-        val sealed = teeBindVault().unwrap(sealedBlob(context, TIER_PASSPHRASE))
-        return openPassphraseInner(sealed, passphrase)
-    }
+    suspend fun unlockWithPassphrase(context: Context, passphrase: ByteArray): X25519Identity? =
+        openPassphraseInner(openOuter(context, Tier.PASSPHRASE), passphrase)
 
     // --------------------------------------------- screen-lock invalidation
 
@@ -443,16 +401,10 @@ object AcquisitionIdentityVault {
 
     /** Change the passphrase on [Tier.PASSPHRASE]. False if [old] is wrong. Argon2id on [Dispatchers.Default]. */
     suspend fun changePassphrase(context: Context, old: ByteArray, new: ByteArray): Boolean {
-        val vault = teeBindVault()
-        val sealed = vault.unwrap(sealedBlob(context, TIER_PASSPHRASE))
-        val secret = withContext(Dispatchers.Default) { PassphraseKeyWrap.open(sealed, old) } ?: return false
-        try {
-            val reSealed = withContext(Dispatchers.Default) { PassphraseKeyWrap.seal(secret, new) }
-            // Same identity, so the public key is unchanged; rewrite the whole file.
-            store(context, publicKeyOf(secret), byteArrayOf(TIER_PASSPHRASE) + vault.wrap(reSealed))
-        } finally {
-            secret.fill(0)
-        }
+        val inner = openOuter(context, Tier.PASSPHRASE)
+        val secret = withContext(Dispatchers.Default) { PassphraseKeyWrap.open(inner, old) } ?: return false
+        // Same identity, so re-sealing rewrites the whole file with an unchanged pubkey.
+        sealAndStore(context, Tier.PASSPHRASE, secret, new)
         return true
     }
 
@@ -461,21 +413,12 @@ object AcquisitionIdentityVault {
      * Two biometric prompts (unwrap, then re-wrap). Argon2id on [Dispatchers.Default].
      */
     suspend fun changeStrongBoxPassphrase(activity: Context, old: ByteArray, new: ByteArray): Boolean {
-        val vault = strongBoxVault()
-        val inner = authUnwrap(activity, vault, TIER_STRONGBOX_PASSPHRASE)
+        val inner = openOuter(activity, Tier.STRONGBOX_PASSPHRASE)
         val secret = withContext(Dispatchers.Default) { PassphraseKeyWrap.open(inner, old) }
             ?: run { inner.fill(0); return false }
         try {
-            val reSealed = withContext(Dispatchers.Default) { PassphraseKeyWrap.seal(secret, new) }
-            val cipher = authenticate(
-                activity,
-                vault.beginWrap(),
-                activity.getString(R.string.acquisition_protect_prompt_title),
-                activity.getString(R.string.acquisition_protect_prompt_subtitle),
-            )
-            store(activity, publicKeyOf(secret), byteArrayOf(TIER_STRONGBOX_PASSPHRASE) + vault.finishWrap(cipher, reSealed))
+            sealAndStore(activity, Tier.STRONGBOX_PASSPHRASE, secret, new)
         } finally {
-            secret.fill(0)
             inner.fill(0)
         }
         return true
@@ -502,15 +445,64 @@ object AcquisitionIdentityVault {
         TEE_BIND_KEY_ALIAS, AndroidKeystoreKeyVault.StrongBoxPolicy.NEVER,
     )
 
-    private suspend fun authUnwrap(activity: Context, vault: AndroidKeystoreKeyVault, expectedTier: Byte): ByteArray {
-        val blob = sealedBlob(activity, expectedTier)
-        val cipher = authenticate(
-            activity,
-            vault.beginUnwrap(blob),
-            activity.getString(R.string.acquisition_unlock_prompt_title),
-            activity.getString(R.string.acquisition_unlock_prompt_subtitle),
-        )
-        return vault.finishUnwrap(cipher, blob)
+    /** Keystore vault backing [tier]'s outer wrap layer. */
+    private fun keystoreVaultFor(tier: Tier): AndroidKeystoreKeyVault = when (tier) {
+        Tier.STRONGBOX, Tier.STRONGBOX_PASSPHRASE -> strongBoxVault()
+        Tier.TEE_AUTH -> teeAuthVault()
+        Tier.PASSPHRASE -> teeBindVault()
+    }
+
+    /**
+     * Seal [secret] into [tier] and persist it; ownership of [secret] is taken and it
+     * is zeroed here. A tier is a stack of wrap layers applied inner→outer: an optional
+     * Argon2id passphrase layer (iff [Tier.usesPassphrase]), then the tier's keystore
+     * layer — auth-gated with a per-operation prompt for a biometric tier
+     * ([Tier.usesBiometric]), else a plain device-bound wrap.
+     */
+    private suspend fun sealAndStore(activity: Context, tier: Tier, secret: ByteArray, passphrase: ByteArray?) {
+        try {
+            val inner = if (tier.usesPassphrase) {
+                withContext(Dispatchers.Default) { PassphraseKeyWrap.seal(secret, passphrase!!) }
+            } else {
+                secret
+            }
+            val vault = keystoreVaultFor(tier)
+            val wrapped = if (tier.usesBiometric) {
+                val cipher = authenticate(
+                    activity,
+                    vault.beginWrap(),
+                    activity.getString(R.string.acquisition_protect_prompt_title),
+                    activity.getString(R.string.acquisition_protect_prompt_subtitle),
+                )
+                vault.finishWrap(cipher, inner)
+            } else {
+                vault.wrap(inner)
+            }
+            store(activity, publicKeyOf(secret), byteArrayOf(tier.tag) + wrapped)
+        } finally {
+            secret.fill(0)
+        }
+    }
+
+    /**
+     * Open [tier]'s outer keystore layer and return what's beneath: the raw secret for
+     * a biometric-only tier, or the Argon2id blob for a passphrase tier (feed that to
+     * [openPassphraseInner]). Prompts once iff the tier is auth-gated.
+     */
+    private suspend fun openOuter(activity: Context, tier: Tier): ByteArray {
+        val blob = sealedBlob(activity, tier.tag)
+        val vault = keystoreVaultFor(tier)
+        return if (tier.usesBiometric) {
+            val cipher = authenticate(
+                activity,
+                vault.beginUnwrap(blob),
+                activity.getString(R.string.acquisition_unlock_prompt_title),
+                activity.getString(R.string.acquisition_unlock_prompt_subtitle),
+            )
+            vault.finishUnwrap(cipher, blob)
+        } else {
+            vault.unwrap(blob)
+        }
     }
 
     private fun sealedBlob(context: Context, expectedTier: Byte): ByteArray {
