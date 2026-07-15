@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,10 +21,13 @@ object WifiConnectivityMonitor {
 
     fun initialize(appContext: Context) {
         connectivityManager = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        // Register the callback to track connectivity changes
-        connectivityManager.registerDefaultNetworkCallback(networkCallback)
-        // Initialize state by checking current connectivity
-        _wifiState.value = checkCurrentWifiConnected()
+        // Watch Wi-Fi by transport, not the default network: an internet-less Wi-Fi
+        // isn't the default network while mobile data is on, so the default-network
+        // callback would miss it.
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .build()
+        connectivityManager.registerNetworkCallback(request, networkCallback)
     }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -56,9 +60,7 @@ object WifiConnectivityMonitor {
         }
     }
 
-    fun checkCurrentWifiConnected(): Boolean {
-        val activeNetwork = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-    }
+    // The callback keeps this current; activeNetwork can't be used because an
+    // internet-less Wi-Fi isn't the active network when mobile data is on.
+    fun checkCurrentWifiConnected(): Boolean = _wifiState.value
 }
