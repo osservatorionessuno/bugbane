@@ -227,6 +227,13 @@ object AcquisitionIdentityVault {
     private fun b64(bytes: ByteArray): String =
         android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
 
+    // Set when an invalidated identity is discarded (see [beginRecovery]): the
+    // device is back to "no identity", and the user must actively re-establish
+    // protection — even on a device with no secure lock, where first-run onboarding
+    // would otherwise defer the password. Cleared automatically once a new identity
+    // is persisted (see [store]).
+    private const val KEY_RECOVERY_PENDING = "recovery_pending"
+
     private const val KEY_PROMPT_DISMISSED = "password_prompt_dismissed"
 
     /** Whether the user has declined the optional/encouraged password prompt (never for [PasswordPromptKind.MANDATORY]). */
@@ -314,20 +321,24 @@ object AcquisitionIdentityVault {
     // ----------------------------------------------- password step (deferred)
 
     /**
-     * Seal the pending ephemeral identity with a passphrase ([Tier.PASSPHRASE]).
-     * The mandatory path for devices with no secure lock. Returns false if there
-     * is no pending identity. Argon2id runs on [Dispatchers.Default].
+     * Establish a [Tier.PASSPHRASE] identity sealed with [passphrase]. Seals the
+     * pending ephemeral identity a just-run acquisition was encrypted to, or — when
+     * there is none (onboarding without an acquisition, or recovery) — mints a fresh
+     * keypair. The mandatory path for devices with no secure lock. Argon2id runs on
+     * [Dispatchers.Default].
      */
-    suspend fun sealPendingWithPassphrase(context: Context, passphrase: ByteArray): Boolean {
-        val secret = pendingSecret ?: return false
-        val sealed = withContext(Dispatchers.Default) { PassphraseKeyWrap.seal(secret, passphrase) }
-        store(context, publicKeyOf(secret), byteArrayOf(TIER_PASSPHRASE) + teeBindVault().wrap(sealed))
-        secret.fill(0)
+    suspend fun sealPendingWithPassphrase(context: Context, passphrase: ByteArray) {
+        val secret = pendingSecret ?: newSecret()
+        try {
+            val sealed = withContext(Dispatchers.Default) { PassphraseKeyWrap.seal(secret, passphrase) }
+            store(context, publicKeyOf(secret), byteArrayOf(TIER_PASSPHRASE) + teeBindVault().wrap(sealed))
+        } finally {
+            secret.fill(0)
+        }
         pendingSecret = null
-        // The pending acquisitions were all encrypted to this now-persisted
-        // identity, so they are readable — they are no longer orphan candidates.
+        // Any acquisitions encrypted to this now-persisted identity are readable, so
+        // they are no longer orphan candidates.
         clearUnsealed(context)
-        return true
     }
 
     /**
@@ -424,6 +435,22 @@ object AcquisitionIdentityVault {
         pendingSecret = null
     }
 
+    /**
+     * Discard an invalidated identity and mark that protection must be re-established
+     * before the app is usable again. Unlike [discardIdentity] this also raises the
+     * recovery flag, so onboarding presents the "set a screen lock or a password"
+     * step even on a device that no longer has a secure lock (see [SlideshowManager]).
+     * The caller deletes the now-unreadable acquisitions.
+     */
+    fun beginRecovery(context: Context) {
+        discardIdentity(context)
+        prefs(context).edit().putBoolean(KEY_RECOVERY_PENDING, true).apply()
+    }
+
+    /** Whether a discarded-identity recovery is still awaiting a fresh protection setup. */
+    fun isRecoveryPending(context: Context): Boolean =
+        !isInitialized(context) && prefs(context).getBoolean(KEY_RECOVERY_PENDING, false)
+
     // ------------------------------------------------------ change passphrase
 
     /** Change the passphrase on [Tier.PASSPHRASE]. False if [old] is wrong. Argon2id on [Dispatchers.Default]. */
@@ -511,6 +538,8 @@ object AcquisitionIdentityVault {
     private fun store(context: Context, publicKey: ByteArray, sealedBlob: ByteArray) {
         require(publicKey.size == PUB_SIZE)
         writeAtomically(identityFile(context), publicKey + sealedBlob)
+        // An identity now exists, so any pending recovery is resolved.
+        prefs(context).edit().remove(KEY_RECOVERY_PENDING).apply()
     }
 
     /** Whole identity file if present and well-formed (public key + at least a tier byte). */

@@ -31,6 +31,9 @@ import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
 import org.osservatorionessuno.bugbane.AcquisitionActivity
 import org.osservatorionessuno.bugbane.components.LayeredProgressIndicator
+import org.osservatorionessuno.bugbane.components.AcquisitionIdentityLostDialog
+import org.osservatorionessuno.bugbane.utils.AcquisitionRecovery
+import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
 import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
 import org.osservatorionessuno.cadb.AdbState
 import org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker
@@ -175,8 +178,24 @@ fun ScanScreen() {
     val skipped = skippedForSpace.value
     val showProgressUi = isScanning || failed != null || skipped != null
 
+    // Set when the acquisition key was destroyed by a screen-lock removal: a new
+    // acquisition would encrypt to a dead public key and be unreadable, so block it
+    // and offer recovery instead.
+    var identityLost by remember { mutableStateOf(false) }
+
     fun startAcquisition() {
+        if (AcquisitionIdentityVault.isIdentityInvalidatedByLockRemoval(context)) {
+            identityLost = true
+            return
+        }
         AcquisitionProgressTracker.start(context, adbManager, File(context.filesDir, "acquisitions"))
+    }
+
+    if (identityLost) {
+        AcquisitionIdentityLostDialog(
+            onReset = { AcquisitionRecovery.begin(context) },
+            onDismiss = { identityLost = false },
+        )
     }
 
     // Navigate to a freshly finished acquisition. This also fires when the

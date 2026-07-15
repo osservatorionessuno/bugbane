@@ -68,7 +68,11 @@ const val MIN_ACQUISITION_PASSWORD_LENGTH = 10
  * allowed) so the host can hide this overlay and refresh.
  */
 @Composable
-fun SetAcquisitionPasswordScreen(kind: PasswordPromptKind, onResolved: () -> Unit) {
+fun SetAcquisitionPasswordScreen(
+    kind: PasswordPromptKind,
+    onResolved: () -> Unit,
+    descriptionOverride: String? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -81,7 +85,7 @@ fun SetAcquisitionPasswordScreen(kind: PasswordPromptKind, onResolved: () -> Uni
     val mismatch = confirmation.isNotEmpty() && confirmation != password
     val valid = password.length >= MIN_ACQUISITION_PASSWORD_LENGTH && confirmation == password
 
-    val description = when (kind) {
+    val description = descriptionOverride ?: when (kind) {
         PasswordPromptKind.MANDATORY -> stringResource(R.string.set_password_mandatory_description)
         PasswordPromptKind.TEE_ENCOURAGED -> stringResource(R.string.set_password_tee_description)
         PasswordPromptKind.SE_OPTIONAL -> stringResource(R.string.set_password_se_description)

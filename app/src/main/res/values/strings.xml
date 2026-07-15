@@ -186,8 +186,14 @@
 
     <!-- Screen lock removed: the biometric-gated key was permanently invalidated -->
     <string name="acquisition_identity_lost_title">Acquisitions can no longer be unlocked</string>
-    <string name="acquisition_identity_lost_message">Your screen lock was removed, so the key that protected your acquisitions was erased by Android and they can no longer be decrypted. (Changing your PIN or password is fine — only removing the lock erases the key.)\n\nReset protection to keep using Bugbane. The old acquisitions are unreadable and can be deleted from the Acquisitions list.</string>
+    <string name="acquisition_identity_lost_message">Your screen lock was removed, so the key that protected your acquisitions was erased by Android and they can no longer be decrypted. (Changing your PIN or password is fine — only removing the lock erases the key.)\n\nReset protection to keep using Bugbane. The old acquisitions are unreadable and will be removed.</string>
     <string name="acquisition_identity_lost_reset">Reset protection</string>
+
+    <!-- Re-establish protection (onboarding chooser + post-invalidation recovery) -->
+    <string name="protection_recovery_description">Set up protection again to keep using Bugbane. Add a screen lock to protect the key with your fingerprint, or set an acquisition password that stays valid even if the lock is later removed.</string>
+    <string name="protection_set_screen_lock">Set a screen lock</string>
+    <string name="protection_use_password">Set a password instead</string>
+    <string name="set_password_chooser_description">Choose an acquisition password. You\'ll enter it to open or export acquisitions — it can\'t be recovered, so store it safely. A password keeps your acquisitions protected even if the screen lock is later removed.</string>
     <string name="set_password_field_label">Password</string>
     <string name="set_password_confirm_label">Confirm password</string>
     <string name="set_password_too_short">Use at least %1$d characters</string>

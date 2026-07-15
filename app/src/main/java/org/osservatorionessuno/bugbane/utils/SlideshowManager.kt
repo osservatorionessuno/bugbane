@@ -68,9 +68,12 @@ object SlideshowManager {
             // Onboarding only creates the identity on devices that use the
             // fingerprint gate; others set a password after the first acquisition,
             // so the onboarding step is considered satisfied for them. The identity
-            // files are the source of truth (not a preference).
-            hasAcquisitionProtection = !AcquisitionIdentityVault.onboardingUsesBiometric(appContext) ||
-                AcquisitionIdentityVault.isInitialized(appContext),
+            // files are the source of truth (not a preference). A pending recovery
+            // (a prior identity was invalidated by lock removal) forces the step even
+            // on a lock-less device, so the user re-establishes protection now.
+            hasAcquisitionProtection = AcquisitionIdentityVault.isInitialized(appContext) ||
+                (!AcquisitionIdentityVault.onboardingUsesBiometric(appContext) &&
+                    !AcquisitionIdentityVault.isRecoveryPending(appContext)),
         )
         if (_appProgress.value != newState) {
             Log.d("SlideshowManager", "update appprogress (onboardcomplete=${newState.hasCompletedOnboarding}, welcomecomplete=${newState.hasSeenWelcomeScreen}, protection=${newState.hasAcquisitionProtection})")
