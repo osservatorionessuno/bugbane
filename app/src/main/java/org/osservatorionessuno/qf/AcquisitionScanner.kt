@@ -12,7 +12,6 @@ import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.bugbane.utils.AndroidStringResolver
 import org.osservatorionessuno.libmvt.common.AbstractInput
 import org.osservatorionessuno.libmvt.common.Artifact
-import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
 import org.osservatorionessuno.qf.crypto.SessionKeyCache
 import org.osservatorionessuno.qf.crypto.age.AgeIdentity
 import org.osservatorionessuno.qf.storage.EncryptedAcquisitionReader
@@ -23,10 +22,7 @@ import java.util.LinkedHashMap
 import java.util.UUID
 
 object AcquisitionScanner {
-    /**
-     * Analyze [acquisitionDir] decrypting with [identity] (plus any legacy
-     * identity for archives from before the identity scheme).
-     */
+    /** Analyze [acquisitionDir] decrypting with [identity]. */
     fun scan(context: Context, acquisitionDir: File, identity: AgeIdentity): File {
         initLibmvtLogging()
 
@@ -34,8 +30,7 @@ object AcquisitionScanner {
         // device that has never updated online still analyzes against a real IOC set.
         org.osservatorionessuno.bugbane.update.BundledIndicators.seedIfStale(context)
         val indicatorsDir = IndicatorStore(context).indicatorsDir
-        val identities = listOf(identity) + AcquisitionIdentityVault.legacyIdentities()
-        return scanWithIndicators(context, acquisitionDir, indicatorsDir, identities)
+        return scanWithIndicators(context, acquisitionDir, indicatorsDir, listOf(identity))
     }
 
     /**

@@ -22,14 +22,9 @@ object AcquisitionRecovery {
      */
     fun begin(context: Context) {
         AcquisitionIdentityVault.beginRecovery(context)
-        // Acquisitions encrypted to the discarded identity are unreadable, so drop
-        // them — but ONLY when there's no legacy key. A legacy (transparent, non
-        // auth-gated) key survives lock removal, so any pre-identity-scheme archive
-        // it can still read must be preserved; blanket-deleting would destroy
-        // readable evidence. When such a key exists we leave the archives in place.
-        if (AcquisitionIdentityVault.legacyIdentities().isEmpty()) {
-            File(context.filesDir, "acquisitions").deleteRecursively()
-        }
+        // Every acquisition was encrypted to the discarded identity, so all are now
+        // unreadable — drop them.
+        File(context.filesDir, "acquisitions").deleteRecursively()
         // Recompute onboarding state now so the slideshow opens on the protection
         // step instead of briefly resolving a stale state.
         runCatching { SlideshowManager.checkState() }

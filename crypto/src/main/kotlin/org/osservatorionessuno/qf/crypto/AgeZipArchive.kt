@@ -35,8 +35,6 @@ class AgeZipArchiveWriter(
     recipients: List<AgeRecipient>,
     onFileKey: ((ByteArray) -> Unit)? = null,
 ) : Closeable {
-    constructor(out: OutputStream, vault: KeyVault) : this(out, listOf(KeyVaultRecipient(vault)))
-
     private val ageOut: OutputStream = Age.encryptingStream(recipients, out, onFileKey)
     private val zip = ZipOutputStream(ageOut).apply { setLevel(Deflater.BEST_SPEED) }
     private var entryOpen = false
@@ -77,13 +75,6 @@ class AgeZipArchiveWriter(
  * A decrypted export opens with stock tools: `age -d acquisition.age > a.zip`.
  */
 object AgeZipArchiveReader {
-
-    /** Decrypt + unzip [file] with a single [vault] identity (see the identities overload). */
-    fun forEachEntry(
-        file: File,
-        vault: KeyVault,
-        action: (name: String, modifiedTime: Long?, open: () -> InputStream) -> Unit,
-    ) = forEachEntry(file, listOf(KeyVaultIdentity(vault)), action)
 
     /** Decrypt + unzip [file] with the given [identities] (tried in order), invoking [action] per entry. */
     fun forEachEntry(
