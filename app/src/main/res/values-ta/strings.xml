@@ -130,14 +130,10 @@
     <string name="mvt_packages_root_package_message">நிறுவப்பட்ட ரூட் தொகுப்பு உள்ளது: %1$s</string>
     <string name="mvt_getprop_security_patch_title">பாதுகாப்பு மேம்படுத்தல்</string>
     <string name="mvt_getprop_security_patch_message">இந்த ஃபோன் ஆறு மாதங்களுக்கும் மேலாக பாதுகாப்புப் புதுப்பிப்புகளைப் பெறவில்லை (கடைசி புதுப்பிப்பு: %1$s).</string>
-    <string name="mvt_mounts_root_title">கணினி பகிர்வு படிக்க-எழுதலாக ஏற்றப்பட்டது</string>
-    <string name="mvt_mounts_root_message">/முறைமை பகிர்வு படிக்க-எழுதலாக (எப) ஏற்றப்பட்டுள்ளது</string>
     <string name="mvt_mounts_system_title">கணினி பகிர்வு படிக்க-எழுதலாக ஏற்றப்பட்டது</string>
     <string name="mvt_mounts_system_message">கணினி பகிர்வு %1$s படிக்க-எழுதலாக (rw) ஏற்றப்பட்டது. இது கணினி மாற்றங்களைக் குறிக்கலாம்.</string>
     <string name="mvt_mounts_suspicious_title">சந்தேகத்திற்கிடமான ஏற்ற விருப்பங்கள்</string>
     <string name="mvt_mounts_suspicious_message">%1$s: %2$sக்கு சந்தேகத்திற்கிடமான மவுண்ட் விருப்பங்கள் உள்ளன</string>
-    <string name="mvt_mounts_data_title">தரவு பகிர்வு</string>
-    <string name="mvt_mounts_data_message">தரவுப் பகிர்வு %1$s விருப்பங்களுடன் %2$s ஆக ஏற்றப்பட்டது: %3$s</string>
     <string name="mvt_dangerous_settings_title">ஆபத்தான அமைப்பு</string>
     <string name="mvt_dangerous_settings_message">%1$s ஆனது %2$s ஆக அமைக்கப்பட்டுள்ளது</string>
     <string name="mvt_tombstone_crashes_uid_title">சந்தேகத்திற்கிடமான விபத்து</string>

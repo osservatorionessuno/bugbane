@@ -130,14 +130,10 @@
     <string name="mvt_packages_root_package_message">Обнаружен установленный root-пакет: %1$s</string>
     <string name="mvt_getprop_security_patch_title">Обновление безопасности</string>
     <string name="mvt_getprop_security_patch_message">Этот телефон не получал обновлений безопасности более шести месяцев (последнее обновление: %1$s).</string>
-    <string name="mvt_mounts_root_title">Системный раздел смонтирован с правами на запись</string>
-    <string name="mvt_mounts_root_message">Раздел /system смонтирован с правами на запись (rw)</string>
     <string name="mvt_mounts_system_title">Системный раздел смонтирован с правами на запись</string>
     <string name="mvt_mounts_system_message">Системный раздел %1$s смонтирован с правами на запись (rw). Это может указывать на изменения в системе.</string>
     <string name="mvt_mounts_suspicious_title">Подозрительные параметры монтирования</string>
     <string name="mvt_mounts_suspicious_message">Обнаружены подозрительные параметры монтирования для %1$s: %2$s</string>
-    <string name="mvt_mounts_data_title">Раздел данных</string>
-    <string name="mvt_mounts_data_message">Раздел данных %1$s смонтирован как %2$s с параметрами: %3$s</string>
     <string name="mvt_dangerous_settings_title">Опасная настройка</string>
     <string name="mvt_dangerous_settings_message">%1$s установлено в %2$s</string>
     <string name="mvt_tombstone_crashes_uid_title">Подозрительное падение</string>
