@@ -50,7 +50,7 @@
     <string name="settings_indicators_title">Индикаторы компрометации (IoC)</string>
     <string name="settings_indicators_last_fetch">Последнее получение: %1$s</string>
     <string name="settings_indicators_last_update">Последнее обновление: %1$s</string>
-    <string name="settings_indicators_count">Файлы индикаторов: %1$d</string>
+    <string name="settings_indicators_count">Файлы индикаторов: %1$s</string>
     <string name="settings_indicators_desc">Индикаторы компрометации (IoC) используются для выявления признаков заражения или слежки на устройствах Android. Они периодически обновляются для обеспечения точности анализа.</string>
     <string name="settings_about">О проекте и авторах</string>
     <string name="settings_about_desc">Bugbane — проект с открытым исходным кодом, разработанный Osservatorio Nessuno OdV.</string>
