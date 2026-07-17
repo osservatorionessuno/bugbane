@@ -67,23 +67,20 @@ class IndicatorUpdater(
         }
 
         val gap = meta.version - local.version
-        val localFull = store.readBundle()
-        val canDelta = local.version > 0 && local.schema == SCHEMA && gap in 1..DELTA_WINDOW && localFull != null
+        val canDelta = local.version > 0 && local.schema == SCHEMA && gap in 1..DELTA_WINDOW && store.hasBundle()
 
+        // Both paths adopt through the single gate (see IndicatorAdoption): the candidate streams
+        // to a scratch file and is only adopted if the hash computed on the way through verifies.
         var viaDelta = false
-        var verified: Verified? = null
+        var objectCount: Int? = null
         if (canDelta) {
-            verified = tryDelta(localFull!!, local.version, meta)
-            viaDelta = verified != null
+            objectCount = tryDelta(local.version, meta, checkedAt)
+            viaDelta = objectCount != null
         }
-        if (verified == null) {
-            verified = fetchFull(meta) ?: return Outcome.Failed("full download failed", sunset)
+        if (objectCount == null) {
+            objectCount = fetchFull(meta, checkedAt)
+                ?: return Outcome.Failed("full download or verification failed", sunset)
         }
-
-        // Adopt through the single gate (see IndicatorAdoption): it re-verifies before touching
-        // disk, so `state.sha256 == hash(bundle on disk)` holds and every source converges here.
-        val objectCount = IndicatorAdoption.adopt(store, meta, verified.bytes, checkedAt, checkedAt)
-            ?: return Outcome.Failed("bundle failed verification", sunset)
         Log.i(TAG, "Adopted version ${meta.version} (${if (viaDelta) "delta" else "full"}), $objectCount objects")
         return Outcome.Updated(
             fromVersion = local.version,
@@ -94,51 +91,47 @@ class IndicatorUpdater(
         )
     }
 
-    /** Fetch and apply `delta-<local>-<target>.diff`; returns the reconstructed full iff the hash we
-     *  compute over it matches the feed's advertised hash. */
-    private fun tryDelta(localFull: ByteArray, localVersion: Int, meta: UpdateMetadata): Verified? {
+    /** Fetch `delta-<local>-<target>.diff` and stream-patch the on-disk bundle through the adoption
+     *  gate; returns the adopted object count iff the reconstructed full verifies. */
+    private fun tryDelta(localVersion: Int, meta: UpdateMetadata, checkedAt: Long): Int? {
         return try {
             val resp = transport.get("$BASE/deltas/delta-$localVersion-${meta.version}.diff")
             if (resp.statusCode != 200) {
                 Log.i(TAG, "Delta delta-$localVersion-${meta.version} not available (status ${resp.statusCode}); using full")
                 return null
             }
-            val candidate = DeltaPatch.apply(localFull, resp.body)
-            val hash = OhttpTransport.sha256Hex(candidate)
-            if (hash == meta.sha256) {
-                Verified(candidate)
-            } else {
-                Log.w(TAG, "Delta result hash mismatch; falling back to full")
-                null
+            val adopted = IndicatorAdoption.adopt(store, meta, checkedAt, checkedAt) { out ->
+                store.openBundle()!!.bufferedReader(Charsets.UTF_8).use { local ->
+                    DeltaPatch.apply(local, resp.body, out)
+                }
             }
+            if (adopted == null) Log.w(TAG, "Delta result hash mismatch; falling back to full")
+            adopted
         } catch (e: Exception) {
             Log.w(TAG, "Delta apply failed; falling back to full", e)
             null
         }
     }
 
-    /** Download the content-addressed full bundle and return it iff the hash we compute matches. */
-    private fun fetchFull(meta: UpdateMetadata): Verified? {
+    /** Download the content-addressed full bundle, streaming it straight through the adoption
+     *  gate — it is never held in memory — and adopt it iff the hash we compute matches. */
+    private fun fetchFull(meta: UpdateMetadata, checkedAt: Long): Int? {
         return try {
-            val resp = transport.get("$BASE/${meta.sha256}.json")
-            if (resp.statusCode != 200) {
-                Log.e(TAG, "Full ${meta.sha256}.json -> inner status ${resp.statusCode}")
-                return null
+            transport.getStream("$BASE/${meta.sha256}.json") { status, body ->
+                if (status != 200) {
+                    Log.e(TAG, "Full ${meta.sha256}.json -> inner status $status")
+                    null
+                } else {
+                    val adopted = IndicatorAdoption.adopt(store, meta, checkedAt, checkedAt) { body.copyTo(it) }
+                    if (adopted == null) Log.e(TAG, "Full bundle hash mismatch (expected ${meta.sha256})")
+                    adopted
+                }
             }
-            val hash = OhttpTransport.sha256Hex(resp.body)
-            if (hash != meta.sha256) {
-                Log.e(TAG, "Full bundle hash mismatch (expected ${meta.sha256}, got $hash)")
-                return null
-            }
-            Verified(resp.body)
         } catch (e: Exception) {
             Log.e(TAG, "Full download failed", e)
             null
         }
     }
-
-    /** A bundle whose SHA-256 we computed ourselves and confirmed equals the feed's advertised hash. */
-    private class Verified(val bytes: ByteArray)
 
     companion object {
         private const val TAG = "IndicatorUpdater"

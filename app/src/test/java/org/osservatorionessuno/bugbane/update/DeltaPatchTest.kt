@@ -1,7 +1,10 @@
 package org.osservatorionessuno.bugbane.update
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.Base64
 
@@ -26,9 +29,28 @@ class DeltaPatchTest {
 
     @Test
     fun reproducesFullBundleBytesAndHash() {
-        val result = DeltaPatch.apply(old, delta)
+        val result = apply(old, delta)
         assertEquals(String(new, Charsets.UTF_8), String(result, Charsets.UTF_8))
         assertEquals(newSha, sha256Hex(result))
+    }
+
+    @Test
+    fun mismatchedRemovalThrows() {
+        // Byte 200 is inside bundle line 3, the first line the delta removes (and thus compares).
+        val tampered = old.copyOf().also { it[200] = 'X'.code.toByte() }
+        assertThrows(IOException::class.java) { apply(tampered, delta) }
+    }
+
+    @Test
+    fun truncatedHunkThrows() {
+        val truncated = delta.copyOfRange(0, delta.size / 2)
+        assertThrows(IOException::class.java) { apply(old, truncated) }
+    }
+
+    private fun apply(source: ByteArray, delta: ByteArray): ByteArray {
+        val out = ByteArrayOutputStream()
+        source.inputStream().bufferedReader(Charsets.UTF_8).use { DeltaPatch.apply(it, delta, out) }
+        return out.toByteArray()
     }
 
     private fun sha256Hex(bytes: ByteArray): String =

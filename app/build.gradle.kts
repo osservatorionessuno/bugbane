@@ -154,9 +154,6 @@ dependencies {
     // Streaming encrypted+compressed acquisition archive (age + ZIP) engine.
     implementation(project(":crypto"))
 
-    // Applying the update feed's unified-diff deltas
-    implementation(libs.java.diff.utils)
-
     // Tombstone protobuf (lite)
     implementation(libs.protobuf.javalite)
 
