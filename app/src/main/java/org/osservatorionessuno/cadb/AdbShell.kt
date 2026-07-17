@@ -219,7 +219,8 @@ class AdbShell(
 
         private fun dispatchLine() {
             if (pending.size() == 0) return
-            onLine(pending.toString(StandardCharsets.UTF_8))
+            // toString(Charset) requires API 33; minSdk is 30
+            onLine(String(pending.toByteArray(), StandardCharsets.UTF_8))
             pending.reset()
         }
     }
