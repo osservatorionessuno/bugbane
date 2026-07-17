@@ -159,12 +159,16 @@ class Packages : Module {
         var withInstaller = true
 
         val packages = mutableListOf<Package>()
+        // execInternal retries re-stream the same lines into this callback, and the pm-list
+        // fallbacks below can re-run after a partial first attempt: dedup by name so neither
+        // can produce duplicate records in packages.pb.
+        val seen = HashSet<String>()
 
         fun addPackage(line: String) {
             if (line.isBlank()) return
             val fields = line.trim().split(Regex("\\s+"))
             val (packageName, installer, uid) = parsePackageLine(fields, withInstaller)
-            if (packageName.isBlank()) return
+            if (packageName.isBlank() || !seen.add(packageName)) return
 
             packages.add(
                 Package(
@@ -175,17 +179,26 @@ class Packages : Module {
             )
         }
 
+        // A fallback replaces whatever a partly-failed attempt collected, so every record is
+        // parsed with the flags of the command that actually succeeded.
+        fun restart() {
+            packages.clear()
+            seen.clear()
+        }
+
         try {
             shell.execForEachLine("pm list packages -U -u -i") { addPackage(it) }
         } catch (_: Throwable) {
             // fallback without "-i"
             try {
                 withInstaller = false
+                restart()
                 shell.execForEachLine("pm list packages -U -u") { addPackage(it) }
             } catch (_: Throwable) {
                 // Some Samsung devices allow only packages installed by current user, as per AndroidQF
                 try {
                     withInstaller = true
+                    restart()
                     shell.execForEachLine("pm list packages -U -u -i --user 0") { addPackage(it) }
                 } catch (e: Throwable) {
                     // Could not obtain packages, write empty protobuf stream and return
