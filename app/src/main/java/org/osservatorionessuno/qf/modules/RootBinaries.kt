@@ -39,7 +39,7 @@ class RootBinaries : Module {
         // Shell output bytes aren't meaningful progress here; keep null.
         val shell = AdbShell(manager, tag = "ShellQF", progress = null)
 
-        val found = mutableListOf<String>()
+        val found = LinkedHashSet<String>()
         for (bin in targets) {
             val script = """
                 # Expand PATH to include common root locations
