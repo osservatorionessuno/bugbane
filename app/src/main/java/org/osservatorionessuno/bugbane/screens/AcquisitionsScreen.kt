@@ -139,6 +139,7 @@ fun AcquisitionsScreen() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(paddingValues)
         ) {
         if (acquisitionItems.isEmpty()) {
             // No acquisitions, place a logo and a message as placeholder

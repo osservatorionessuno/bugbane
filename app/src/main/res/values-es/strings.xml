@@ -50,7 +50,7 @@
     <string name="settings_indicators_title">Indicadores de Compromiso (IoCs)</string>
     <string name="settings_indicators_last_fetch">Última captura: %1$s</string>
     <string name="settings_indicators_last_update">Última actualización: %1$s</string>
-    <string name="settings_indicators_count">Archivos de indicador: %1$d</string>
+    <string name="settings_indicators_count">Archivos de indicador: %1$s</string>
     <string name="settings_indicators_desc">Los indicadores de compromiso (local) son utilizados para identificar firmas de infección o supervivencia en dispositivos Android. Puede actualizarse periódicamente para asegurar la certeza del análisis.</string>
     <string name="settings_about">Acerca de Nosotros y Reconocimientos</string>
     <string name="settings_about_desc">Bugbane es un proyecto de fuente abierta desarrollado por Osservatorio Nessuno OdV.</string>

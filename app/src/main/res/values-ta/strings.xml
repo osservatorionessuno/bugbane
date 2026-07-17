@@ -50,7 +50,7 @@
     <string name="settings_indicators_title">சமரசத்தின் குறிகாட்டிகள் (IoCs)</string>
     <string name="settings_indicators_last_fetch">கடைசியாக பெறப்பட்டது: %1$s</string>
     <string name="settings_indicators_last_update">கடைசியாக புதுப்பித்தது: %1$s</string>
-    <string name="settings_indicators_count">காட்டி கோப்புகள்: %1$d</string>
+    <string name="settings_indicators_count">காட்டி கோப்புகள்: %1$s</string>
     <string name="settings_indicators_desc">ஆண்ட்ராய்டு சாதனங்களில் நோய்த்தொற்றுகள் அல்லது கண்காணிப்பின் அறிகுறிகளை அடையாளம் காண சமரசத்தின் (IoCs) குறிகாட்டிகள் பயன்படுத்தப்படுகின்றன. பகுப்பாய்வின் துல்லியத்தை உறுதிப்படுத்த அவை அவ்வப்போது புதுப்பிக்கப்படுகின்றன.</string>
     <string name="settings_about">எங்களைப் பற்றி &amp; கடன்கள்</string>
     <string name="settings_about_desc">Bugbane என்பது Osservatorio Nessuno OdV ஆல் உருவாக்கப்பட்ட ஒரு திறந்த மூல திட்டமாகும்.</string>
