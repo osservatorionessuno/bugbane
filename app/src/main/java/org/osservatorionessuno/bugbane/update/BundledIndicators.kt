@@ -7,10 +7,9 @@ import android.util.Log
  * Seeds [IndicatorStore] from the IOC set bundled in the APK, so the app analyzes offline out of
  * the box.
  *
- * The snapshot is committed under `assets/[ASSET_DIR]/` (`update.json` + `indicators.json`,
- * refreshed by the `refreshBundledIndicators` Gradle task). Adopted when newer than the stored
- * set (fresh install, or an app update newer than the last online fetch); [IndicatorUpdater]
- * handles online updates.
+ * The snapshot is committed under `assets/[ASSET_DIR]/` (`update.json` + `indicators.json`).
+ * Adopted when newer than the stored set (fresh install, or an app update newer than the last
+ * online fetch); [IndicatorUpdater] handles online updates.
  *
  * Cheap when unchanged (metadata read + version compare); the bundle is read only when adopted.
  */
@@ -36,12 +35,17 @@ object BundledIndicators {
         // Keep the stored set if it is the same schema and at least as new.
         if (local.schema == meta.schema && local.version >= meta.version) return
 
-        val bundle = runCatching { assets.open(BUNDLE_ASSET).use { it.readBytes() } }.getOrNull() ?: run {
-            Log.w(TAG, "Bundled indicators.json missing though update.json present; skipping seed")
+        // Adopt through the shared gate, streaming the asset straight into the staging file — the
+        // bundle is never held in memory. Timestamps are 0: this set was never fetched online, so
+        // the updater still runs and the UI reads "not yet checked online".
+        val objectCount = try {
+            IndicatorAdoption.adopt(store, meta, checkedAtEpoch = 0, updatedAtEpoch = 0) { out ->
+                assets.open(BUNDLE_ASSET).use { it.copyTo(out) }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Bundled indicators.json missing or unreadable though update.json present; skipping seed", e)
             return
         }
-        // Adopt via the shared gate with timestamps 0 (this set was never fetched online).
-        val objectCount = IndicatorAdoption.adopt(store, meta, bundle, checkedAtEpoch = 0, updatedAtEpoch = 0)
         if (objectCount == null) {
             Log.w(TAG, "Bundled indicators failed verification (hash mismatch); skipping seed")
             return

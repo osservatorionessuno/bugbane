@@ -62,12 +62,23 @@ class IndicatorUpdaterTest {
             val (status, body) = routes[path] ?: (404 to ByteArray(0))
             return BhttpResponse(status, emptyList(), body, emptyList())
         }
+        override fun <T> getStream(path: String, consume: (Int, java.io.InputStream) -> T): T {
+            requested += path
+            val (status, body) = routes[path] ?: (404 to ByteArray(0))
+            return consume(status, body.inputStream())
+        }
     }
 
     private fun store() = IndicatorStore(tmp)
 
+    private fun writeBundle(store: IndicatorStore, bundle: ByteArray) =
+        store.adoptStaged(store.stage { it.write(bundle) })
+
+    private fun readBundle(store: IndicatorStore): ByteArray? =
+        store.openBundle()?.use { it.readBytes() }
+
     private fun seed(store: IndicatorStore, version: Int, sha256: String, bundle: ByteArray, objectCount: Int) {
-        store.writeBundle(bundle)
+        writeBundle(store, bundle)
         store.writeState(IndicatorStore.State(schema = 1, version = version, sha256 = sha256, objectCount = objectCount))
     }
 
@@ -91,7 +102,7 @@ class IndicatorUpdaterTest {
         assertEquals(1, out.toVersion)
         assertFalse(out.viaDelta)
         assertEquals(5, out.newObjects)
-        assertArrayEquals(newBundle, store.readBundle())
+        assertArrayEquals(newBundle, readBundle(store))
         val s = store.readState()
         assertEquals(1, s.version)
         assertEquals(shaNew, s.sha256)
@@ -118,7 +129,7 @@ class IndicatorUpdaterTest {
     fun upToDate_usesStoredHashWithoutRecomputingLocalBundle() {
         val store = store()
         // On-disk bundle is garbage, but the stored hash matches the server: must NOT re-download.
-        store.writeBundle("not a real bundle".toByteArray())
+        writeBundle(store, "not a real bundle".toByteArray())
         store.writeState(IndicatorStore.State(schema = 1, version = 2, sha256 = shaNew, objectCount = 5))
         val t = FakeTransport().apply { route("/v1/update.json", 200, updateJson(2, shaNew)) }
 
@@ -144,7 +155,7 @@ class IndicatorUpdaterTest {
         assertTrue(out.viaDelta)
         assertEquals(1, out.fromVersion)
         assertEquals(2, out.toVersion)
-        assertArrayEquals(newBundle, store.readBundle())
+        assertArrayEquals(newBundle, readBundle(store))
         assertEquals(shaNew, store.readState().sha256)
         assertTrue(deltaPath(1, 2) in t.requested)
         assertFalse(fullPath(shaNew) in t.requested)
@@ -163,7 +174,7 @@ class IndicatorUpdaterTest {
 
         assertTrue(out is IndicatorUpdater.Outcome.Updated)
         assertFalse((out as IndicatorUpdater.Outcome.Updated).viaDelta)
-        assertArrayEquals(newBundle, store.readBundle())
+        assertArrayEquals(newBundle, readBundle(store))
         assertTrue(deltaPath(1, 2) in t.requested)
         assertTrue(fullPath(shaNew) in t.requested)
     }
@@ -181,7 +192,7 @@ class IndicatorUpdaterTest {
 
         assertTrue(out is IndicatorUpdater.Outcome.Updated)
         assertFalse((out as IndicatorUpdater.Outcome.Updated).viaDelta)
-        assertArrayEquals(newBundle, store.readBundle())
+        assertArrayEquals(newBundle, readBundle(store))
     }
 
     @Test
@@ -213,7 +224,7 @@ class IndicatorUpdaterTest {
         assertTrue(out is IndicatorUpdater.Outcome.Updated)
         assertFalse((out as IndicatorUpdater.Outcome.Updated).viaDelta)
         assertEquals(shaNew, store.readState().sha256)
-        assertArrayEquals(newBundle, store.readBundle())
+        assertArrayEquals(newBundle, readBundle(store))
     }
 
     @Test
@@ -227,7 +238,7 @@ class IndicatorUpdaterTest {
         assertTrue(out is IndicatorUpdater.Outcome.UnknownSchema)
         assertEquals(2, (out as IndicatorUpdater.Outcome.UnknownSchema).schema)
         // Local indicators untouched.
-        assertArrayEquals(oldBundle, store.readBundle())
+        assertArrayEquals(oldBundle, readBundle(store))
         assertEquals(3, store.readState().version)
     }
 
@@ -242,7 +253,7 @@ class IndicatorUpdaterTest {
 
         assertTrue(out is IndicatorUpdater.Outcome.Failed)
         assertEquals(0, store.readState().version)
-        assertNull(store.readBundle())
+        assertNull(readBundle(store))
     }
 
     @Test

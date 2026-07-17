@@ -1,5 +1,6 @@
 package org.osservatorionessuno.bugbane.update
 
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -7,6 +8,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.security.MessageDigest
 
 class IndicatorStoreTest {
 
@@ -28,7 +30,7 @@ class IndicatorStoreTest {
     }
 
     @Test
-    fun writeBundleClearsStaleIndicatorFilesAndCounts() {
+    fun adoptStagedClearsStaleIndicatorFilesAndCounts() {
         val dir = IndicatorStore(tmp).indicatorsDir
         // Pre-existing stale indicator files that a previous mechanism might have left behind.
         File(dir, "old-a.json").writeText("{}")
@@ -40,18 +42,28 @@ class IndicatorStoreTest {
             """{"id":"indicator--1"},""" + "\n" +
             """{"id":"indicator--2"}""" + "\n" +
             """],"type":"bundle"}""" + "\n").toByteArray()
-        store.writeBundle(bundle)
+        val staged = store.stage { it.write(bundle) }
+        assertEquals(2, staged.objectCount)
+        assertEquals(sha256Hex(bundle), staged.sha256)
+        store.adoptStaged(staged)
 
         val names = dir.listFiles()!!.map { it.name }.toSet()
         assertFalse("old-a.json" in names)
         assertFalse("old-b.stix2" in names)
         assertTrue("indicators.json" in names)
-        assertEquals(2, store.countObjects(bundle))
-        assertEquals(0, store.countObjects("not json".toByteArray()))
+        assertArrayEquals(bundle, store.openBundle()!!.use { it.readBytes() })
+        assertEquals(0, store.stage { it.write("not json".toByteArray()) }.also { it.discard() }.objectCount)
     }
 
     @Test
-    fun readBundleNullWhenAbsent() {
-        assertNull(IndicatorStore(tmp).readBundle())
+    fun discardedStageLeavesNoBundle() {
+        val store = IndicatorStore(tmp)
+        store.stage { it.write("candidate".toByteArray()) }.discard()
+        assertFalse(store.hasBundle())
+        assertNull(store.openBundle())
+        assertTrue(store.indicatorsDir.listFiles()!!.isEmpty())
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }
