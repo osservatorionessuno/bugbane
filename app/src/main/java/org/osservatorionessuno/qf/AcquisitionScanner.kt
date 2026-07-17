@@ -10,6 +10,7 @@ import org.osservatorionessuno.libmvt.common.GroupedDetection
 import org.osservatorionessuno.libmvt.common.Indicators
 import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.bugbane.utils.AndroidStringResolver
+import org.osservatorionessuno.libmvt.common.AbstractInput
 import org.osservatorionessuno.libmvt.common.Artifact
 import org.osservatorionessuno.qf.storage.EncryptedAcquisitionReader
 import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
@@ -54,9 +55,19 @@ object AcquisitionScanner {
             EncryptedAcquisitionReader(acquisitionDir, vault).use { reader ->
                 reader.forEachArtifact { artifact ->
                     if (ForensicRunner.findModuleIndices(artifact.path).isEmpty()) return@forEachArtifact
-                    runner.streamFileAnalysis(artifact.reopenable)?.let { parsed ->
-                        // Assign all the modules' detections to the artifact
-                        artifacts[artifact.path] = parsed
+                    // runCatching: a malformed artifact (exactly what a compromised device might
+                    // produce) skips that artifact instead of aborting the whole scan.
+                    runCatching { runner.streamFileAnalysis(artifact.reopenable) }.getOrNull()?.let { parsed ->
+                        // Keep only the detections: the parsed Artifact drags its full results
+                        // list (e.g. the entire device file list), and retaining every artifact
+                        // until the end of the scan would hold all of them in memory at once.
+                        // Grouping only reads `detected`, so a stub carries just that.
+                        val detectionsOnly = object : Artifact() {
+                            override fun parse(artifactInput: AbstractInput) = Unit
+                            override fun checkIndicators() = Unit
+                        }
+                        detectionsOnly.detected.addAll(parsed.detected)
+                        artifacts[artifact.path] = detectionsOnly
                     }
                 }
             }
