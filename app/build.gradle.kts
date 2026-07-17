@@ -58,6 +58,11 @@ android {
         buildConfig = true
     }
 
+    lint {
+        // Translations lag behind source strings; don't fail the build on them
+        warning += "MissingTranslation"
+    }
+
     testOptions {
         unitTests {
             isReturnDefaultValues = true
