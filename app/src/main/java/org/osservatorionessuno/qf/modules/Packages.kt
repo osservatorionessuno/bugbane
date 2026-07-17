@@ -79,10 +79,13 @@ class Packages : Module {
         isSystem: Boolean,
     ): List<PackageFile> {
         val files = mutableListOf<PackageFile>()
+        // exec retries re-stream the same lines: dedup by path so a mid-stream retry cannot
+        // hash a file twice or pull a duplicate copy of a suspicious APK into the archive.
+        val seenPaths = HashSet<String>()
         try {
             shell.execForEachLine("pm path $packageName") { line ->
             val packagePath = line.trim().removePrefix("package:").trim()
-            if (packagePath.isEmpty()) return@execForEachLine
+            if (packagePath.isEmpty() || !seenPaths.add(packagePath)) return@execForEachLine
             // we don't need to test system packages
             if (isSystem) return@execForEachLine
 
