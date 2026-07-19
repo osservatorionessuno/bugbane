@@ -1,0 +1,53 @@
+name: Refresh bundled indicators
+
+# Refreshes the committed offline IOC snapshot from the latest bugbane-updater release and opens
+# a PR when it changed, so it is already current at release time with no manual steps. Only a
+# cold-start seed (the runtime updater handles freshness), so the cadence is not critical.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  UPDATER_REPO: osservatorionessuno/bugbane-updater
+  ASSETS: app/src/main/assets/bundled-indicators
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refresh committed snapshot from the latest release
+        env:
+          GH_TOKEN: ${{ github.token }} # authenticates the API/download (avoids the 60/hr limit)
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          gh release download --repo "$UPDATER_REPO" --pattern 'dist-*.tar.gz' --dir "$tmp"
+          tar -xzf "$tmp"/dist-*.tar.gz -C "$tmp"
+
+          # Content address: the bundle file is named for its sha256; verify before committing.
+          sha=$(jq -r '.signed.sha256 // .sha256' "$tmp/v1/update.json" | tr 'A-F' 'a-f')
+          echo "$sha  $tmp/v1/$sha.json" | sha256sum -c -
+
+          mkdir -p "$ASSETS"
+          cp "$tmp/v1/update.json"   "$ASSETS/update.json"
+          cp "$tmp/v1/$sha.json"     "$ASSETS/indicators.json"
+          echo "Refreshed bundled indicators to $sha"
+
+      - name: Open PR if the snapshot changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          add-paths: app/src/main/assets/bundled-indicators/**
+          branch: bot/refresh-bundled-indicators
+          title: "Refresh bundled IOC snapshot"
+          commit-message: "Refresh bundled IOC snapshot"
+          body: |
+            Automated refresh of the committed offline IOC snapshot.
+            Opened only when the feed changed; merging pins the new snapshot.

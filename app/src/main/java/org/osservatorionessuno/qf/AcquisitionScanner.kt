@@ -23,6 +23,9 @@ object AcquisitionScanner {
     fun scan(context: Context, acquisitionDir: File): File {
         initLibmvtLogging()
 
+        // Make sure the indicators shipped in the APK are adopted before analysis, so a
+        // device that has never updated online still analyzes against a real IOC set.
+        org.osservatorionessuno.bugbane.update.BundledIndicators.seedIfStale(context)
         val indicatorsDir = IndicatorStore(context).indicatorsDir
         return scanWithIndicators(context, acquisitionDir, indicatorsDir)
     }

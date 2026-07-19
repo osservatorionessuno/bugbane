@@ -1,3 +1,4 @@
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -87,6 +88,41 @@ android {
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Offline IOC snapshot bundled into the APK (issue #47).
+//
+// Committed under src/main/assets/bundled-indicators/ (raw indicators.json + update.json). The
+// build packages it as a plain asset, keeping builds reproducible and F-Droid-buildable.
+// BundledIndicators.seedIfStale adopts it at runtime as a cold-start seed.
+//
+// The "Refresh bundled indicators" workflow updates it from a bugbane-updater release and opens
+// a PR; it is never fetched during a build.
+// checkBundledIndicators fails the build if it is missing (-Pbugbane.allowMissingIndicators skips).
+// ---------------------------------------------------------------------------------------------
+
+val bundledIndicatorsAssets = layout.projectDirectory.dir("src/main/assets/bundled-indicators")
+val allowMissingIndicators = (findProperty("bugbane.allowMissingIndicators") as String?).toBoolean()
+
+// Fail the build if the committed snapshot is missing.
+val checkBundledIndicators by tasks.registering {
+    description = "Verify the committed bundled IOC snapshot is present (#47)"
+    group = "bugbane"
+    val meta = bundledIndicatorsAssets.file("update.json").asFile
+    val bundle = bundledIndicatorsAssets.file("indicators.json").asFile
+    val allowMissing = allowMissingIndicators
+    doLast {
+        if (allowMissing) return@doLast
+        if (!meta.exists() || !bundle.exists() || bundle.length() == 0L) {
+            throw GradleException(
+                "Committed bundled indicators missing under src/main/assets/bundled-indicators/. " +
+                    "Run the 'Refresh bundled indicators' workflow and merge its PR, or pass " +
+                    "-Pbugbane.allowMissingIndicators=true to build without them.",
+            )
+        }
+    }
+}
+tasks.named("preBuild") { dependsOn(checkBundledIndicators) }
 
 dependencies {
     implementation(libs.androidx.core.ktx)

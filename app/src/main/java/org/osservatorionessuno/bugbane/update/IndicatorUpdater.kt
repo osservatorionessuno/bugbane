@@ -80,22 +80,10 @@ class IndicatorUpdater(
             verified = fetchFull(meta) ?: return Outcome.Failed("full download failed", sunset)
         }
 
-        // Disk is touched only now, after the bytes verified against the hash we computed. State
-        // records that computed hash (over the exact bytes written), not the server-provided value,
-        // so `state.sha256 == hash(bundle on disk)` holds by construction.
-        val objectCount = store.writeBundle(verified.bytes)
-        store.writeState(
-            IndicatorStore.State(
-                schema = meta.schema,
-                version = meta.version,
-                sha256 = verified.sha256,
-                sunset = meta.sunset,
-                buildDate = meta.buildDate,
-                objectCount = objectCount,
-                lastCheckEpoch = checkedAt,
-                lastUpdateEpoch = checkedAt,
-            ),
-        )
+        // Adopt through the single gate (see IndicatorAdoption): it re-verifies before touching
+        // disk, so `state.sha256 == hash(bundle on disk)` holds and every source converges here.
+        val objectCount = IndicatorAdoption.adopt(store, meta, verified.bytes, checkedAt, checkedAt)
+            ?: return Outcome.Failed("bundle failed verification", sunset)
         Log.i(TAG, "Adopted version ${meta.version} (${if (viaDelta) "delta" else "full"}), $objectCount objects")
         return Outcome.Updated(
             fromVersion = local.version,
@@ -118,7 +106,7 @@ class IndicatorUpdater(
             val candidate = DeltaPatch.apply(localFull, resp.body)
             val hash = OhttpTransport.sha256Hex(candidate)
             if (hash == meta.sha256) {
-                Verified(candidate, hash)
+                Verified(candidate)
             } else {
                 Log.w(TAG, "Delta result hash mismatch; falling back to full")
                 null
@@ -142,7 +130,7 @@ class IndicatorUpdater(
                 Log.e(TAG, "Full bundle hash mismatch (expected ${meta.sha256}, got $hash)")
                 return null
             }
-            Verified(resp.body, hash)
+            Verified(resp.body)
         } catch (e: Exception) {
             Log.e(TAG, "Full download failed", e)
             null
@@ -150,7 +138,7 @@ class IndicatorUpdater(
     }
 
     /** A bundle whose SHA-256 we computed ourselves and confirmed equals the feed's advertised hash. */
-    private class Verified(val bytes: ByteArray, val sha256: String)
+    private class Verified(val bytes: ByteArray)
 
     companion object {
         private const val TAG = "IndicatorUpdater"
