@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
+import java.security.MessageDigest
 
 /**
  * Live end-to-end fetch from the real update server over Oblivious HTTP, including the HPKE round
@@ -34,6 +35,9 @@ class OhttpFetchLiveTest {
         val meta = UpdateMetadata.parse(transport.get("/v1/update.json").body)
         val full = transport.get("/v1/${meta.sha256}.json")
         assertEquals(200, full.statusCode)
-        assertEquals(meta.sha256, OhttpTransport.sha256Hex(full.body))
+        assertEquals(meta.sha256, sha256Hex(full.body))
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }
