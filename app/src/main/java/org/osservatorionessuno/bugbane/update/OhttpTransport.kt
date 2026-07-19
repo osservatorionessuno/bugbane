@@ -14,7 +14,6 @@ import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
 import java.util.Base64
 import java.util.zip.GZIPInputStream
 
@@ -170,9 +169,5 @@ class OhttpTransport : UpdateTransport {
 
         /** Hard ceiling on a gzip-decompressed response body (128MB). */
         private const val MAX_DECOMPRESSED_BYTES = 128L * 1024 * 1024
-
-        fun sha256Hex(bytes: ByteArray): String =
-            MessageDigest.getInstance("SHA-256").digest(bytes)
-                .joinToString("") { "%02x".format(it) }
     }
 }
