@@ -19,6 +19,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import io.github.muntashirakon.adb.PRNGFixes
 import androidx.work.*
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import org.osservatorionessuno.bugbane.update.BundledIndicators
 import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.bugbane.workers.IndicatorsUpdateWorker
 import java.util.concurrent.TimeUnit
@@ -72,12 +75,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setupIndicatorsUpdates() {
+        // Seed the APK-bundled set at startup, off the main thread, so indicators are available
+        // offline. The workers below require network and only cover online updates.
+        lifecycleScope.launch(Dispatchers.IO) {
+            BundledIndicators.seedIfStale(applicationContext)
+        }
+
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
-        // Kick an immediate, one-time run if nothing has been downloaded yet
-        if (IndicatorStore(this).readState().version == 0) {
+        // Until the app has checked online once, keep an immediate run enqueued; the network
+        // constraint makes WorkManager launch it the moment connectivity is available. Gated on
+        // lastCheckEpoch (0 until a real online check) rather than version, since the bundled
+        // seed sets a version offline.
+        if (IndicatorStore(this).readState().lastCheckEpoch == 0L) {
             val now = OneTimeWorkRequestBuilder<IndicatorsUpdateWorker>()
                 .setConstraints(constraints)
                 .addTag("IndicatorsUpdate") // common tag for querying later if you want
