@@ -16,6 +16,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import java.util.Base64
+import java.util.zip.GZIPInputStream
 
 /**
  * Oblivious HTTP transport for the indicator update feed, using the chunked variant
@@ -49,7 +50,7 @@ class OhttpTransport : UpdateTransport {
                 scheme = TARGET_SCHEME,
                 authority = TARGET_AUTHORITY,
                 path = path,
-                headers = listOf("accept" to "*/*"),
+                headers = listOf("accept" to "*/*", "accept-encoding" to "gzip"),
             ),
         )
         val body = request.header + request.sealFinalChunk(inner)
@@ -78,14 +79,28 @@ class OhttpTransport : UpdateTransport {
                 throw IOException("unexpected relay content type ${conn.contentType}")
             }
             conn.inputStream.use { raw ->
-                val plaintext = request.decapsulateChunkedResponse(BoundedInputStream(raw))
+                val plaintext = request.decapsulateChunkedResponse(BoundedInputStream(raw, MAX_RESPONSE_BYTES, "relay response"))
                 val response = decodeResponseStream(plaintext)
                 Log.i(TAG, "GET $path -> inner status ${response.statusCode}")
-                return consume(response.statusCode, response.body)
+                return consume(response.statusCode, decoded(response.headers, response.body))
             }
         } finally {
             conn.disconnect()
         }
+    }
+
+    /**
+     * Apply the response's content-encoding. Only gzip is offered ([accept-encoding]); the body is
+     * streamed through the decompressor and bounded, since a small gzip can expand hugely and the
+     * bytes are unverified until the hash check downstream. An unencoded body passes through.
+     */
+    internal fun decoded(
+        headers: List<Pair<String, String>>,
+        body: InputStream,
+        maxBytes: Long = MAX_DECOMPRESSED_BYTES,
+    ): InputStream {
+        val gzip = headers.any { it.first.equals("content-encoding", ignoreCase = true) && it.second.trim().equals("gzip", ignoreCase = true) }
+        return if (gzip) BoundedInputStream(GZIPInputStream(body), maxBytes, "decompressed response") else body
     }
 
     /** Count [input]'s bytes without retaining them, giving up at [MAX_RESPONSE_BYTES]. */
@@ -101,13 +116,14 @@ class OhttpTransport : UpdateTransport {
     }
 
     /**
-     * The relay is a separate, not-fully-trusted party: even though decryption is streamed with
-     * bounded memory, cap the total bytes it can feed us per response so a rogue relay cannot
-     * stream forever (into our disk or time). [MAX_RESPONSE_BYTES] leaves generous headroom over
-     * the real bundle size.
+     * Caps how many bytes [input] can yield, throwing past [limit]. Used on the wire (a rogue relay
+     * must not stream forever) and on the decompressed body (a small gzip must not expand without
+     * bound). Both limits leave generous headroom over the real bundle size.
      */
-    private class BoundedInputStream(
+    internal class BoundedInputStream(
         input: InputStream,
+        private val limit: Long,
+        private val what: String,
     ) : FilterInputStream(input) {
         private var total = 0L
 
@@ -121,7 +137,7 @@ class OhttpTransport : UpdateTransport {
 
         private fun count(n: Int) {
             total += n
-            if (total > MAX_RESPONSE_BYTES) throw IOException("relay response exceeds $MAX_RESPONSE_BYTES bytes")
+            if (total > limit) throw IOException("$what exceeds $limit bytes")
         }
     }
 
@@ -151,6 +167,9 @@ class OhttpTransport : UpdateTransport {
 
         /** Hard ceiling on the total wire bytes of a single relay response (128MB). */
         private const val MAX_RESPONSE_BYTES = 128L * 1024 * 1024
+
+        /** Hard ceiling on a gzip-decompressed response body (128MB). */
+        private const val MAX_DECOMPRESSED_BYTES = 128L * 1024 * 1024
 
         fun sha256Hex(bytes: ByteArray): String =
             MessageDigest.getInstance("SHA-256").digest(bytes)
