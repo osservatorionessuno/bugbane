@@ -26,3 +26,9 @@
 -dontwarn org.tukaani.xz.**
 -dontwarn com.github.luben.zstd.**
 -dontwarn org.brotli.dec.**
+
+# Commons Compress registers ZIP extra-field parsers reflectively (ExtraFieldUtils), building
+# each from its no-arg constructor. Keep those constructors so reading an archive works minified.
+-keepclasseswithmembers class * implements org.apache.commons.compress.archivers.zip.ZipExtraField {
+    <init>();
+}
