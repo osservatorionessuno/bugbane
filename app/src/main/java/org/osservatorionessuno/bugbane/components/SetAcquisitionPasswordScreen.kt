@@ -187,16 +187,6 @@ fun SetAcquisitionPasswordScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            if (kind == PasswordPromptKind.SE_OPTIONAL) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.set_password_se_extra_prompts),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center,
-                )
-            }
-
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
