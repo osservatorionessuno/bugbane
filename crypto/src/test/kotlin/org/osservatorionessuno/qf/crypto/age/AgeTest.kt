@@ -71,7 +71,8 @@ class AgeTest {
             // kage -> ours
             val kct = ByteArrayOutputStream()
             KageAge.encryptStream(listOf(KageX25519Recipient(pub)), ByteArrayInputStream(d), kct)
-            assertArrayEquals(d, decrypt(kct.toByteArray(), listOf(X25519Identity(secret))), "kage->ours ${d.size}")
+            // copyOf: X25519Identity takes ownership and zeroes its key; secret is shared with kageId here.
+            assertArrayEquals(d, decrypt(kct.toByteArray(), listOf(X25519Identity(secret.copyOf()))), "kage->ours ${d.size}")
         }
     }
 

@@ -259,8 +259,11 @@ private fun ChangeAcquisitionPasswordCard(tier: AcquisitionIdentityVault.Tier) {
         working = true
         scope.launch {
             try {
-                val changed =
-                    AcquisitionIdentityVault.changePassword(context, current.toByteArray(), new.toByteArray())
+                val changed = AcquisitionIdentityVault.withPasswordBytes(current) { cur ->
+                    AcquisitionIdentityVault.withPasswordBytes(new) { neu ->
+                        AcquisitionIdentityVault.changePassword(context, cur, neu)
+                    }
+                }
                 if (changed) {
                     showDialog = false
                     Toast.makeText(context, R.string.settings_change_password_success, Toast.LENGTH_SHORT).show()
@@ -421,7 +424,7 @@ private fun ConfirmWithPasswordDialog(
                 working = true
                 scope.launch {
                     try {
-                        if (run(current.toByteArray())) {
+                        if (AcquisitionIdentityVault.withPasswordBytes(current) { run(it) }) {
                             Toast.makeText(context, R.string.settings_protection_updated, Toast.LENGTH_SHORT).show()
                             onDone(true)
                         } else {
@@ -480,7 +483,7 @@ private fun AddPasswordDialog(twoPrompts: Boolean, onDone: (changed: Boolean) ->
                 working = true
                 scope.launch {
                     try {
-                        if (AcquisitionIdentityVault.addPassword(context, new.toByteArray())) {
+                        if (AcquisitionIdentityVault.withPasswordBytes(new) { AcquisitionIdentityVault.addPassword(context, it) }) {
                             Toast.makeText(context, R.string.settings_protection_updated, Toast.LENGTH_SHORT).show()
                             onDone(true)
                         }
