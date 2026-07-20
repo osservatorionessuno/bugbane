@@ -94,4 +94,7 @@ object Keys {
 
     // Skips the "Get Started" page after the first onboarding flow
     const val KEY_HAS_SEEN_HOMEPAGE = "has_seen_homepage"
+
+    // Skips the beta warning countdown after the user has acknowledged it once
+    const val KEY_BETA_WARNING_ACKNOWLEDGED = "beta_warning_acknowledged"
 }

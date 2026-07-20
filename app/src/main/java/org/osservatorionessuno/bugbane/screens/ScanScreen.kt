@@ -2,16 +2,19 @@ package org.osservatorionessuno.bugbane.screens
 
 import android.app.Activity
 import android.app.Application
+import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -19,9 +22,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import android.content.res.Configuration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import org.osservatorionessuno.bugbane.R
@@ -32,13 +37,151 @@ import org.osservatorionessuno.bugbane.components.LayeredProgressIndicator
 import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
 import org.osservatorionessuno.cadb.AdbState
 import org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker
+import org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker.ModuleScanStatus
 import org.osservatorionessuno.bugbane.utils.AppState
+import org.osservatorionessuno.bugbane.utils.Keys
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
 import org.osservatorionessuno.bugbane.utils.Utils
 import java.io.File
 
-private const val TAG = "ScanScreen"
 private const val BETA_COUNTDOWN_SECONDS = 10
+
+private fun formatModuleDisplayName(name: String): String =
+    name.split('_')
+        .joinToString(" ") { word ->
+            word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
+
+@Composable
+private fun ScanModuleCard(
+    name: String,
+    status: ModuleScanStatus,
+    bytes: Long,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = formatModuleDisplayName(name),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                )
+                if (status != ModuleScanStatus.Waiting) {
+                    Text(
+                        text = " ${Utils.formatBytes(bytes)}",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    )
+                }
+            }
+            ModuleStatusIcon(status)
+        }
+    }
+}
+
+@Composable
+private fun ModuleStatusIcon(status: ModuleScanStatus) {
+    when (status) {
+        ModuleScanStatus.Completed -> Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+        ModuleScanStatus.Running -> CircularProgressIndicator(
+            modifier = Modifier.size(22.dp),
+            strokeWidth = 2.dp,
+        )
+        ModuleScanStatus.Error -> Icon(
+            imageVector = Icons.Default.Close,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(22.dp),
+        )
+        ModuleScanStatus.Waiting -> Spacer(modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun ScanModuleList(
+    modules: List<AcquisitionProgressTracker.ModuleProgress>,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(bottom = 16.dp),
+    ) {
+        items(modules, key = { it.name }) { module ->
+            ScanModuleCard(
+                name = module.name,
+                status = module.status,
+                bytes = module.bytes,
+            )
+        }
+    }
+}
+
+/**
+ * Beta gate dialog. [deadlineMs] is a wall-clock deadline shared via rememberSaveable
+ * so rotation / reopen resumes the same countdown.
+ */
+@Composable
+private fun BetaWarningDialog(
+    countdownMs: Long,
+    onAcknowledge: () -> Unit,
+    onQuit: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var remainingSec by remember(countdownMs) {
+        mutableIntStateOf(
+            ((countdownMs - System.currentTimeMillis() + 999) / 1000).toInt().coerceAtLeast(0)
+        )
+    }
+
+    LaunchedEffect(countdownMs) {
+        while (true) {
+            val leftMs = (countdownMs - System.currentTimeMillis()).coerceAtLeast(0L)
+            remainingSec = ((leftMs + 999) / 1000).toInt()
+            if (leftMs == 0L) break
+            delay(leftMs.coerceAtMost(1000L))
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.beta_warning_title)) },
+        text = { Text(stringResource(R.string.beta_warning_message)) },
+        confirmButton = {
+            Button(onClick = onAcknowledge, enabled = remainingSec == 0) {
+                Text(
+                    if (remainingSec == 0) stringResource(R.string.beta_warning_understand)
+                    else "$remainingSec"
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onQuit) {
+                Text(stringResource(R.string.beta_warning_quit))
+            }
+        },
+    )
+}
 
 @Composable
 fun ScanScreen() {
@@ -57,14 +200,24 @@ fun ScanScreen() {
     val completedModules = AcquisitionProgressTracker.completedModules.collectAsStateWithLifecycle()
     val totalModules = AcquisitionProgressTracker.totalModules.collectAsStateWithLifecycle()
     val pendingAcquisition = AcquisitionProgressTracker.pendingAcquisition.collectAsStateWithLifecycle()
+    val failedModules = AcquisitionProgressTracker.failedModules.collectAsStateWithLifecycle()
     val showDisableDialog = AcquisitionProgressTracker.showDisableReminder.collectAsStateWithLifecycle()
 
     val isBetaVersion = context.packageName.contains("beta", ignoreCase = true)
-    var showBetaWarningDialog by remember { mutableStateOf(false) }
-    var betaCountdown by remember { mutableStateOf(BETA_COUNTDOWN_SECONDS) }
-    var betaButtonEnabled by remember { mutableStateOf(false) }
+    val appPrefs = remember {
+        context.getSharedPreferences(Keys.PREFS_NAME, Context.MODE_PRIVATE)
+    }
+    var showBetaWarningDialog by rememberSaveable { mutableStateOf(false) }
+    var betaAcknowledged by remember {
+        mutableStateOf(appPrefs.getBoolean(Keys.KEY_BETA_WARNING_ACKNOWLEDGED, false))
+    }
+    // 0 = not started yet; otherwise wall-clock end of the countdown.
+    var betaCountdownMs by rememberSaveable { mutableLongStateOf(0L) }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isScanning = adbState.value == AdbState.ConnectedAcquiring || adbState.value == AdbState.Cancelling
+    val failed = failedModules.value
+    val showProgressUi = isScanning || failed != null
 
     fun startAcquisition() {
         AcquisitionProgressTracker.start(context, adbManager, File(context.filesDir, "acquisitions"))
@@ -73,6 +226,7 @@ fun ScanScreen() {
     // Navigate to a freshly finished acquisition. This also fires when the
     // screen is recreated (or the app is reopened from the completion
     // notification) while a finished acquisition is still pending.
+    // Failed modules never set pendingAcquisition, so this path is skipped.
     LaunchedEffect(pendingAcquisition.value) {
         val pending = pendingAcquisition.value ?: return@LaunchedEffect
         AcquisitionProgressTracker.consumePendingAcquisition(context)
@@ -87,7 +241,7 @@ fun ScanScreen() {
             .fillMaxSize()
             .padding(8.dp)
     ) {
-        if (adbState.value == AdbState.ConnectedAcquiring || adbState.value == AdbState.Cancelling) {
+        if (showProgressUi) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (isLandscape) {
                     Row(modifier = Modifier.weight(1f)) {
@@ -97,89 +251,103 @@ fun ScanScreen() {
                                 .fillMaxHeight(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                LayeredProgressIndicator(
-                                    totalModules = totalModules.value,
-                                    completedModules = completedModules.value,
-                                    size = 128.dp,
-                                    strokeWidth = 8.dp
-                                )
-                            }
+                            LayeredProgressIndicator(
+                                totalModules = totalModules.value,
+                                completedModules = completedModules.value,
+                                size = 128.dp,
+                                strokeWidth = 8.dp
+                            )
                         }
-                        LazyColumn(
+                        ScanModuleList(
+                            modules = modules.value,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
                                 .padding(16.dp),
-                        ) {
-                            items(modules.value) { module ->
-                                Text(
-                                    stringResource(
-                                        if (module.done) R.string.scan_module_completed else R.string.scan_module_running,
-                                        module.name,
-                                        Utils.formatBytes(module.bytes)
-                                    )
-                                )
-                            }
-                        }
+                        )
                     }
                 } else {
                     Column(modifier = Modifier.weight(1f)) {
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                LayeredProgressIndicator(
-                                    totalModules = totalModules.value,
-                                    completedModules = completedModules.value,
-                                    size = 128.dp,
-                                    strokeWidth = 8.dp
-                                )
-                            }
+                            LayeredProgressIndicator(
+                                totalModules = totalModules.value,
+                                completedModules = completedModules.value,
+                                size = 96.dp,
+                                strokeWidth = 8.dp
+                            )
                         }
-                        LazyColumn(
+                        ScanModuleList(
+                            modules = modules.value,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                        ) {
-                            items(modules.value) { module ->
-                                Text(
-                                    stringResource(
-                                        if (module.done) R.string.scan_module_completed else R.string.scan_module_running,
-                                        module.name,
-                                        Utils.formatBytes(module.bytes)
-                                    )
-                                )
-                            }
-                        }
+                                .padding(horizontal = 8.dp),
+                        )
                     }
                 }
-                Button(
-                    onClick = { 
-                        if (adbState.value != AdbState.Cancelling) {
-                            adbManager.cancelQuickForensics()
-                        }
-                    },
-                    enabled = adbState.value != AdbState.Cancelling,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    ),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (adbState.value == AdbState.Cancelling) stringResource(R.string.scan_cancelling_button) else stringResource(R.string.scan_cancel_button),
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                    )
+
+                if (failed != null) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.scan_acquisition_failed_message,
+                                failed.joinToString(", ") { formatModuleDisplayName(it) },
+                            ),
+                            modifier = Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    Button(
+                        onClick = { AcquisitionProgressTracker.dismissFailedModules() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.scan_acquisition_failed_rescan),
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            if (adbState.value != AdbState.Cancelling) {
+                                adbManager.cancelQuickForensics()
+                            }
+                        },
+                        enabled = adbState.value != AdbState.Cancelling,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (adbState.value == AdbState.Cancelling) {
+                                stringResource(R.string.scan_cancelling_button)
+                            } else {
+                                stringResource(R.string.scan_cancel_button)
+                            },
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                        )
+                    }
                 }
             }
         } else {
@@ -308,7 +476,11 @@ fun ScanScreen() {
                     onClick = {
                         when (appState.value) {
                             AppState.AdbConnected -> {
-                                if (isBetaVersion) {
+                                if (isBetaVersion && !betaAcknowledged) {
+                                    if (betaCountdownMs == 0L) {
+                                        betaCountdownMs =
+                                            System.currentTimeMillis() + BETA_COUNTDOWN_SECONDS * 1000L
+                                    }
                                     showBetaWarningDialog = true
                                     return@Button
                                 }
@@ -360,52 +532,22 @@ fun ScanScreen() {
                 }
             }
         }
-        
-        // Beta warning dialog
-        if (showBetaWarningDialog) {
-            LaunchedEffect(showBetaWarningDialog) {
-                if (showBetaWarningDialog) {
-                    betaCountdown = BETA_COUNTDOWN_SECONDS
-                    betaButtonEnabled = false
-                    for (i in betaCountdown.toInt() downTo 1) {
-                        delay(1000)
-                        betaCountdown = i - 1
-                    }
-                    betaButtonEnabled = true
-                }
-            }
 
-            AlertDialog(
-                onDismissRequest = { showBetaWarningDialog = false },
-                title = {
-                    Text(stringResource(R.string.beta_warning_title))
+        if (showBetaWarningDialog) {
+            BetaWarningDialog(
+                countdownMs = betaCountdownMs,
+                onAcknowledge = {
+                    appPrefs.edit { putBoolean(Keys.KEY_BETA_WARNING_ACKNOWLEDGED, true) }
+                    betaAcknowledged = true
+                    showBetaWarningDialog = false
+                    startAcquisition()
                 },
-                text = {
-                    Text(stringResource(R.string.beta_warning_message))
+                onQuit = {
+                    showBetaWarningDialog = false
+                    (context as? Activity)?.finishAffinity()
+                    System.exit(0)
                 },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showBetaWarningDialog = false
-                            startAcquisition()
-                        },
-                        enabled = betaButtonEnabled
-                    ) {
-                        Text(if (betaButtonEnabled) stringResource(R.string.beta_warning_understand) else "$betaCountdown")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            showBetaWarningDialog = false
-                            // Close the application
-                            (context as? Activity)?.finishAffinity()
-                            System.exit(0);
-                        }
-                    ) {
-                        Text(stringResource(R.string.beta_warning_quit))
-                    }
-                }
+                onDismiss = { showBetaWarningDialog = false },
             )
         }
     }

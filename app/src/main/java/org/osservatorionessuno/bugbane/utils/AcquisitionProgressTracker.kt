@@ -1,7 +1,6 @@
 package org.osservatorionessuno.bugbane.utils
 
 import android.Manifest
-import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -12,6 +11,7 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import android.app.ActivityManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,7 +45,18 @@ object AcquisitionProgressTracker {
     private const val CHANNEL_ID = "acquisition_complete"
     private const val NOTIFICATION_ID = 2
 
-    data class ModuleProgress(val name: String, val bytes: Long, val done: Boolean)
+    enum class ModuleScanStatus {
+        Waiting,
+        Running,
+        Completed,
+        Error,
+    }
+
+    data class ModuleProgress(
+        val name: String,
+        val bytes: Long = 0L,
+        val status: ModuleScanStatus = ModuleScanStatus.Waiting,
+    )
 
     private val _modules = MutableStateFlow<List<ModuleProgress>>(emptyList())
     val modules: StateFlow<List<ModuleProgress>> = _modules.asStateFlow()
@@ -60,6 +71,13 @@ object AcquisitionProgressTracker {
     private val _pendingAcquisition = MutableStateFlow<File?>(null)
     val pendingAcquisition: StateFlow<File?> = _pendingAcquisition.asStateFlow()
 
+    /**
+     * Names of modules that failed in the last acquisition. Non-null until the
+     * UI dismisses the error; while set, the acquisition view is not opened.
+     */
+    private val _failedModules = MutableStateFlow<List<String>?>(null)
+    val failedModules: StateFlow<List<String>?> = _failedModules.asStateFlow()
+
     /** True after a successful acquisition until the user dismisses the reminder. */
     private val _showDisableReminder = MutableStateFlow(false)
     val showDisableReminder: StateFlow<Boolean> = _showDisableReminder.asStateFlow()
@@ -72,30 +90,47 @@ object AcquisitionProgressTracker {
 
     fun start(context: Context, adbManager: AdbManager, baseDir: File) {
         val appContext = context.applicationContext
-        _modules.value = emptyList()
+        _modules.value = AcquisitionRunner.MODULE_NAMES.map { ModuleProgress(it) }
         _completedModules.value = 0
-        _totalModules.value = 0
+        _totalModules.value = AcquisitionRunner.MODULE_NAMES.size
         _pendingAcquisition.value = null
+        _failedModules.value = null
 
         adbManager.runQuickForensics(baseDir, object : AcquisitionRunner.ProgressListener {
             override fun onModuleStart(name: String, completed: Int, total: Int) {
                 _totalModules.value = total
-                _modules.update { it + ModuleProgress(name, 0L, false) }
+                _modules.update { list ->
+                    if (list.any { it.name == name }) {
+                        list.map {
+                            if (it.name == name) it.copy(bytes = 0L, status = ModuleScanStatus.Running)
+                            else it
+                        }
+                    } else {
+                        list + ModuleProgress(name, 0L, ModuleScanStatus.Running)
+                    }
+                }
             }
 
             override fun onModuleProgress(name: String, bytes: Long) {
                 _modules.update { list ->
-                    list.map { if (it.name == name && !it.done) it.copy(bytes = bytes) else it }
+                    list.map {
+                        if (it.name == name && it.status == ModuleScanStatus.Running) {
+                            it.copy(bytes = bytes)
+                        } else {
+                            it
+                        }
+                    }
                 }
             }
 
-            override fun onModuleComplete(name: String, completed: Int, total: Int) {
+            override fun onModuleComplete(name: String, completed: Int, total: Int, success: Boolean) {
                 _completedModules.value = completed
+                val status = if (success) ModuleScanStatus.Completed else ModuleScanStatus.Error
                 _modules.update { list ->
                     if (list.any { it.name == name }) {
-                        list.map { if (it.name == name) it.copy(done = true) else it }
+                        list.map { if (it.name == name) it.copy(status = status) else it }
                     } else {
-                        list + ModuleProgress(name, 0L, true)
+                        list + ModuleProgress(name, 0L, status)
                     }
                 }
             }
@@ -104,6 +139,17 @@ object AcquisitionProgressTracker {
 
             override fun onFinished(cancelled: Boolean, output: File?) {
                 if (cancelled || output == null) return
+                val failed = _modules.value
+                    .filter { it.status == ModuleScanStatus.Error }
+                    .map { it.name }
+                if (failed.isNotEmpty()) {
+                    Log.w(TAG, "Acquisition finished with failed modules: $failed")
+                    _failedModules.value = failed
+                    if (!isAppInForeground()) {
+                        postFailedNotification(appContext, failed)
+                    }
+                    return
+                }
                 _showDisableReminder.value = true
                 _pendingAcquisition.value = output
                 autoAnalyze(appContext, output)
@@ -130,6 +176,8 @@ object AcquisitionProgressTracker {
             }
             if (!isAppInForeground()) {
                 postFinishedNotification(context, analyzed)
+            } else {
+                Log.d(TAG, "Skipping completion notification; app is in the foreground")
             }
         }
     }
@@ -144,21 +192,28 @@ object AcquisitionProgressTracker {
         _showDisableReminder.value = false
     }
 
+    fun dismissFailedModules() {
+        _failedModules.value = null
+    }
+
     private fun isAppInForeground(): Boolean {
         val state = ActivityManager.RunningAppProcessInfo()
         ActivityManager.getMyMemoryState(state)
         return state.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
     }
 
-    private fun postFinishedNotification(context: Context, analyzed: Boolean) {
+    private fun ensureAcquisitionChannel(context: Context): NotificationManagerCompat? {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
-            Log.w(TAG, "Notification permission missing, skipping completion notification")
-            return
+            Log.w(TAG, "Notification permission missing, skipping acquisition notification")
+            return null
         }
-
         val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled()) {
+            Log.w(TAG, "Notifications disabled for the app; skipping acquisition notification")
+            return null
+        }
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
@@ -166,16 +221,22 @@ object AcquisitionProgressTracker {
                 NotificationManager.IMPORTANCE_HIGH
             )
         )
+        return manager
+    }
 
-        // Reopen the app; ScanScreen consumes the pending acquisition and
-        // navigates to the results.
+    private fun reopenAppIntent(context: Context): PendingIntent {
         val intent = Intent(context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val pendingIntent = PendingIntent.getActivity(
+        return PendingIntent.getActivity(
             context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+    }
 
+    private fun postFinishedNotification(context: Context, analyzed: Boolean) {
+        val manager = ensureAcquisitionChannel(context) ?: return
+        // Reopen the app; ScanScreen consumes the pending acquisition and
+        // navigates to the results.
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_bugbane_zoom)
             .setContentTitle(context.getString(R.string.notification_acquisition_complete_title))
@@ -185,7 +246,26 @@ object AcquisitionProgressTracker {
                     else R.string.notification_acquisition_complete_text
                 )
             )
-            .setContentIntent(pendingIntent)
+            .setContentIntent(reopenAppIntent(context))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+
+        manager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun postFailedNotification(context: Context, failed: List<String>) {
+        val manager = ensureAcquisitionChannel(context) ?: return
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_bugbane_zoom)
+            .setContentTitle(context.getString(R.string.notification_acquisition_failed_title))
+            .setContentText(
+                context.getString(
+                    R.string.notification_acquisition_failed_text,
+                    failed.joinToString(", "),
+                )
+            )
+            .setContentIntent(reopenAppIntent(context))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
