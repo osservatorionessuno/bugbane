@@ -301,18 +301,39 @@ fun ScanScreen() {
                         ),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        Text(
-                            text = stringResource(
-                                R.string.scan_acquisition_failed_message,
-                                failed.joinToString(", ") { formatModuleDisplayName(it) },
-                            ),
-                            modifier = Modifier.padding(16.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    R.string.scan_acquisition_failed_message,
+                                    failed.joinToString(", ") { formatModuleDisplayName(it) },
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(vertical = 16.dp),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            IconButton(
+                                onClick = { AcquisitionProgressTracker.dismissFailedModules() }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.scan_disable_dialog_close_button),
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                            }
+                        }
                     }
                     Button(
-                        onClick = { AcquisitionProgressTracker.dismissFailedModules() },
+                        onClick = {
+                            AcquisitionProgressTracker.dismissFailedModules()
+                            startAcquisition()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(

@@ -146,13 +146,10 @@ object AcquisitionProgressTracker {
                 if (failed.isNotEmpty()) {
                     Log.w(TAG, "Acquisition finished with failed modules: $failed")
                     _failedModules.value = failed
-                    if (!isAppInForeground()) {
-                        postFailedNotification(appContext, failed)
-                    }
-                    return
+                } else {
+                    _pendingAcquisition.value = output
                 }
                 _showDisableReminder.value = true
-                _pendingAcquisition.value = output
                 autoAnalyze(appContext, output)
             }
         })
@@ -176,7 +173,12 @@ object AcquisitionProgressTracker {
                 _analyzing.value = null
             }
             if (!isAppInForeground()) {
-                postFinishedNotification(context, analyzed)
+                val failed = _failedModules.value
+                if (failed != null) {
+                    postFailedNotification(context, failed)
+                } else {
+                    postFinishedNotification(context, analyzed)
+                }
             } else {
                 Log.d(TAG, "Skipping completion notification; app is in the foreground")
             }
