@@ -1,5 +1,6 @@
 package org.osservatorionessuno.qf.storage
 
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -27,13 +28,17 @@ class EncryptedAcquisitionWriter(
     private val writer = AgeZipArchiveWriter(FileOutputStream(File(acquisitionDir, ARCHIVE_FILE)), vault)
     private val writtenPaths = mutableSetOf<String>()
     private var indexWritten = false
+    private val hashManifest = ByteArrayOutputStream()
+    private var hashManifestArchived = false
 
     override fun openArtifact(path: String, modifiedTime: Long?): OutputStream {
         val name = normalizeArtifactPath(path)
         if (isReservedArtifact(name) || !writtenPaths.add(name)) {
             throw IOException("Artifact already exists: $path")
         }
-        return writer.putEntry(name, modifiedTime)
+        return DigestingOutputStream(writer.putEntry(name, modifiedTime)) { sha256 ->
+            hashManifest.write(ArtifactHashes.formatLine(name, sha256).toByteArray(Charsets.UTF_8))
+        }
     }
 
     override fun artifactExists(path: String): Boolean {
@@ -41,17 +46,27 @@ class EncryptedAcquisitionWriter(
         return isReservedArtifact(name) || name in writtenPaths
     }
 
-    override fun close(): Unit = writer.close()
+    override fun close() {
+        archiveHashManifestIfNeeded()
+        writer.close()
+    }
 
     /** Write [index] as the final [METADATA_FILE] zip entry (before [close]). */
     @Throws(IOException::class)
     fun writeIndex(index: AcquisitionIndex) {
         check(!indexWritten) { "index already written" }
+        archiveHashManifestIfNeeded()
         val json = Utils.toJsonString(index.toJsonObject()).toByteArray(Charsets.UTF_8)
         writer.putEntry(METADATA_FILE).use { it.write(json) }
         indexWritten = true
         // Keep a copy in plaintext so acquisitions can be listed without unlocking the Keystore.
         File(acquisitionDir, METADATA_FILE).writeText(Utils.toJsonString(index.toJsonObject()), Charsets.UTF_8)
+    }
+
+    private fun archiveHashManifestIfNeeded() {
+        if (hashManifestArchived || hashManifest.size() == 0) return
+        writer.putEntry(HASHES_FILE).use { hashManifest.writeTo(it) }
+        hashManifestArchived = true
     }
 }
 
@@ -81,6 +96,17 @@ class EncryptedAcquisitionReader(
             )
         }
         return index
+    }
+
+    fun readHashes(): List<Pair<String, String>>? {
+        var hashes: List<Pair<String, String>>? = null
+        forEachArtifact { artifact ->
+            if (artifact.path != HASHES_FILE) return@forEachArtifact
+            hashes = ArtifactHashes.parse(
+                artifact.reopenable.openStream().bufferedReader().readText(),
+            )
+        }
+        return hashes
     }
 
     override fun close(): Unit {
@@ -114,6 +140,7 @@ private fun normalizeArtifactPath(path: String): String {
 */
 private fun isReservedArtifact(name: String): Boolean {
     if (name == METADATA_FILE) return true
+    if (name == HASHES_FILE) return true
     if (name.startsWith("${AcquisitionIndex.ANALYSIS_DIR}/")) return true
     return false
 }
