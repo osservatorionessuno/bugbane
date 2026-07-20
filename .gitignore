@@ -11,3 +11,7 @@ local.properties
 *.code-workspace
 .kotlin/
 bin/
+# Python (local e2e / UI-automation scratch scripts — not part of the app)
+__pycache__/
+*.pyc
+/e2e/
