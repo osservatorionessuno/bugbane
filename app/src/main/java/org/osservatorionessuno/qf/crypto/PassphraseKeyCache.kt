@@ -13,8 +13,8 @@ import android.os.SystemClock
  * It holds only the *knowledge* factor (the derived key), never the identity itself.
  * The eviction policy is chosen by the caller per tier:
  *  - **two-factor tiers** (fingerprint + password): kept until process death, with
- *    no screen-off eviction — every read still requires a fresh per-operation
- *    fingerprint to unwrap the outer layer, so the cached key is inert on its own
+ *    no screen-off eviction — every read still requires a recent fingerprint/
+ *    credential to unwrap the outer layer, so the cached key is inert on its own
  *    (a seized/locked phone can't use it, and a live attacker who could read it
  *    still can't produce the hardware auth).
  *  - **password-only tier** (no secure lock): the password is the sole factor, so

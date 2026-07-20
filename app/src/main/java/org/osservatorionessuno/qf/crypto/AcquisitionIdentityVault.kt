@@ -19,7 +19,7 @@ import org.osservatorionessuno.qf.crypto.age.X25519Recipient
 import java.io.File
 import java.io.IOException
 import java.security.SecureRandom
-import javax.crypto.Cipher
+import android.security.keystore.UserNotAuthenticatedException
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKeyFactory
 import kotlin.coroutines.resume
@@ -33,8 +33,9 @@ import kotlin.coroutines.resumeWithException
  * never prompts. The private key — which reads or exports an acquisition — is
  * stored wrapped according to the tier chosen for the device (see bugbane#86):
  *
- *  - [Tier.STRONGBOX] — wrapped by a StrongBox AES key requiring a fresh
- *    biometric/credential authentication per operation. Unextractable, and the
+ *  - [Tier.STRONGBOX] — wrapped by a StrongBox AES key requiring a recent
+ *    biometric/credential authentication
+ *    ([AndroidKeystoreKeyVault.AUTH_WINDOW_SECONDS]). Unextractable, and the
  *    secure element makes a boot-chain (BFU) attack inert.
  *  - [Tier.TEE_AUTH] — same, in the TEE, for devices without a secure element
  *    that keep only the fingerprint gate. Holds against plain root; a strong
@@ -313,8 +314,8 @@ object AcquisitionIdentityVault {
      * Add a password to a biometric-only identity, making it two-factor: the
      * fingerprint/credential gate **and** the password are then both required
      * ([Tier.STRONGBOX]→[Tier.STRONGBOX_PASSPHRASE], [Tier.TEE_AUTH]→[Tier.TEE_PASSPHRASE]).
-     * Two biometric prompts (unwrap the identity, then re-wrap). Argon2id on
-     * [Dispatchers.Default]. Returns false if the current tier can't take a password.
+     * Prompts only if the auth window lapsed. Argon2id on [Dispatchers.Default].
+     * Returns false if the current tier can't take a password.
      */
     suspend fun addPassword(activity: Context, passphrase: ByteArray): Boolean {
         val from = tier(activity) ?: return false
@@ -553,7 +554,7 @@ object AcquisitionIdentityVault {
      * Seal [secret] into [tier] and persist it; ownership of [secret] is taken and it
      * is zeroed here. A tier is a stack of wrap layers applied inner→outer: an optional
      * Argon2id passphrase layer (iff [Tier.usesPassphrase]), then the tier's keystore
-     * layer — auth-gated with a per-operation prompt for a biometric tier
+     * layer — auth-gated (prompting iff the auth window lapsed) for a biometric tier
      * ([Tier.usesBiometric]), else a plain device-bound wrap.
      */
     private suspend fun sealAndStore(activity: Context, tier: Tier, secret: ByteArray, passphrase: ByteArray?) {
@@ -565,13 +566,11 @@ object AcquisitionIdentityVault {
             }
             val vault = keystoreVaultFor(tier)
             val wrapped = if (tier.usesBiometric) {
-                val cipher = authenticate(
+                withAuthWindow(
                     activity,
-                    vault.beginWrap(),
                     activity.getString(R.string.acquisition_protect_prompt_title),
                     activity.getString(R.string.acquisition_protect_prompt_subtitle),
-                )
-                vault.finishWrap(cipher, inner)
+                ) { vault.wrap(inner) }
             } else {
                 vault.wrap(inner)
             }
@@ -584,19 +583,17 @@ object AcquisitionIdentityVault {
     /**
      * Open [tier]'s outer keystore layer and return what's beneath: the raw secret for
      * a biometric-only tier, or the Argon2id blob for a passphrase tier (opened with the
-     * password). Prompts once iff the tier is auth-gated.
+     * password). Prompts iff the tier is auth-gated and the auth window lapsed.
      */
     private suspend fun openOuter(activity: Context, tier: Tier): ByteArray {
         val blob = sealedBlob(activity, tier.tag)
         val vault = keystoreVaultFor(tier)
         return if (tier.usesBiometric) {
-            val cipher = authenticate(
+            withAuthWindow(
                 activity,
-                vault.beginUnwrap(blob),
                 activity.getString(R.string.acquisition_unlock_prompt_title),
                 activity.getString(R.string.acquisition_unlock_prompt_subtitle),
-            )
-            vault.finishUnwrap(cipher, blob)
+            ) { vault.unwrap(blob) }
         } else {
             vault.unwrap(blob)
         }
@@ -640,13 +637,28 @@ object AcquisitionIdentityVault {
 
     private fun identityFile(context: Context) = File(context.filesDir, IDENTITY_FILE)
 
-    /** Show a biometric-or-credential prompt authorizing exactly [cipher]'s operation. */
-    private suspend fun authenticate(
+    /**
+     * Run [op] on an auth-gated key; if the authentication window has lapsed
+     * ([AndroidKeystoreKeyVault.AUTH_WINDOW_SECONDS]), prompt to refresh it and retry.
+     */
+    private suspend fun <T> withAuthWindow(
         context: Context,
-        cipher: Cipher,
         title: String,
         subtitle: String,
-    ): Cipher = suspendCancellableCoroutine { cont ->
+        op: () -> T,
+    ): T = try {
+        op()
+    } catch (_: UserNotAuthenticatedException) {
+        authenticate(context, title, subtitle)
+        op()
+    }
+
+    /** Show a biometric-or-credential prompt, refreshing the keystore auth window. */
+    private suspend fun authenticate(
+        context: Context,
+        title: String,
+        subtitle: String,
+    ): Unit = suspendCancellableCoroutine { cont ->
         val prompt = BiometricPrompt.Builder(context)
             .setTitle(title)
             .setSubtitle(subtitle)
@@ -655,14 +667,11 @@ object AcquisitionIdentityVault {
         val signal = CancellationSignal()
         cont.invokeOnCancellation { signal.cancel() }
         prompt.authenticate(
-            BiometricPrompt.CryptoObject(cipher),
             signal,
             context.mainExecutor,
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    val authorized = result.cryptoObject?.cipher
-                    if (authorized != null) cont.resume(authorized)
-                    else cont.resumeWithException(UserAuthenticationException("no cipher in authentication result"))
+                    cont.resume(Unit)
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {

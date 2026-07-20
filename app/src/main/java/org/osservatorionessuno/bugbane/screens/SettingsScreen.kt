@@ -206,8 +206,7 @@ fun SettingsScreen() {
 
 /**
  * Change the acquisition password. Only re-wraps the identity — acquisitions are
- * encrypted to the identity, not the password, so nothing is re-encrypted. On the
- * stacked StrongBox tier this shows two biometric prompts (unwrap, then re-wrap).
+ * encrypted to the identity, not the password, so nothing is re-encrypted.
  */
 @Composable
 private fun ChangeAcquisitionPasswordCard(tier: AcquisitionIdentityVault.Tier) {
