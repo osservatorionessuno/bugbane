@@ -187,7 +187,9 @@ object AcquisitionIdentityVault {
     fun recipient(context: Context): X25519Recipient {
         persistedPublicKey(context)?.let { return X25519Recipient(it) }
         val secret = pendingSecret ?: newSecret().also { pendingSecret = it }
-        return X25519Identity(secret).recipient()
+        // copyOf + destroy: pendingSecret is retained; X25519Identity would otherwise zero it.
+        val identity = X25519Identity(secret.copyOf())
+        return identity.recipient().also { identity.destroy() }
     }
 
     fun hasPendingEphemeral(): Boolean = pendingSecret != null
@@ -311,6 +313,21 @@ object AcquisitionIdentityVault {
     }
 
     /**
+     * Run [block] with the UTF-8 bytes of [password] held in a [Secret], zeroing the
+     * derived char and byte copies afterward. The String itself lives in the caller's
+     * Compose state and can't be wiped — this bounds every copy we control.
+     */
+    suspend fun <T> withPasswordBytes(password: String, block: suspend (ByteArray) -> T): T =
+        Secret.ofChars(password.toCharArray()).use { secret ->
+            val bytes = secret.copyBytes()
+            try {
+                block(bytes)
+            } finally {
+                bytes.fill(0)
+            }
+        }
+
+    /**
      * Add a password to a biometric-only identity, making it two-factor: the
      * fingerprint/credential gate **and** the password are then both required
      * ([Tier.STRONGBOX]→[Tier.STRONGBOX_PASSPHRASE], [Tier.TEE_AUTH]→[Tier.TEE_PASSPHRASE]).
@@ -393,7 +410,7 @@ object AcquisitionIdentityVault {
             // Password-only: the password is the sole factor — bound it tightly.
             PassphraseKeyCache.put(context, key, ttlMs = PassphraseKeyCache.DEFAULT_TTL_MS, evictScreenOff = true)
         }
-        key.fill(0) // put copied it
+        // put took ownership of key and zeroed it.
     }
 
     // --------------------------------------------- screen-lock invalidation
@@ -485,8 +502,9 @@ object AcquisitionIdentityVault {
     private fun newSecret(): ByteArray = ByteArray(SECRET_SIZE).also { SecureRandom().nextBytes(it) }
 
     private fun publicKeyOf(secret: ByteArray): ByteArray {
-        val identity = X25519Identity(secret)
-        return identity.publicKeyBytes()
+        // copyOf + destroy: the caller still owns and later zeroes secret.
+        val identity = X25519Identity(secret.copyOf())
+        return identity.publicKeyBytes().also { identity.destroy() }
     }
 
     private fun strongBoxVault() = AndroidKeystoreKeyVault.getOrCreateKeyVault(

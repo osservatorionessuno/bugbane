@@ -98,11 +98,15 @@ fun SetAcquisitionPasswordScreen(
             try {
                 when (kind) {
                     PasswordPromptKind.MANDATORY ->
-                        AcquisitionIdentityVault.sealPendingWithPassphrase(context, password.toByteArray())
+                        AcquisitionIdentityVault.withPasswordBytes(password) {
+                            AcquisitionIdentityVault.sealPendingWithPassphrase(context, it)
+                        }
                     // SE and TEE both stack the password on top of the fingerprint gate
                     // (both factors then required) — see addPassword.
                     PasswordPromptKind.TEE_ENCOURAGED, PasswordPromptKind.SE_OPTIONAL ->
-                        AcquisitionIdentityVault.addPassword(context, password.toByteArray())
+                        AcquisitionIdentityVault.withPasswordBytes(password) {
+                            AcquisitionIdentityVault.addPassword(context, it)
+                        }
                     PasswordPromptKind.NONE -> Unit
                 }
                 onResolved()

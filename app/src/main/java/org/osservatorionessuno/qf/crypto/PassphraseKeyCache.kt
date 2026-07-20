@@ -27,7 +27,7 @@ object PassphraseKeyCache {
     const val DEFAULT_TTL_MS = 30L * 60 * 1000
 
     private val lock = Any()
-    private var key: ByteArray? = null
+    private var key: Secret? = null
     private var expiresAt: Long = Long.MAX_VALUE
     private var evictOnScreenOff = false
 
@@ -35,14 +35,14 @@ object PassphraseKeyCache {
     private var hookInstalled = false
 
     /**
-     * Cache a copy of [derivedKey]. [ttlMs] null keeps it until process death;
-     * [evictScreenOff] drops it when the screen turns off.
+     * Cache [derivedKey]. Takes ownership and zeroes it. [ttlMs] null keeps it until
+     * process death; [evictScreenOff] drops it when the screen turns off.
      */
     fun put(context: Context, derivedKey: ByteArray, ttlMs: Long?, evictScreenOff: Boolean) {
         if (evictScreenOff) installEvictionHook(context)
         synchronized(lock) {
-            key?.fill(0)
-            key = derivedKey.copyOf()
+            key?.close()
+            key = Secret(derivedKey)
             expiresAt = if (ttlMs == null) Long.MAX_VALUE else SystemClock.elapsedRealtime() + ttlMs
             evictOnScreenOff = evictScreenOff
         }
@@ -52,14 +52,14 @@ object PassphraseKeyCache {
     fun get(): ByteArray? = synchronized(lock) {
         val k = key ?: return null
         if (SystemClock.elapsedRealtime() >= expiresAt) {
-            k.fill(0); key = null; return null
+            k.close(); key = null; return null
         }
-        k.copyOf()
+        k.copyBytes()
     }
 
     /** Zero and drop the cached key (password change, identity discard, screen off). */
     fun evict() = synchronized(lock) {
-        key?.fill(0)
+        key?.close()
         key = null
     }
 

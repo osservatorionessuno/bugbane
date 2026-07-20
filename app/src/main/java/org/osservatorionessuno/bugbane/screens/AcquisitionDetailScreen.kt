@@ -593,9 +593,9 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
         fun attempt() {
             checking = true
             scope.launch {
-                val identity = AcquisitionIdentityVault.openPassphraseWithPassword(
-                    context, pending.inner, password.toByteArray(),
-                )
+                val identity = AcquisitionIdentityVault.withPasswordBytes(password) {
+                    AcquisitionIdentityVault.openPassphraseWithPassword(context, pending.inner, it)
+                }
                 checking = false
                 if (identity == null) {
                     wrongPassword = true

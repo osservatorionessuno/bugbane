@@ -28,7 +28,7 @@ import java.io.File
 object SessionKeyCache {
     private const val TTL_MS = 30L * 60 * 1000
 
-    private class Entry(val fileKey: ByteArray, val expiresAt: Long)
+    private class Entry(val secret: Secret, val expiresAt: Long)
 
     private val entries = HashMap<String, Entry>()
 
@@ -44,8 +44,8 @@ object SessionKeyCache {
         installEvictionHook(context)
         synchronized(lock) {
             evictExpired()
-            entries.put(acquisitionDir.absolutePath, Entry(fileKey, SystemClock.elapsedRealtime() + TTL_MS))
-                ?.fileKey?.fill(0)
+            entries.put(acquisitionDir.absolutePath, Entry(Secret(fileKey), SystemClock.elapsedRealtime() + TTL_MS))
+                ?.secret?.close()
         }
     }
 
@@ -55,12 +55,12 @@ object SessionKeyCache {
      */
     fun identityFor(acquisitionDir: File): FileKeyIdentity? = synchronized(lock) {
         evictExpired()
-        entries[acquisitionDir.absolutePath]?.let { FileKeyIdentity(it.fileKey) }
+        entries[acquisitionDir.absolutePath]?.let { entry -> entry.secret.withBytes { FileKeyIdentity(it) } }
     }
 
     /** Zero and drop every cached key (device lock, sign-out, tests). */
     fun evictAll() = synchronized(lock) {
-        entries.values.forEach { it.fileKey.fill(0) }
+        entries.values.forEach { it.secret.close() }
         entries.clear()
     }
 
@@ -68,7 +68,7 @@ object SessionKeyCache {
     private fun evictExpired() {
         val now = SystemClock.elapsedRealtime()
         entries.values.removeIf { entry ->
-            (entry.expiresAt < now).also { expired -> if (expired) entry.fileKey.fill(0) }
+            (entry.expiresAt < now).also { expired -> if (expired) entry.secret.close() }
         }
     }
 
