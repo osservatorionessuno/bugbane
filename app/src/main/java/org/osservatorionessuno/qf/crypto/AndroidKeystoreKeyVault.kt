@@ -16,47 +16,31 @@ import javax.crypto.spec.GCMParameterSpec
  * hardware — **StrongBox** (a discrete secure element, e.g. Titan M2) when the
  * device has one, otherwise the **TEE**.
  *
- * Keys created with `requireAuth` demand a **per-operation** user authentication
- * (biometric if enrolled, else the lock-screen credential): [wrap]/[unwrap] will
- * fail for them. Instead initialize a cipher with [beginWrap]/[beginUnwrap],
- * authorize it through a `BiometricPrompt.CryptoObject`, and complete with
- * [finishWrap]/[finishUnwrap].
+ * Keys created with `requireAuth` demand a **recent** user authentication
+ * (biometric if enrolled, else the lock-screen credential — the screen unlock
+ * itself counts): [wrap]/[unwrap] throw
+ * [android.security.keystore.UserNotAuthenticatedException] once the last
+ * authentication is older than [AUTH_WINDOW_SECONDS]; show a
+ * `BiometricPrompt` to refresh the window and retry.
  */
 class AndroidKeystoreKeyVault private constructor(
     private val key: SecretKey,
 ) : KeyVault {
 
-    override fun wrap(fileKey: ByteArray): ByteArray = finishWrap(beginWrap(), fileKey)
-
-    override fun unwrap(blob: ByteArray): ByteArray = finishUnwrap(beginUnwrap(blob), blob)
-
-    /** Cipher ready to encrypt; for auth-gated keys pass it through a BiometricPrompt first. */
-    fun beginWrap(): Cipher {
+    override fun wrap(fileKey: ByteArray): ByteArray {
         val cipher = Cipher.getInstance(TRANSFORM) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         cipher.init(Cipher.ENCRYPT_MODE, key) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
-        return cipher
-    }
-
-    /** Complete a wrap with a cipher from [beginWrap] (possibly authorized in between). */
-    fun finishWrap(cipher: Cipher, fileKey: ByteArray): ByteArray {
         val iv = cipher.iv
         val ct = cipher.doFinal(fileKey)
         // [ivLen:1][iv][ciphertext+tag]
         return byteArrayOf(iv.size.toByte()) + iv + ct
     }
 
-    /** Cipher ready to decrypt [blob]; for auth-gated keys pass it through a BiometricPrompt first. */
-    fun beginUnwrap(blob: ByteArray): Cipher {
+    override fun unwrap(blob: ByteArray): ByteArray {
         val ivLen = blob[0].toInt() and 0xFF
         val iv = blob.copyOfRange(1, 1 + ivLen)
         val cipher = Cipher.getInstance(TRANSFORM) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv)) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
-        return cipher
-    }
-
-    /** Complete an unwrap with a cipher from [beginUnwrap] (possibly authorized in between). */
-    fun finishUnwrap(cipher: Cipher, blob: ByteArray): ByteArray {
-        val ivLen = blob[0].toInt() and 0xFF
         return cipher.doFinal(blob, 1 + ivLen, blob.size - 1 - ivLen)
     }
 
@@ -75,10 +59,13 @@ class AndroidKeystoreKeyVault private constructor(
         private const val TRANSFORM = "AES/GCM/NoPadding"
         private const val GCM_TAG_BITS = 128
 
+        /** How long a successful authentication arms auth-gated keys. */
+        const val AUTH_WINDOW_SECONDS = 10 * 60
+
         /**
          * Load or create a vault for [alias]. [requireAuth] (creation-time only)
-         * gates every key operation behind a fresh biometric/credential
-         * authentication; it requires a secure lock screen to be set.
+         * gates key operations behind a biometric/credential authentication no
+         * older than [AUTH_WINDOW_SECONDS]; it requires a secure lock screen.
          */
         @JvmStatic
         @JvmOverloads
@@ -141,12 +128,13 @@ class AndroidKeystoreKeyVault private constructor(
                 .apply {
                     if (requireAuth) {
                         setUserAuthenticationRequired(true)
-                        // Timeout 0 = a fresh authentication per operation, delivered via
-                        // BiometricPrompt.CryptoObject — a root process cannot piggyback
-                        // on an earlier unlock. Credential is always accepted so devices
-                        // without biometrics (or after biometric lockout) still work.
+                        // Any successful authentication — the screen unlock included —
+                        // arms the key for AUTH_WINDOW_SECONDS; outside the window
+                        // operations throw UserNotAuthenticatedException and the caller
+                        // prompts. Credential is always accepted so devices without
+                        // biometrics (or after biometric lockout) still work.
                         setUserAuthenticationParameters(
-                            0,
+                            AUTH_WINDOW_SECONDS,
                             KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
                         )
                         // Enrolling a new fingerprint already requires the device
