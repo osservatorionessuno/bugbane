@@ -16,32 +16,64 @@ import javax.crypto.spec.GCMParameterSpec
  * hardware — **StrongBox** (a discrete secure element, e.g. Titan M2) when the
  * device has one, otherwise the **TEE**.
  *
- * Keys created with `requireAuth` demand a **recent** user authentication
+ * Keys created with [Auth.WINDOW] demand a **recent** user authentication
  * (biometric if enrolled, else the lock-screen credential — the screen unlock
  * itself counts): [wrap]/[unwrap] throw
  * [android.security.keystore.UserNotAuthenticatedException] once the last
  * authentication is older than [AUTH_WINDOW_SECONDS]; show a
  * `BiometricPrompt` to refresh the window and retry.
+ *
+ * Keys created with [Auth.PER_OPERATION] demand a **fresh** authentication per
+ * operation: [wrap]/[unwrap] always fail for them. Instead initialize a cipher
+ * with [beginWrap]/[beginUnwrap], authorize it through a
+ * `BiometricPrompt.CryptoObject`, and complete with [finishWrap]/[finishUnwrap].
  */
 class AndroidKeystoreKeyVault private constructor(
     private val key: SecretKey,
 ) : KeyVault {
 
-    override fun wrap(fileKey: ByteArray): ByteArray {
+    override fun wrap(fileKey: ByteArray): ByteArray = finishWrap(beginWrap(), fileKey)
+
+    override fun unwrap(blob: ByteArray): ByteArray = finishUnwrap(beginUnwrap(blob), blob)
+
+    /** Cipher ready to encrypt; for [Auth.PER_OPERATION] keys pass it through a BiometricPrompt first. */
+    fun beginWrap(): Cipher {
         val cipher = Cipher.getInstance(TRANSFORM) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         cipher.init(Cipher.ENCRYPT_MODE, key) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
+        return cipher
+    }
+
+    /** Complete a wrap with a cipher from [beginWrap] (possibly authorized in between). */
+    fun finishWrap(cipher: Cipher, fileKey: ByteArray): ByteArray {
         val iv = cipher.iv
         val ct = cipher.doFinal(fileKey)
         // [ivLen:1][iv][ciphertext+tag]
         return byteArrayOf(iv.size.toByte()) + iv + ct
     }
 
-    override fun unwrap(blob: ByteArray): ByteArray {
+    /** Cipher ready to decrypt [blob]; for [Auth.PER_OPERATION] keys pass it through a BiometricPrompt first. */
+    fun beginUnwrap(blob: ByteArray): Cipher {
         val ivLen = blob[0].toInt() and 0xFF
         val iv = blob.copyOfRange(1, 1 + ivLen)
         val cipher = Cipher.getInstance(TRANSFORM) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv)) // nosemgrep: kotlin.lang.security.gcm-detection.gcm-detection
+        return cipher
+    }
+
+    /** Complete an unwrap with a cipher from [beginUnwrap] (possibly authorized in between). */
+    fun finishUnwrap(cipher: Cipher, blob: ByteArray): ByteArray {
+        val ivLen = blob[0].toInt() and 0xFF
         return cipher.doFinal(blob, 1 + ivLen, blob.size - 1 - ivLen)
+    }
+
+    /** User-authentication demand for key operations (fixed at key creation). */
+    enum class Auth {
+        /** None: any process with the app's UID can use the key. */
+        NONE,
+        /** A biometric/credential authentication no older than [AUTH_WINDOW_SECONDS]. */
+        WINDOW,
+        /** A fresh authentication per operation, delivered via `BiometricPrompt.CryptoObject`. */
+        PER_OPERATION,
     }
 
     /** How to pick StrongBox vs TEE when generating a new AES key. */
@@ -63,18 +95,18 @@ class AndroidKeystoreKeyVault private constructor(
         const val AUTH_WINDOW_SECONDS = 10 * 60
 
         /**
-         * Load or create a vault for [alias]. [requireAuth] (creation-time only)
-         * gates key operations behind a biometric/credential authentication no
-         * older than [AUTH_WINDOW_SECONDS]; it requires a secure lock screen.
+         * Load or create a vault for [alias]. [auth] (creation-time only) gates key
+         * operations behind a biometric/credential authentication; an auth-gated
+         * key requires a secure lock screen.
          */
         @JvmStatic
         @JvmOverloads
         fun getOrCreateKeyVault(
             alias: String,
             strongBoxPolicy: StrongBoxPolicy,
-            requireAuth: Boolean = false,
+            auth: Auth = Auth.NONE,
         ): AndroidKeystoreKeyVault {
-            val key = getOrCreateKey(alias, strongBoxPolicy, requireAuth)
+            val key = getOrCreateKey(alias, strongBoxPolicy, auth)
             return AndroidKeystoreKeyVault(key)
         }
 
@@ -95,26 +127,26 @@ class AndroidKeystoreKeyVault private constructor(
         private fun getOrCreateKey(
             alias: String,
             strongBoxPolicy: StrongBoxPolicy,
-            requireAuth: Boolean,
+            auth: Auth,
         ): SecretKey {
             val ks = KeyStore.getInstance(KEYSTORE).apply { load(null) }
             (ks.getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.secretKey?.let { return it }
 
             return when (strongBoxPolicy) {
                 StrongBoxPolicy.PREFER -> try {
-                    generateAesKey(alias, strongBox = true, requireAuth = requireAuth)
+                    generateAesKey(alias, strongBox = true, auth = auth)
                 } catch (_: StrongBoxUnavailableException) {
-                    generateAesKey(alias, strongBox = false, requireAuth = requireAuth)
+                    generateAesKey(alias, strongBox = false, auth = auth)
                 }
-                StrongBoxPolicy.NEVER -> generateAesKey(alias, strongBox = false, requireAuth = requireAuth)
-                StrongBoxPolicy.REQUIRE -> generateAesKey(alias, strongBox = true, requireAuth = requireAuth)
+                StrongBoxPolicy.NEVER -> generateAesKey(alias, strongBox = false, auth = auth)
+                StrongBoxPolicy.REQUIRE -> generateAesKey(alias, strongBox = true, auth = auth)
             }
         }
 
         private fun generateAesKey(
             alias: String,
             strongBox: Boolean,
-            requireAuth: Boolean,
+            auth: Auth,
         ): SecretKey {
             val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE)
             val spec = KeyGenParameterSpec.Builder(
@@ -126,15 +158,18 @@ class AndroidKeystoreKeyVault private constructor(
                 .setKeySize(256)
                 .setIsStrongBoxBacked(strongBox)
                 .apply {
-                    if (requireAuth) {
+                    if (auth != Auth.NONE) {
                         setUserAuthenticationRequired(true)
-                        // Any successful authentication — the screen unlock included —
-                        // arms the key for AUTH_WINDOW_SECONDS; outside the window
-                        // operations throw UserNotAuthenticatedException and the caller
-                        // prompts. Credential is always accepted so devices without
-                        // biometrics (or after biometric lockout) still work.
+                        // WINDOW: any successful authentication — the screen unlock
+                        // included — arms the key for AUTH_WINDOW_SECONDS; outside the
+                        // window operations throw UserNotAuthenticatedException and the
+                        // caller prompts. PER_OPERATION (timeout 0): a fresh
+                        // authentication per operation, delivered via
+                        // BiometricPrompt.CryptoObject — a root process cannot piggyback
+                        // on an earlier unlock. Credential is always accepted so devices
+                        // without biometrics (or after biometric lockout) still work.
                         setUserAuthenticationParameters(
-                            AUTH_WINDOW_SECONDS,
+                            if (auth == Auth.WINDOW) AUTH_WINDOW_SECONDS else 0,
                             KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
                         )
                         // Enrolling a new fingerprint already requires the device
