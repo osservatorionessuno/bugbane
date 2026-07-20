@@ -96,8 +96,7 @@ class AcquisitionShareProvider : ContentProvider() {
     companion object {
         private const val AUTHORITY_SUFFIX = ".shareprovider"
 
-        // A registered share whose target is never opened (the user dismissed the
-        // chooser) would otherwise keep the unlocked identity in the heap. Bound it.
+        // Bounds how long a share nobody opens keeps its unlocked identity in the heap.
         private const val PENDING_TTL_MS = 5L * 60 * 1000
 
         private val pending = ConcurrentHashMap<String, PendingExport>()
@@ -116,9 +115,7 @@ class AcquisitionShareProvider : ContentProvider() {
             sweepStale()
             val id = UUID.randomUUID().toString()
             pending[id] = PendingExport(archive, identity, passphrase, displayName, SystemClock.elapsedRealtime())
-            // Don't rely on a *later* enqueue to sweep this one: if the user shares
-            // once and never again, an untouched entry would keep its unlocked
-            // identity alive until process death. Guarantee the bound with a timer.
+            // A timer enforces the TTL even if no later enqueue runs sweepStale.
             mainHandler.postDelayed(::sweepStale, PENDING_TTL_MS + 1_000)
             return Uri.parse("content://${context.packageName}$AUTHORITY_SUFFIX/$id")
         }

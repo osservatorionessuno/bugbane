@@ -132,10 +132,8 @@ object AcquisitionIdentityVault {
     /** Whether the keystore is hardware-backed (TEE/StrongBox) rather than software (emulator). */
     fun hasHardwareKeystore(): Boolean {
         hwKeystoreCache?.let { return it }
-        // null = the probe threw (e.g. keystore momentarily unavailable). Only a
-        // genuine hardware/software determination is cached; a transient failure
-        // must NOT be memoized, or a StrongBox device could be permanently
-        // downgraded to the password tier for the process lifetime.
+        // null = the probe threw (keystore momentarily unavailable). Cache only a
+        // genuine hardware/software determination, never a transient failure.
         val probed: Boolean? = runCatching {
             val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
             gen.init(

@@ -102,8 +102,7 @@ fun AcquisitionProtectionPage(onProtected: () -> Unit) {
         scope.launch {
             try {
                 // Prefer the secure element; fall back to the TEE if StrongBox is
-                // unavailable *or* rejects the key for any reason, so a flaky
-                // secure element can't strand the user on this step.
+                // unavailable or rejects the key for any reason.
                 val strongBoxWorked = AcquisitionIdentityVault.strongBoxAvailable(context) &&
                     runCatching { AcquisitionIdentityVault.setupStrongBox(context) }
                         .onFailure { if (it is AcquisitionIdentityVault.UserAuthenticationException) throw it }
