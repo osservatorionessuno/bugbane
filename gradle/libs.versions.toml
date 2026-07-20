@@ -1,5 +1,6 @@
 [versions]
 agp                   = "8.11.1"
+lint                  = "31.11.1"
 kotlin                = "2.2.10"
 coreKtx               = "1.17.0"
 junitVersion          = "1.3.0"
@@ -24,6 +25,7 @@ acra                  = "5.13.1"
 
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
+android-lint          = { id = "com.android.lint",                   version.ref = "agp" }
 kotlin-android        = { id = "org.jetbrains.kotlin.android",       version.ref = "kotlin" }
 kotlin-jvm            = { id = "org.jetbrains.kotlin.jvm",           version.ref = "kotlin" }
 kotlin-compose        = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
@@ -53,6 +55,8 @@ protobuf-javalite                 = { group = "com.google.protobuf",          na
 protoc                            = { group = "com.google.protobuf",          name = "protoc",                 version.ref = "protobuf" }
 junit-jupiter-api                 = { group = "org.junit.jupiter",            name = "junit-jupiter-api",      version.ref = "junitJupiter" }
 junit-jupiter-engine              = { group = "org.junit.jupiter",            name = "junit-jupiter-engine",   version.ref = "junitJupiter" }
+lint-api                          = { group = "com.android.tools.lint",       name = "lint-api",               version.ref = "lint" }
+lint-tests                        = { group = "com.android.tools.lint",       name = "lint-tests",             version.ref = "lint" }
 androidx-work-runtime-ktx         = { group = "androidx.work",              name = "work-runtime-ktx",      version.ref = "work" }
 kage                              = { group = "com.github.android-password-store", name = "kage", version.ref = "kage" }
 org-json                          = { group = "org.json",                     name = "json",                   version.ref = "json" }
