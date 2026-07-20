@@ -40,18 +40,28 @@ object PassphraseKeyWrap {
     fun seal(secret: ByteArray, passphrase: ByteArray): ByteArray {
         val salt = AgePrimitives.randomBytes(SALT_SIZE)
         val key = argon2id(passphrase, salt, MEMORY_KIB, T_COST, PARALLELISM)
-        val header = ByteArray(HEADER_SIZE)
-        header[0] = VERSION
-        header[1] = T_COST.toByte()
-        header[2] = PARALLELISM.toByte()
-        for (i in 0..3) header[3 + i] = (MEMORY_KIB ushr (8 * (3 - i)) and 0xFF).toByte()
-        salt.copyInto(header, 7)
-        return header + AgePrimitives.chachaSeal(key, ZERO_NONCE, secret)
+        try {
+            val header = ByteArray(HEADER_SIZE)
+            header[0] = VERSION
+            header[1] = T_COST.toByte()
+            header[2] = PARALLELISM.toByte()
+            for (i in 0..3) header[3 + i] = (MEMORY_KIB ushr (8 * (3 - i)) and 0xFF).toByte()
+            salt.copyInto(header, 7)
+            return header + AgePrimitives.chachaSeal(key, ZERO_NONCE, secret)
+        } finally {
+            key.fill(0)
+        }
     }
 
     /** Open a blob produced by [seal]; returns null on a wrong passphrase (or tampered blob). */
-    fun open(blob: ByteArray, passphrase: ByteArray): ByteArray? =
-        openWithKey(blob, deriveKey(blob, passphrase))
+    fun open(blob: ByteArray, passphrase: ByteArray): ByteArray? {
+        val key = deriveKey(blob, passphrase)
+        try {
+            return openWithKey(blob, key)
+        } finally {
+            key.fill(0)
+        }
+    }
 
     /**
      * Run Argon2id over [passphrase] with the parameters embedded in [blob], returning

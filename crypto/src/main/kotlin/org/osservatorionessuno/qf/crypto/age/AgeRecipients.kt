@@ -19,8 +19,14 @@ class X25519Recipient(private val publicKey: ByteArray) : AgeRecipient {
         val shared = AgePrimitives.x25519(ephemeral, publicKey)
             ?: throw IllegalArgumentException("X25519 recipient is a low-order point")
         val wrapKey = AgePrimitives.hkdf(share + publicKey, shared, INFO, 32)
-        val body = AgePrimitives.chachaSeal(wrapKey, ZERO_NONCE, fileKey)
-        return listOf(AgeStanza("X25519", listOf(AgeFormat.encodeArg(share)), body))
+        try {
+            val body = AgePrimitives.chachaSeal(wrapKey, ZERO_NONCE, fileKey)
+            return listOf(AgeStanza("X25519", listOf(AgeFormat.encodeArg(share)), body))
+        } finally {
+            ephemeral.fill(0)
+            shared.fill(0)
+            wrapKey.fill(0)
+        }
     }
 
     internal companion object {
@@ -54,8 +60,13 @@ class X25519Identity(secretKey: ByteArray) : DestroyableAgeIdentity {
                 if (share.size != 32) continue
                 val shared = AgePrimitives.x25519(secretKey, share) ?: continue
                 val wrapKey = AgePrimitives.hkdf(share + publicKey, shared, X25519Recipient.INFO, 32)
-                runCatching { AgePrimitives.chachaOpen(wrapKey, X25519Recipient.ZERO_NONCE, s.body) }
-                    .getOrNull()?.let { if (it.size == AgeFormat.FILE_KEY_SIZE) return@withBytes it }
+                try {
+                    runCatching { AgePrimitives.chachaOpen(wrapKey, X25519Recipient.ZERO_NONCE, s.body) }
+                        .getOrNull()?.let { if (it.size == AgeFormat.FILE_KEY_SIZE) return@withBytes it }
+                } finally {
+                    shared.fill(0)
+                    wrapKey.fill(0)
+                }
             }
             null
         }
@@ -101,8 +112,12 @@ class ScryptRecipient(private val passphrase: ByteArray, private val logN: Int =
     override fun wrap(fileKey: ByteArray): List<AgeStanza> {
         val salt = AgePrimitives.randomBytes(16)
         val wrapKey = AgePrimitives.scrypt(passphrase, LABEL + salt, logN)
-        val body = AgePrimitives.chachaSeal(wrapKey, X25519Recipient.ZERO_NONCE, fileKey)
-        return listOf(AgeStanza("scrypt", listOf(AgeFormat.encodeArg(salt), logN.toString()), body))
+        try {
+            val body = AgePrimitives.chachaSeal(wrapKey, X25519Recipient.ZERO_NONCE, fileKey)
+            return listOf(AgeStanza("scrypt", listOf(AgeFormat.encodeArg(salt), logN.toString()), body))
+        } finally {
+            wrapKey.fill(0)
+        }
     }
 
     internal companion object {
@@ -125,6 +140,10 @@ class ScryptIdentity(private val passphrase: ByteArray) : AgeIdentity {
             throw AgeFormatException("invalid or unsafe scrypt work factor (logN=$logN)")
         }
         val wrapKey = AgePrimitives.scrypt(passphrase, ScryptRecipient.LABEL + salt, logN)
-        return runCatching { AgePrimitives.chachaOpen(wrapKey, X25519Recipient.ZERO_NONCE, s.body) }.getOrNull()
+        try {
+            return runCatching { AgePrimitives.chachaOpen(wrapKey, X25519Recipient.ZERO_NONCE, s.body) }.getOrNull()
+        } finally {
+            wrapKey.fill(0)
+        }
     }
 }
