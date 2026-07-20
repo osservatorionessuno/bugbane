@@ -81,8 +81,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     // Set when the biometric-gated key was destroyed by the screen lock being
     // removed — the acquisitions can no longer be decrypted (see the dialog below).
     var identityLost by remember { mutableStateOf(false) }
-    // Guards the async unlock window so a double-tap can't launch two biometric
-    // prompts (and leak the un-destroyed identity from the first).
+    // Guards the async unlock window: a double-tap must not launch two biometric prompts.
     var unlocking by remember { mutableStateOf(false) }
 
     fun withUnlockedIdentity(onUnlocked: (DestroyableAgeIdentity) -> Unit) {
@@ -162,8 +161,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
         }
     }
 
-    // Zero any secret material still held if the composition leaves (rotation,
-    // navigation) — otherwise a config change would drop it un-zeroed on the heap.
+    // Zero any secret material still held when the composition leaves (rotation, navigation).
     DisposableEffect(Unit) {
         onDispose {
             pendingUnlock?.dispose()
@@ -243,10 +241,8 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     context.getString(org.osservatorionessuno.bugbane.R.string.acquisition_share_message, pass)
                 )
                 // The read grant only reliably follows a URI in ClipData; EXTRA_STREAM
-                // alone isn't covered. This grants read only to the app the user picks
-                // from the chooser (at launch) — the ciphertext is never exposed to
-                // other apps, and the decryption passphrase rides in EXTRA_TEXT, which
-                // only the chosen app receives.
+                // alone isn't covered. Only the app the user picks receives the grant
+                // and the EXTRA_TEXT passphrase.
                 clipData = ClipData.newRawUri(EXPORT_FILE_NAME, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }

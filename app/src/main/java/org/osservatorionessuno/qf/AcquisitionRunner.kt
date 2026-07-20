@@ -144,10 +144,9 @@ class AcquisitionRunner(
             analysisDir = AcquisitionIndex.ANALYSIS_DIR,
         )
 
-        // Encrypting only needs the public acquisition identity: no secret is
-        // unlocked, so no biometric/passphrase prompt during an acquisition. The
-        // fresh file key is cached so the first analysis right after acquiring
-        // doesn't prompt either (see SessionKeyCache).
+        // Encrypting needs only the public acquisition identity, so it never
+        // prompts. The fresh file key is cached so the first analysis doesn't
+        // prompt either (see SessionKeyCache).
         val recipient = AcquisitionIdentityVault.recipient(context)
         // On devices with no secure lock the acquisition is encrypted to an
         // in-memory ephemeral key until the user sets a password; record it so an
