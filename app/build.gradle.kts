@@ -164,6 +164,7 @@ dependencies {
 
     // Streaming encrypted+compressed acquisition archive (age + ZIP) engine.
     implementation(project(":crypto"))
+    lintChecks(project(":lint-rules"))
 
     // Tombstone protobuf (lite)
     implementation(libs.protobuf.javalite)
