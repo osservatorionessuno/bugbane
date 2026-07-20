@@ -150,7 +150,7 @@ object AcquisitionProgressTracker {
                     _pendingAcquisition.value = output
                 }
                 _showDisableReminder.value = true
-                autoAnalyze(appContext, output)
+                autoAnalyze(appContext, output, failed)
             }
         })
     }
@@ -160,7 +160,7 @@ object AcquisitionProgressTracker {
      * background the completion notification is deferred until the analysis
      * is done, so tapping it lands on the results.
      */
-    private fun autoAnalyze(context: Context, acquisitionDir: File) {
+    private fun autoAnalyze(context: Context, acquisitionDir: File, failed: List<String>) {
         _analyzing.value = acquisitionDir
         analysisScope.launch {
             var analyzed = false
@@ -173,8 +173,7 @@ object AcquisitionProgressTracker {
                 _analyzing.value = null
             }
             if (!isAppInForeground()) {
-                val failed = _failedModules.value
-                if (failed != null) {
+                if (failed.isNotEmpty()) {
                     postFailedNotification(context, failed)
                 } else {
                     postFinishedNotification(context, analyzed)
