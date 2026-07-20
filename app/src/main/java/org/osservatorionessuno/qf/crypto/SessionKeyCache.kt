@@ -9,8 +9,8 @@ import org.osservatorionessuno.qf.crypto.age.FileKeyIdentity
 import java.io.File
 
 /**
- * Session-scoped cache of per-archive file keys captured while *writing* an
- * acquisition, so the first analysis/export/share right after acquiring doesn't
+ * Session-scoped cache of per-archive file keys, cached as an acquisition
+ * finishes writing, so the first analysis/export/share right after doesn't
  * prompt for the identity unlock: the plaintext just transited this process, so
  * retaining its (single-archive) file key for a bounded window adds no
  * data-at-rest exposure beyond what a live compromise would already capture.
