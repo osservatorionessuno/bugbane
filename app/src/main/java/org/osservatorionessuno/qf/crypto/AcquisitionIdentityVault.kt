@@ -462,8 +462,7 @@ object AcquisitionIdentityVault {
 
     /**
      * Change the password on a passphrase tier ([Tier.PASSPHRASE], [Tier.STRONGBOX_PASSPHRASE],
-     * [Tier.TEE_PASSPHRASE]). False if [old] is wrong. On a two-factor tier this prompts
-     * twice (unwrap, then re-wrap). Argon2id on [Dispatchers.Default].
+     * [Tier.TEE_PASSPHRASE]). False if [old] is wrong. Argon2id on [Dispatchers.Default].
      */
     suspend fun changePassword(activity: Context, old: ByteArray, new: ByteArray): Boolean {
         val tier = tier(activity)?.takeIf { it.usesPassphrase } ?: return false

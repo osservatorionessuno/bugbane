@@ -123,7 +123,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     inner.fill(0)
                     onUnlocked(cached)
                 } else {
-                    pendingUnlock = PendingUnlock(inner, stacked = tier.usesBiometric, onUnlocked)
+                    pendingUnlock = PendingUnlock(inner, onUnlocked)
                 }
             }
 
@@ -612,15 +612,6 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             title = { Text(stringResource(R.string.acquisition_unlock_password_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // On a two-factor tier the fingerprint prompt already ran; make it
-                    // clear this second step is expected, not a repeat request.
-                    if (pending.stacked) {
-                        Text(
-                            text = stringResource(R.string.acquisition_unlock_password_stacked_hint),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it; wrongPassword = false },
@@ -950,14 +941,12 @@ enum class ProcessingState {
 
 /**
  * A read action waiting on the acquisition password. [inner] is the already-unwrapped
- * Argon2id blob (the outer layer was opened first — a fingerprint prompt on a
- * two-factor tier, a silent device-bind unwrap on the password-only tier), so password
- * retries need no further prompt. [stacked] is true when that outer step was a
- * fingerprint (a two-factor tier), used only to tailor the dialog copy.
+ * Argon2id blob (the outer layer was opened first — on a two-factor tier gated by the
+ * screen lock, on the password-only tier a silent device-bind unwrap), so password
+ * retries need no further prompt.
  */
 class PendingUnlock(
     val inner: ByteArray,
-    val stacked: Boolean,
     val onUnlocked: (DestroyableAgeIdentity) -> Unit,
 ) {
     fun dispose() = inner.fill(0)

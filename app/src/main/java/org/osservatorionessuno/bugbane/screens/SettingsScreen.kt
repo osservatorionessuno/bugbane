@@ -106,7 +106,7 @@ fun SettingsScreen() {
             AcquisitionIdentityVault.tier(context)?.takeIf { it.usesPassphrase }
         }
         if (passwordTier != null) {
-            ChangeAcquisitionPasswordCard(passwordTier)
+            ChangeAcquisitionPasswordCard()
             Spacer(modifier = Modifier.height(16.dp))
         }
 
@@ -209,7 +209,7 @@ fun SettingsScreen() {
  * encrypted to the identity, not the password, so nothing is re-encrypted.
  */
 @Composable
-private fun ChangeAcquisitionPasswordCard(tier: AcquisitionIdentityVault.Tier) {
+private fun ChangeAcquisitionPasswordCard() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var showDialog by remember { mutableStateOf(false) }
@@ -291,14 +291,6 @@ private fun ChangeAcquisitionPasswordCard(tier: AcquisitionIdentityVault.Tier) {
                     if (tooShort) stringResource(R.string.set_password_too_short, MIN_ACQUISITION_PASSWORD_LENGTH) else null, !working)
                 PasswordField(confirmation, { confirmation = it }, stringResource(R.string.set_password_confirm_label),
                     if (mismatch) stringResource(R.string.set_password_mismatch) else null, !working)
-                if (tier.usesBiometric) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.settings_change_password_two_prompts),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
             }
         },
         confirmButton = {
@@ -362,12 +354,12 @@ private fun ManageProtectionCard() {
     val close = { changed: Boolean -> action = null; if (changed) version++ }
     when (action) {
         ProtectionAction.ADD_PASSWORD ->
-            AddPasswordDialog(twoPrompts = tier.usesBiometric, onDone = close)
+            AddPasswordDialog(onDone = close)
         ProtectionAction.REMOVE_PASSWORD ->
-            ConfirmWithPasswordDialog(R.string.settings_remove_password, tier.usesBiometric,
+            ConfirmWithPasswordDialog(R.string.settings_remove_password,
                 run = { AcquisitionIdentityVault.removePassword(context, it) }, onDone = close)
         ProtectionAction.REMOVE_FINGERPRINT ->
-            ConfirmWithPasswordDialog(R.string.settings_remove_fingerprint, tier.usesBiometric,
+            ConfirmWithPasswordDialog(R.string.settings_remove_fingerprint,
                 run = { AcquisitionIdentityVault.removeFingerprint(context, it) }, onDone = close)
         null -> {}
     }
@@ -393,7 +385,6 @@ private fun ProtectionActionRow(titleRes: Int, descRes: Int, onClick: () -> Unit
 @Composable
 private fun ConfirmWithPasswordDialog(
     titleRes: Int,
-    twoPrompts: Boolean,
     run: suspend (ByteArray) -> Boolean,
     onDone: (changed: Boolean) -> Unit,
 ) {
@@ -411,12 +402,6 @@ private fun ConfirmWithPasswordDialog(
                 PasswordField(current, { current = it; wrongCurrent = false },
                     stringResource(R.string.settings_change_password_current),
                     if (wrongCurrent) stringResource(R.string.acquisition_unlock_password_wrong) else null, !working)
-                if (twoPrompts) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(stringResource(R.string.settings_change_password_two_prompts),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                }
             }
         },
         confirmButton = {
@@ -451,7 +436,7 @@ private fun ConfirmWithPasswordDialog(
 
 /** Add a password to a biometric-only identity (→ two-factor). */
 @Composable
-private fun AddPasswordDialog(twoPrompts: Boolean, onDone: (changed: Boolean) -> Unit) {
+private fun AddPasswordDialog(onDone: (changed: Boolean) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var new by remember { mutableStateOf("") }
@@ -470,12 +455,6 @@ private fun AddPasswordDialog(twoPrompts: Boolean, onDone: (changed: Boolean) ->
                     if (tooShort) stringResource(R.string.set_password_too_short, MIN_ACQUISITION_PASSWORD_LENGTH) else null, !working)
                 PasswordField(confirmation, { confirmation = it }, stringResource(R.string.set_password_confirm_label),
                     if (mismatch) stringResource(R.string.set_password_mismatch) else null, !working)
-                if (twoPrompts) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(stringResource(R.string.settings_change_password_two_prompts),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                }
             }
         },
         confirmButton = {
