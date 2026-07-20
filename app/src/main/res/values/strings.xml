@@ -226,6 +226,11 @@
     <string name="settings_remove_fingerprint_desc">Protect with the password alone. Unlike the fingerprint, this survives removing your screen lock — do it before removing the lock if you want to keep your acquisitions.</string>
     <string name="settings_protection_confirm_remove">Remove</string>
     <string name="settings_protection_updated">Protection updated</string>
+    <string name="settings_auth_mode_title">Unlock confirmation</string>
+    <string name="settings_auth_mode_window">Recent unlock</string>
+    <string name="settings_auth_mode_window_desc">No prompt while the device was unlocked within the last %1$d minutes.</string>
+    <string name="settings_auth_mode_per_op">Every operation</string>
+    <string name="settings_auth_mode_per_op_desc">Confirm your fingerprint or screen lock each time acquisitions are unlocked.</string>
     <string name="settings_protection_error">Couldn\'t update protection</string>
 
     <!-- Scan details strings -->

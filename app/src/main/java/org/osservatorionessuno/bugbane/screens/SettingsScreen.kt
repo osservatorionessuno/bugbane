@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
+import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -315,6 +317,8 @@ private enum class ProtectionAction { ADD_PASSWORD, REMOVE_PASSWORD, REMOVE_FING
  * drop either factor — never both. [AcquisitionIdentityVault.removeFingerprint] leaves
  * a password that survives lock removal; [AcquisitionIdentityVault.removePassword]
  * leaves the fingerprint. The keypair is preserved, so acquisitions stay readable.
+ * Also picks how the fingerprint gate confirms: a recent-unlock window or a fresh
+ * prompt per operation ([AcquisitionIdentityVault.AuthMode]).
  */
 @Composable
 private fun ManageProtectionCard() {
@@ -348,6 +352,8 @@ private fun ManageProtectionCard() {
                     action = ProtectionAction.REMOVE_FINGERPRINT
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            AuthModeSection(version)
         }
     }
 
@@ -362,6 +368,72 @@ private fun ManageProtectionCard() {
             ConfirmWithPasswordDialog(R.string.settings_remove_fingerprint,
                 run = { AcquisitionIdentityVault.removeFingerprint(context, it) }, onDone = close)
         null -> {}
+    }
+}
+
+/**
+ * Choose how the fingerprint gate confirms ([AcquisitionIdentityVault.AuthMode]):
+ * a recent unlock arming the keys for a window, or a fresh prompt per operation.
+ * Switching re-wraps only the identity's outer layer under the current tier and
+ * shows the prompt(s) the modes involved require.
+ */
+@Composable
+private fun AuthModeSection(version: Int) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var mode by remember(version) { mutableStateOf(AcquisitionIdentityVault.authMode(context)) }
+    var working by remember { mutableStateOf(false) }
+    if (mode == null) return
+
+    fun switch(target: AcquisitionIdentityVault.AuthMode) {
+        if (working || target == mode) return
+        working = true
+        scope.launch {
+            try {
+                if (AcquisitionIdentityVault.setAuthMode(context, target)) {
+                    mode = target
+                    Toast.makeText(context, R.string.settings_protection_updated, Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: AcquisitionIdentityVault.UserAuthenticationException) {
+                // biometric prompt dismissed — nothing changed
+            } catch (_: Exception) {
+                Toast.makeText(context, R.string.settings_protection_error, Toast.LENGTH_LONG).show()
+            } finally {
+                working = false
+            }
+        }
+    }
+
+    Text(
+        text = stringResource(R.string.settings_auth_mode_title),
+        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
+    )
+    AuthModeOption(
+        title = stringResource(R.string.settings_auth_mode_window),
+        desc = stringResource(R.string.settings_auth_mode_window_desc, AndroidKeystoreKeyVault.AUTH_WINDOW_SECONDS / 60),
+        selected = mode == AcquisitionIdentityVault.AuthMode.WINDOW,
+        enabled = !working,
+    ) { switch(AcquisitionIdentityVault.AuthMode.WINDOW) }
+    AuthModeOption(
+        title = stringResource(R.string.settings_auth_mode_per_op),
+        desc = stringResource(R.string.settings_auth_mode_per_op_desc),
+        selected = mode == AcquisitionIdentityVault.AuthMode.PER_OPERATION,
+        enabled = !working,
+    ) { switch(AcquisitionIdentityVault.AuthMode.PER_OPERATION) }
+}
+
+@Composable
+private fun AuthModeOption(title: String, desc: String, selected: Boolean, enabled: Boolean, onSelect: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        RadioButton(selected = selected, onClick = onSelect, enabled = enabled)
+        Column {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = desc,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+        }
     }
 }
 

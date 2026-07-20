@@ -10,6 +10,7 @@ import android.os.CancellationSignal
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -20,6 +21,7 @@ import java.io.File
 import java.io.IOException
 import java.security.SecureRandom
 import android.security.keystore.UserNotAuthenticatedException
+import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKeyFactory
 import kotlin.coroutines.resume
@@ -33,10 +35,9 @@ import kotlin.coroutines.resumeWithException
  * never prompts. The private key — which reads or exports an acquisition — is
  * stored wrapped according to the tier chosen for the device (see bugbane#86):
  *
- *  - [Tier.STRONGBOX] — wrapped by a StrongBox AES key requiring a recent
- *    biometric/credential authentication
- *    ([AndroidKeystoreKeyVault.AUTH_WINDOW_SECONDS]). Unextractable, and the
- *    secure element makes a boot-chain (BFU) attack inert.
+ *  - [Tier.STRONGBOX] — wrapped by a StrongBox AES key requiring a
+ *    biometric/credential authentication (see [AuthMode]). Unextractable, and
+ *    the secure element makes a boot-chain (BFU) attack inert.
  *  - [Tier.TEE_AUTH] — same, in the TEE, for devices without a secure element
  *    that keep only the fingerprint gate. Holds against plain root; a strong
  *    screen lock is what protects it against forensic extraction.
@@ -55,13 +56,27 @@ object AcquisitionIdentityVault {
     // Single file, written atomically, so the public key and sealed blob can never
     // be left in a half-written / mismatched state by a crash. Layout:
     //   [public key: PUB_SIZE][tier tag: 1][sealed blob …]
+    // where the sealed blob of a biometric tier is [auth mode tag: 1][wrapped …].
     private const val IDENTITY_FILE = "acquisition_identity"
     private const val PUB_SIZE = 32
 
+    // Auth mode is a key-creation-time property, so each mode wraps under its own
+    // alias: a mode switch creates the new key and atomically rewrites the file
+    // before the old key is deleted, and a crash can never strand the identity
+    // behind a key with the wrong parameters.
     private const val STRONGBOX_KEY_ALIAS = "bugbane.acquisition.identity.se"
+    private const val STRONGBOX_PER_OP_KEY_ALIAS = "bugbane.acquisition.identity.se.perop"
     private const val TEE_AUTH_KEY_ALIAS = "bugbane.acquisition.identity.tee.auth"
+    private const val TEE_AUTH_PER_OP_KEY_ALIAS = "bugbane.acquisition.identity.tee.auth.perop"
     private const val TEE_BIND_KEY_ALIAS = "bugbane.acquisition.identity.tee"
     private const val HW_PROBE_ALIAS = "bugbane.hwprobe"
+
+    private val AUTH_KEY_ALIASES = listOf(
+        STRONGBOX_KEY_ALIAS,
+        STRONGBOX_PER_OP_KEY_ALIAS,
+        TEE_AUTH_KEY_ALIAS,
+        TEE_AUTH_PER_OP_KEY_ALIAS,
+    )
 
     private const val SECRET_SIZE = 32
 
@@ -85,6 +100,28 @@ object AcquisitionIdentityVault {
         /** Has an Argon2id password layer. */
         val usesPassphrase: Boolean get() =
             this == PASSPHRASE || this == STRONGBOX_PASSPHRASE || this == TEE_PASSPHRASE
+    }
+
+    /**
+     * How a biometric tier's auth-gated keystore key demands authentication. Chosen
+     * per identity (stored in its sealed blob) and switchable in settings via
+     * [setAuthMode]; the auth-window default trades the CryptoObject binding for
+     * far fewer prompts.
+     */
+    enum class AuthMode(internal val tag: Byte) {
+        /**
+         * Any biometric/credential authentication — the screen unlock included —
+         * arms the key for [AndroidKeystoreKeyVault.AUTH_WINDOW_SECONDS]; a prompt
+         * appears only when the window lapsed.
+         */
+        WINDOW(1),
+
+        /**
+         * A fresh biometric/credential prompt authorizes each key operation
+         * through a `BiometricPrompt.CryptoObject`, so a compromised OS cannot
+         * piggyback on an earlier unlock.
+         */
+        PER_OPERATION(2),
     }
 
     /** Thrown when the user cancels or fails the biometric/credential prompt. */
@@ -175,6 +212,12 @@ object AcquisitionIdentityVault {
         val bytes = identityBytes(context) ?: return null
         val tag = bytes[PUB_SIZE]
         return Tier.entries.firstOrNull { it.tag == tag }
+    }
+
+    /** The identity's [AuthMode], or null when there is no biometric-tier identity. */
+    fun authMode(context: Context): AuthMode? {
+        val tier = tier(context)?.takeIf { it.usesBiometric } ?: return null
+        return authModeOf(sealedBlob(context, tier.tag))
     }
 
     // ------------------------------------------------------------ recipients
@@ -434,8 +477,7 @@ object AcquisitionIdentityVault {
      */
     fun discardIdentity(context: Context) {
         identityFile(context).delete()
-        AndroidKeystoreKeyVault.deleteKey(STRONGBOX_KEY_ALIAS)
-        AndroidKeystoreKeyVault.deleteKey(TEE_AUTH_KEY_ALIAS)
+        AUTH_KEY_ALIASES.forEach { AndroidKeystoreKeyVault.deleteKey(it) }
         AndroidKeystoreKeyVault.deleteKey(TEE_BIND_KEY_ALIAS)
         prefs(context).edit().remove(KEY_UNSEALED).remove(KEY_PROMPT_DISMISSED).apply()
         pendingSecret = null
@@ -496,6 +538,26 @@ object AcquisitionIdentityVault {
         return reseal(activity, from, Tier.PASSPHRASE, old, newPassphrase = old)
     }
 
+    /**
+     * Switch a biometric tier's [AuthMode], re-wrapping only the outer keystore layer
+     * (the keypair — and on a two-factor tier the Argon2id blob and its password — are
+     * untouched). One prompt to open under the current mode, plus one to authorize the
+     * re-wrap when switching to [AuthMode.PER_OPERATION]. False on a non-biometric tier.
+     */
+    suspend fun setAuthMode(activity: Context, mode: AuthMode): Boolean {
+        val tier = tier(activity)?.takeIf { it.usesBiometric } ?: return false
+        if (authMode(activity) == mode) return true
+        val inner = openOuter(activity, tier)
+        try {
+            val wrapped = wrapAuthGated(activity, tier, mode, inner)
+            store(activity, persistedPublicKey(activity)!!, byteArrayOf(tier.tag, mode.tag) + wrapped)
+        } finally {
+            inner.fill(0)
+        }
+        pruneKeystore(tier, mode)
+        return true
+    }
+
     // ------------------------------------------------------------- internals
 
     private fun newSecret(): ByteArray = ByteArray(SECRET_SIZE).also { SecureRandom().nextBytes(it) }
@@ -506,23 +568,31 @@ object AcquisitionIdentityVault {
         return identity.publicKeyBytes().also { identity.destroy() }
     }
 
-    private fun strongBoxVault() = AndroidKeystoreKeyVault.getOrCreateKeyVault(
-        STRONGBOX_KEY_ALIAS, AndroidKeystoreKeyVault.StrongBoxPolicy.REQUIRE, requireAuth = true,
-    )
-
-    private fun teeAuthVault() = AndroidKeystoreKeyVault.getOrCreateKeyVault(
-        TEE_AUTH_KEY_ALIAS, AndroidKeystoreKeyVault.StrongBoxPolicy.NEVER, requireAuth = true,
-    )
-
     private fun teeBindVault() = AndroidKeystoreKeyVault.getOrCreateKeyVault(
         TEE_BIND_KEY_ALIAS, AndroidKeystoreKeyVault.StrongBoxPolicy.NEVER,
     )
 
-    /** Keystore vault backing [tier]'s outer wrap layer. */
-    private fun keystoreVaultFor(tier: Tier): AndroidKeystoreKeyVault = when (tier) {
-        Tier.STRONGBOX, Tier.STRONGBOX_PASSPHRASE -> strongBoxVault()
-        Tier.TEE_AUTH, Tier.TEE_PASSPHRASE -> teeAuthVault()
-        Tier.PASSPHRASE -> teeBindVault()
+    /** Alias of the auth-gated key backing a biometric [tier] in [mode]; null for [Tier.PASSPHRASE]. */
+    private fun authKeyAlias(tier: Tier, mode: AuthMode): String? = when (tier) {
+        Tier.STRONGBOX, Tier.STRONGBOX_PASSPHRASE ->
+            if (mode == AuthMode.WINDOW) STRONGBOX_KEY_ALIAS else STRONGBOX_PER_OP_KEY_ALIAS
+        Tier.TEE_AUTH, Tier.TEE_PASSPHRASE ->
+            if (mode == AuthMode.WINDOW) TEE_AUTH_KEY_ALIAS else TEE_AUTH_PER_OP_KEY_ALIAS
+        Tier.PASSPHRASE -> null
+    }
+
+    /** Auth-gated keystore vault backing a biometric [tier]'s outer wrap layer in [mode]. */
+    private fun authVaultFor(tier: Tier, mode: AuthMode): AndroidKeystoreKeyVault {
+        val alias = checkNotNull(authKeyAlias(tier, mode)) { "tier has no auth-gated key" }
+        val policy = when (tier) {
+            Tier.STRONGBOX, Tier.STRONGBOX_PASSPHRASE -> AndroidKeystoreKeyVault.StrongBoxPolicy.REQUIRE
+            else -> AndroidKeystoreKeyVault.StrongBoxPolicy.NEVER
+        }
+        val auth = when (mode) {
+            AuthMode.WINDOW -> AndroidKeystoreKeyVault.Auth.WINDOW
+            AuthMode.PER_OPERATION -> AndroidKeystoreKeyVault.Auth.PER_OPERATION
+        }
+        return AndroidKeystoreKeyVault.getOrCreateKeyVault(alias, policy, auth)
     }
 
     /**
@@ -540,9 +610,11 @@ object AcquisitionIdentityVault {
         oldPassphrase: ByteArray?,
         newPassphrase: ByteArray?,
     ): Boolean {
+        // Read before sealAndStore overwrites the file: factor changes keep the mode.
+        val mode = authMode(activity) ?: AuthMode.WINDOW
         val secret = unlockSecret(activity, from, oldPassphrase) ?: return false
-        sealAndStore(activity, target, secret, newPassphrase) // takes ownership of secret
-        pruneKeystore(target)
+        sealAndStore(activity, target, secret, newPassphrase, mode) // takes ownership of secret
+        pruneKeystore(target, mode)
         return true
     }
 
@@ -555,14 +627,10 @@ object AcquisitionIdentityVault {
         return secret
     }
 
-    /** Delete the auth-gated keystore key(s) the now-current [tier] doesn't use (after dropping a factor). */
-    private fun pruneKeystore(tier: Tier) {
-        val keep = when (tier) {
-            Tier.STRONGBOX, Tier.STRONGBOX_PASSPHRASE -> STRONGBOX_KEY_ALIAS
-            Tier.TEE_AUTH, Tier.TEE_PASSPHRASE -> TEE_AUTH_KEY_ALIAS
-            Tier.PASSPHRASE -> null // uses the (non-auth) device-bind key, kept
-        }
-        for (alias in listOf(STRONGBOX_KEY_ALIAS, TEE_AUTH_KEY_ALIAS)) {
+    /** Delete the auth-gated keystore keys the now-current [tier]+[mode] doesn't use. */
+    private fun pruneKeystore(tier: Tier, mode: AuthMode) {
+        val keep = authKeyAlias(tier, mode) // null for PASSPHRASE: (non-auth) device-bind key, kept
+        for (alias in AUTH_KEY_ALIASES) {
             if (alias != keep) AndroidKeystoreKeyVault.deleteKey(alias)
         }
     }
@@ -571,27 +639,28 @@ object AcquisitionIdentityVault {
      * Seal [secret] into [tier] and persist it; ownership of [secret] is taken and it
      * is zeroed here. A tier is a stack of wrap layers applied inner→outer: an optional
      * Argon2id passphrase layer (iff [Tier.usesPassphrase]), then the tier's keystore
-     * layer — auth-gated (prompting iff the auth window lapsed) for a biometric tier
-     * ([Tier.usesBiometric]), else a plain device-bound wrap.
+     * layer — auth-gated in [mode] for a biometric tier ([Tier.usesBiometric]), else a
+     * plain device-bound wrap.
      */
-    private suspend fun sealAndStore(activity: Context, tier: Tier, secret: ByteArray, passphrase: ByteArray?) {
+    private suspend fun sealAndStore(
+        activity: Context,
+        tier: Tier,
+        secret: ByteArray,
+        passphrase: ByteArray?,
+        mode: AuthMode = AuthMode.WINDOW,
+    ) {
         try {
             val inner = if (tier.usesPassphrase) {
                 withContext(Dispatchers.Default) { PassphraseKeyWrap.seal(secret, passphrase!!) }
             } else {
                 secret
             }
-            val vault = keystoreVaultFor(tier)
-            val wrapped = if (tier.usesBiometric) {
-                withAuthWindow(
-                    activity,
-                    activity.getString(R.string.acquisition_protect_prompt_title),
-                    activity.getString(R.string.acquisition_protect_prompt_subtitle),
-                ) { vault.wrap(inner) }
+            val blob = if (tier.usesBiometric) {
+                byteArrayOf(tier.tag, mode.tag) + wrapAuthGated(activity, tier, mode, inner)
             } else {
-                vault.wrap(inner)
+                byteArrayOf(tier.tag) + teeBindVault().wrap(inner)
             }
-            store(activity, publicKeyOf(secret), byteArrayOf(tier.tag) + wrapped)
+            store(activity, publicKeyOf(secret), blob)
         } finally {
             secret.fill(0)
         }
@@ -600,21 +669,42 @@ object AcquisitionIdentityVault {
     /**
      * Open [tier]'s outer keystore layer and return what's beneath: the raw secret for
      * a biometric-only tier, or the Argon2id blob for a passphrase tier (opened with the
-     * password). Prompts iff the tier is auth-gated and the auth window lapsed.
+     * password). Prompts as the identity's [AuthMode] requires on a biometric tier.
      */
     private suspend fun openOuter(activity: Context, tier: Tier): ByteArray {
         val blob = sealedBlob(activity, tier.tag)
-        val vault = keystoreVaultFor(tier)
-        return if (tier.usesBiometric) {
-            withAuthWindow(
-                activity,
-                activity.getString(R.string.acquisition_unlock_prompt_title),
-                activity.getString(R.string.acquisition_unlock_prompt_subtitle),
-            ) { vault.unwrap(blob) }
-        } else {
-            vault.unwrap(blob)
+        if (!tier.usesBiometric) return teeBindVault().unwrap(blob)
+        val mode = authModeOf(blob)
+        val wrapped = blob.copyOfRange(1, blob.size)
+        val vault = authVaultFor(tier, mode)
+        val title = activity.getString(R.string.acquisition_unlock_prompt_title)
+        val subtitle = activity.getString(R.string.acquisition_unlock_prompt_subtitle)
+        return when (mode) {
+            AuthMode.WINDOW -> withAuthWindow(activity, title, subtitle) { vault.unwrap(wrapped) }
+            AuthMode.PER_OPERATION -> {
+                val cipher = authenticate(activity, vault.beginUnwrap(wrapped), title, subtitle)
+                vault.finishUnwrap(cipher, wrapped)
+            }
         }
     }
+
+    /** Wrap [inner] under a biometric [tier]'s keystore key in [mode], prompting as the mode requires. */
+    private suspend fun wrapAuthGated(activity: Context, tier: Tier, mode: AuthMode, inner: ByteArray): ByteArray {
+        val vault = authVaultFor(tier, mode)
+        val title = activity.getString(R.string.acquisition_protect_prompt_title)
+        val subtitle = activity.getString(R.string.acquisition_protect_prompt_subtitle)
+        return when (mode) {
+            AuthMode.WINDOW -> withAuthWindow(activity, title, subtitle) { vault.wrap(inner) }
+            AuthMode.PER_OPERATION -> {
+                val cipher = authenticate(activity, vault.beginWrap(), title, subtitle)
+                vault.finishWrap(cipher, inner)
+            }
+        }
+    }
+
+    /** The [AuthMode] tag leading a biometric tier's sealed [blob]. */
+    private fun authModeOf(blob: ByteArray): AuthMode =
+        checkNotNull(AuthMode.entries.firstOrNull { it.tag == blob[0] }) { "unknown auth mode" }
 
     private fun sealedBlob(context: Context, expectedTier: Byte): ByteArray {
         val bytes = identityBytes(context) ?: error("acquisition identity not initialized")
@@ -676,6 +766,31 @@ object AcquisitionIdentityVault {
         title: String,
         subtitle: String,
     ): Unit = suspendCancellableCoroutine { cont ->
+        promptAuthentication(context, title, subtitle, cipher = null, cont) { cont.resume(Unit) }
+    }
+
+    /** Show a biometric-or-credential prompt authorizing exactly [cipher]'s operation. */
+    private suspend fun authenticate(
+        context: Context,
+        cipher: Cipher,
+        title: String,
+        subtitle: String,
+    ): Cipher = suspendCancellableCoroutine { cont ->
+        promptAuthentication(context, title, subtitle, cipher, cont) { result ->
+            val authorized = result.cryptoObject?.cipher
+            if (authorized != null) cont.resume(authorized)
+            else cont.resumeWithException(UserAuthenticationException("no cipher in authentication result"))
+        }
+    }
+
+    private fun <T> promptAuthentication(
+        context: Context,
+        title: String,
+        subtitle: String,
+        cipher: Cipher?,
+        cont: CancellableContinuation<T>,
+        onSuccess: (BiometricPrompt.AuthenticationResult) -> Unit,
+    ) {
         val prompt = BiometricPrompt.Builder(context)
             .setTitle(title)
             .setSubtitle(subtitle)
@@ -683,18 +798,19 @@ object AcquisitionIdentityVault {
             .build()
         val signal = CancellationSignal()
         cont.invokeOnCancellation { signal.cancel() }
-        prompt.authenticate(
-            signal,
-            context.mainExecutor,
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    cont.resume(Unit)
-                }
+        val callback = object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                onSuccess(result)
+            }
 
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
-                    cont.resumeWithException(UserAuthenticationException(errString?.toString() ?: "error $errorCode"))
-                }
-            },
-        )
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                cont.resumeWithException(UserAuthenticationException(errString?.toString() ?: "error $errorCode"))
+            }
+        }
+        if (cipher != null) {
+            prompt.authenticate(BiometricPrompt.CryptoObject(cipher), signal, context.mainExecutor, callback)
+        } else {
+            prompt.authenticate(signal, context.mainExecutor, callback)
+        }
     }
 }
