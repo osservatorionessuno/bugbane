@@ -1,6 +1,7 @@
 package org.osservatorionessuno.bugbane.utils
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -202,17 +203,19 @@ object AcquisitionProgressTracker {
         return state.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
     }
 
-    private fun ensureAcquisitionChannel(context: Context): NotificationManagerCompat? {
+    // Permission check and notify() must stay in the same function for lint's
+    // MissingPermission dataflow analysis.
+    private fun postAcquisitionNotification(context: Context, notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             Log.w(TAG, "Notification permission missing, skipping acquisition notification")
-            return null
+            return
         }
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) {
             Log.w(TAG, "Notifications disabled for the app; skipping acquisition notification")
-            return null
+            return
         }
         manager.createNotificationChannel(
             NotificationChannel(
@@ -221,7 +224,7 @@ object AcquisitionProgressTracker {
                 NotificationManager.IMPORTANCE_HIGH
             )
         )
-        return manager
+        manager.notify(NOTIFICATION_ID, notification)
     }
 
     private fun reopenAppIntent(context: Context): PendingIntent {
@@ -234,7 +237,6 @@ object AcquisitionProgressTracker {
     }
 
     private fun postFinishedNotification(context: Context, analyzed: Boolean) {
-        val manager = ensureAcquisitionChannel(context) ?: return
         // Reopen the app; ScanScreen consumes the pending acquisition and
         // navigates to the results.
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -251,11 +253,10 @@ object AcquisitionProgressTracker {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
-        manager.notify(NOTIFICATION_ID, notification)
+        postAcquisitionNotification(context, notification)
     }
 
     private fun postFailedNotification(context: Context, failed: List<String>) {
-        val manager = ensureAcquisitionChannel(context) ?: return
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_bugbane_zoom)
             .setContentTitle(context.getString(R.string.notification_acquisition_failed_title))
@@ -270,6 +271,6 @@ object AcquisitionProgressTracker {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
-        manager.notify(NOTIFICATION_ID, notification)
+        postAcquisitionNotification(context, notification)
     }
 }
