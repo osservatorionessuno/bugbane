@@ -154,10 +154,11 @@ class AcquisitionRunner(
         if (AcquisitionIdentityVault.hasPendingEphemeral()) {
             AcquisitionIdentityVault.markUnsealed(context, acquisitionDir)
         }
+        var fileKey: ByteArray? = null
         val writer = EncryptedAcquisitionWriter(
             acquisitionDir,
             listOf(recipient),
-            onFileKey = { SessionKeyCache.put(context, acquisitionDir, it) },
+            onFileKey = { fileKey = it },
         )
 
         var cancelled = false
@@ -219,6 +220,11 @@ class AcquisitionRunner(
             runCatching { writer.close() }
                 .onFailure { Log.e(TAG, "Failed to close acquisition archive", it) }
         }
+
+        // Cache only once the writer is closed: a screen-off during the (long)
+        // acquisition evicts the cache, so an early put would never survive
+        // until the automatic first analysis.
+        fileKey?.let { SessionKeyCache.put(context, acquisitionDir, it) }
 
         Log.i(TAG, "Acquisition finished in ${acquisitionDir.absolutePath}")
         listener?.onFinished(cancelled, acquisitionDir)
