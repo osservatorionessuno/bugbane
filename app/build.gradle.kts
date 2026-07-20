@@ -186,3 +186,11 @@ protobuf {
         }
     }
 }
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "failed", "skipped", "standardOut", "standardError")
+        showStandardStreams = true
+    }
+}
