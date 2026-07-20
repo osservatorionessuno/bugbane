@@ -38,6 +38,8 @@
     <string name="scan_cancelling_button">Annullamento...</string>
     <string name="scan_module_running">Esecuzione di %1$s: %2$s</string>
     <string name="scan_module_completed">Completato %1$s: %2$s</string>
+    <string name="scan_acquisition_failed_message">Attenzione: L\'acquisizione è incompleta.\nPuoi trovarla nella scheda Acquisizioni.\nModuli falliti: %1$s</string>
+    <string name="scan_acquisition_failed_rescan">Acquisisci nuovamente</string>
     <string name="beta_warning_title">Avviso Versione Beta</string>
     <string name="beta_warning_message">Questa è una versione Beta. Installala e testala su un telefono di riserva, NON su quello che usi quotidianamente. Procedi solo se hai compreso i rischi.</string>
     <string name="beta_warning_quit">Esci dall\'app</string>

@@ -42,27 +42,31 @@ private const val TAG = "AcquisitionRunner"
  * to be implemented.
  */
 class AcquisitionRunner(
-    private val modules: List<Module> = listOf(
-        Env(),
-        Dumpsys(),
-        Files(),
-        Bugreport(),
-        Logs(),
-        Logcat(),
-        GetProp(),
-        Mounts(),
-        Packages(),
-        Processes(),
-        RootBinaries(),
-        Services(),
-        Settings(),
-        SELinux(),
-        Temp()
-    )
+    private val modules: List<Module> = DEFAULT_MODULES
 ) {
 
     companion object {
         const val ACQUISITION_KEY_ALIAS = "bugbane.acquisition.kek"
+
+        val DEFAULT_MODULES: List<Module> = listOf(
+            Env(),
+            Dumpsys(),
+            Files(),
+            Bugreport(),
+            Logs(),
+            Logcat(),
+            GetProp(),
+            Mounts(),
+            Packages(),
+            Processes(),
+            RootBinaries(),
+            Services(),
+            Settings(),
+            SELinux(),
+            Temp()
+        )
+
+        val MODULE_NAMES: List<String> = DEFAULT_MODULES.map { it.name }
 
         fun acquisitionKeyVault(): AndroidKeystoreKeyVault =
             AndroidKeystoreKeyVault.getOrCreateKeyVault(ACQUISITION_KEY_ALIAS, StrongBoxPolicy.PREFER)
@@ -74,7 +78,7 @@ class AcquisitionRunner(
     interface ProgressListener {
         fun onModuleStart(name: String, completed: Int, total: Int)
         fun onModuleProgress(name: String, bytes: Long)
-        fun onModuleComplete(name: String, completed: Int, total: Int)
+        fun onModuleComplete(name: String, completed: Int, total: Int, success: Boolean)
         fun isCancelled(): Boolean
         fun onFinished(cancelled: Boolean, output: File?)
     }
@@ -157,15 +161,17 @@ class AcquisitionRunner(
                 }
                 Log.i(TAG, "Running module ${module.name}")
                 listener?.onModuleStart(module.name, completedCount, total)
+                var success = true
                 try {
                     module.run(context, manager, writer, progressCb)
                     Log.i(TAG, "Module ${module.name} finished")
                 } catch (t: Throwable) {
+                    success = false
                     Log.e(TAG, "Module ${module.name} failed", t)
                     // TODO: display error message to the user
                 }
                 completedCount++
-                listener?.onModuleComplete(module.name, completedCount, total)
+                listener?.onModuleComplete(module.name, completedCount, total, success)
             }
 
             val completed = Instant.now()
