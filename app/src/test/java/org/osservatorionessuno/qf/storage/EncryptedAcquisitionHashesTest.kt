@@ -4,32 +4,50 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.osservatorionessuno.qf.crypto.InMemoryKeyVault
-import java.io.File
+import java.nio.file.Files
 import java.security.MessageDigest
+
+private fun sha256Hex(data: ByteArray): String =
+    MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }
 
 class ArtifactHashesTest {
 
     @Test
-    fun `parse matches example hashes csv format`() {
-        val content = """
-            getprop.txt,a7adc0aeb573a9c881d7379f87444359afc4bf2515a0378de89e3d26e3473d8b
-            env.txt,7fec02dc1108aa9b2a53337c11c7f2980947da6e294c35f1e49dddb5d5fa5c65
-
-        """.trimIndent()
+    fun `parse matches androidqf hashes csv format`() {
+        val hashA = "a7adc0aeb573a9c881d7379f87444359afc4bf2515a0378de89e3d26e3473d8b"
+        val hashB = "7fec02dc1108aa9b2a53337c11c7f2980947da6e294c35f1e49dddb5d5fa5c65"
+        val content = "getprop.txt,$hashA\n\"logs/anr,with,commas.txt\",$hashB\n"
 
         val parsed = ArtifactHashes.parse(content)
         assertEquals(2, parsed.size)
-        assertEquals("getprop.txt" to "a7adc0aeb573a9c881d7379f87444359afc4bf2515a0378de89e3d26e3473d8b", parsed[0])
-        assertEquals("env.txt" to "7fec02dc1108aa9b2a53337c11c7f2980947da6e294c35f1e49dddb5d5fa5c65", parsed[1])
+        assertEquals("getprop.txt" to hashA, parsed[0])
+        assertEquals("logs/anr,with,commas.txt" to hashB, parsed[1])
     }
 
     @Test
-    fun `formatLine is path comma sha256 newline`() {
+    fun `formatLine quotes paths that need it`() {
+        val hash = "a".repeat(64)
+        assertEquals("getprop.txt,$hash\n", ArtifactHashes.formatLine("getprop.txt", hash))
         assertEquals(
-            "getprop.txt,abc\n",
-            ArtifactHashes.formatLine("getprop.txt", "abc"),
+            "\"logs/anr,trace.txt\",$hash\n",
+            ArtifactHashes.formatLine("logs/anr,trace.txt", hash),
         )
+    }
+
+    @Test
+    fun `quoted quotes and newlines in paths round-trip through format and parse`() {
+        val hash = "a".repeat(64)
+        for (path in listOf("""logs/we"ird.txt""", "logs/multi\nline.txt")) {
+            assertEquals(listOf(path to hash), ArtifactHashes.parse(ArtifactHashes.formatLine(path, hash)))
+        }
+    }
+
+    @Test
+    fun `parse rejects malformed records`() {
+        assertThrows<IllegalArgumentException> { ArtifactHashes.parse("no-comma-at-all") }
+        assertThrows<IllegalArgumentException> { ArtifactHashes.parse("\"unterminated.txt,${"a".repeat(64)}") }
     }
 }
 
@@ -48,14 +66,48 @@ class DigestingOutputStreamTest {
 
 class EncryptedAcquisitionHashesTest {
 
+    private fun tempDir() = Files.createTempDirectory("hashes-test-").toFile().also { it.deleteOnExit() }
+
     @Test
     fun `hashes csv is reserved from module artifacts`() {
-        val dir = createTempDir(prefix = "hashes-reserved-").also { it.deleteOnExit() }
-        val vault = InMemoryKeyVault()
-        EncryptedAcquisitionWriter(dir, vault).use { writer ->
+        val dir = tempDir()
+        EncryptedAcquisitionWriter(dir, InMemoryKeyVault()).use { writer ->
             val error = runCatching { writer.openArtifact(HASHES_FILE) }.exceptionOrNull()
             assertNotNull(error)
             assertTrue(error!!.message!!.contains(HASHES_FILE))
         }
+    }
+
+    @Test
+    fun `written hashes round-trip and match the artifact contents`() {
+        val dir = tempDir()
+        val vault = InMemoryKeyVault()
+        val artifacts = mapOf(
+            "getprop.txt" to "ro.product.model=Pixel 7\n".toByteArray(),
+            "logs/anr/trace.txt" to ByteArray(1 shl 16) { it.toByte() },
+            // Hostile device filename: quoting must keep it one manifest record.
+            "logs/innocent.txt,${"0".repeat(64)}\nbugreport.zip" to "boom".toByteArray(),
+        )
+        EncryptedAcquisitionWriter(dir, vault).use { writer ->
+            artifacts.forEach { (path, data) ->
+                writer.useArtifact(path) { it.write(data) }
+            }
+        }
+
+        val hashes = EncryptedAcquisitionReader(dir, vault).use { it.readHashes() }
+        assertNotNull(hashes)
+        assertEquals(
+            artifacts.mapValues { sha256Hex(it.value) },
+            hashes!!.toMap(),
+        )
+    }
+
+    @Test
+    fun `artifacts cannot be added after the manifest is archived`() {
+        val dir = tempDir()
+        val writer = EncryptedAcquisitionWriter(dir, InMemoryKeyVault())
+        writer.useArtifact("getprop.txt") { it.write(1) }
+        writer.close()
+        assertThrows<IllegalStateException> { writer.openArtifact("late.txt") }
     }
 }
