@@ -1,17 +1,19 @@
 package org.osservatorionessuno.bugbane
 
 import android.app.Application
+import android.content.Context
 import org.acra.ReportField
 import org.acra.config.mailSenderConfiguration
 import org.acra.config.notificationConfiguration
 import org.acra.data.StringFormat
 import org.acra.ktx.initAcra
-import org.osservatorionessuno.bugbane.utils.ViewModelFactory
 
 class BugbaneApplication : Application() {
 
-    override fun onCreate() {
-        super.onCreate()
+    // ACRA is initialized here rather than in onCreate so crashes during
+    // ContentProvider startup (androidx.startup, WorkManager) are reported.
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
 
         if (BuildConfig.CRASH_REPORTING_ENABLED) {
             initAcra {
@@ -56,7 +58,5 @@ class BugbaneApplication : Application() {
                 )
             }
         }
-
-        ViewModelFactory.get(this)
     }
 }
