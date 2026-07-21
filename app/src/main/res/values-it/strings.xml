@@ -19,6 +19,11 @@
     <string name="slideshow_developer_title">Abilita opzioni sviluppatore</string>
     <string name="slideshow_developer_description">Per utilizzare quesa applicazione, è necessario abilitare le opzioni sviluppatore.\n\nL\'applicazione acquisisce dati usando l\'ADB Wireless Debugging, che è disponibile solo quando le opzioni sviluppatore sono abilitate.</string>
     <string name="slideshow_button_text_enable">Abilita</string>
+    <string name="adb_vuln_title">Il tuo dispositivo deve essere aggiornato</string>
+    <string name="adb_vuln_description">A questo telefono manca una correzione di sicurezza di Android (CVE-2026-0073). Durante una scansione di Bugbane, altre persone sulla stessa rete Wi-Fi potrebbero usare questa falla per accedere al telefono. Installa prima gli aggiornamenti di sistema.</string>
+    <string name="adb_vuln_network_warning">Non puoi aggiornare adesso? Esegui la scansione solo connesso a un hotspot personale creato da un altro telefono o computer di cui ti fidi — mai su Wi-Fi pubbliche o condivise. Disattiva il Wireless Debugging subito dopo.</string>
+    <string name="adb_vuln_update_button">Controlla aggiornamenti</string>
+    <string name="adb_vuln_continue_button">Ho capito, continua comunque</string>
     <string name="slideshow_wireless_and_pair_title">Abilita Wireless Debugging e accoppia</string>
     <string name="slideshow_wireless_and_pair_description">Connettiti ad una rete Wi-Fi, abilita l\'opzione ADB Wireless Debugging, premi \"Accoppia dispositivo con codice di accoppiamento\", poi inserirsci il codice visualizzato nella notifica di Bugbane.</string>
     <string name="slideshow_wireless_and_pair_button">Accoppia</string>

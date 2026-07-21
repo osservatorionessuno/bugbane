@@ -35,8 +35,8 @@
 
     <!-- ADB wireless-debugging vulnerability warning (CVE-2026-0073) -->
     <string name="adb_vuln_title">Your device needs an update</string>
-    <string name="adb_vuln_description">This device is missing a security update for a serious flaw in Android\'s wireless debugging (CVE-2026-0073). Because Bugbane works by turning on wireless debugging, on an unpatched device an attacker on the same network could gain access without any action from you. Please install system updates before continuing.</string>
-    <string name="adb_vuln_network_warning">If you continue without updating, you MUST do so only on a network you fully trust — your own personal hotspot or an ad-hoc network — and never on public or shared Wi-Fi. Turn Wireless Debugging back off immediately after each acquisition.</string>
+    <string name="adb_vuln_description">This phone is missing an Android security fix (CVE-2026-0073). While Bugbane scans, other people on the same Wi-Fi network could use that flaw to access the phone. Install system updates first.</string>
+    <string name="adb_vuln_network_warning">Can\'t update now? Scan only while connected to a personal hotspot made by another phone or computer you trust — never on shared or public Wi-Fi. Turn Wireless Debugging off right after.</string>
     <string name="adb_vuln_update_button">Check for updates</string>
     <string name="adb_vuln_continue_button">I understand, continue anyway</string>
 
