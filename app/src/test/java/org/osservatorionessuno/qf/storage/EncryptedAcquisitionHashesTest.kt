@@ -71,7 +71,7 @@ class EncryptedAcquisitionHashesTest {
     @Test
     fun `hashes csv is reserved from module artifacts`() {
         val dir = tempDir()
-        EncryptedAcquisitionWriter(dir, InMemoryKeyVault()).use { writer ->
+        EncryptedAcquisitionWriter(dir, InMemoryKeyVault(), reserveBytes = 0).use { writer ->
             val error = runCatching { writer.openArtifact(HASHES_FILE) }.exceptionOrNull()
             assertNotNull(error)
             assertTrue(error!!.message!!.contains(HASHES_FILE))
@@ -88,7 +88,7 @@ class EncryptedAcquisitionHashesTest {
             // Hostile device filename: quoting must keep it one manifest record.
             "logs/innocent.txt,${"0".repeat(64)}\nbugreport.zip" to "boom".toByteArray(),
         )
-        EncryptedAcquisitionWriter(dir, vault).use { writer ->
+        EncryptedAcquisitionWriter(dir, vault, reserveBytes = 0).use { writer ->
             artifacts.forEach { (path, data) ->
                 writer.useArtifact(path) { it.write(data) }
             }
@@ -105,9 +105,21 @@ class EncryptedAcquisitionHashesTest {
     @Test
     fun `artifacts cannot be added after the manifest is archived`() {
         val dir = tempDir()
-        val writer = EncryptedAcquisitionWriter(dir, InMemoryKeyVault())
+        val writer = EncryptedAcquisitionWriter(dir, InMemoryKeyVault(), reserveBytes = 0)
         writer.useArtifact("getprop.txt") { it.write(1) }
         writer.close()
         assertThrows<IllegalStateException> { writer.openArtifact("late.txt") }
+    }
+
+    @Test
+    fun `writer stops writing once free space is below the reserve`() {
+        val dir = tempDir()
+        // The unit-test StatFs stub reports 0 free bytes, so any positive reserve trips.
+        EncryptedAcquisitionWriter(dir, InMemoryKeyVault(), reserveBytes = 1).use { writer ->
+            assertThrows<InsufficientStorageException> {
+                writer.useArtifact("big.bin") { it.write(ByteArray(4 * 1024 * 1024)) }
+            }
+            assertTrue(writer.outOfSpace)
+        }
     }
 }

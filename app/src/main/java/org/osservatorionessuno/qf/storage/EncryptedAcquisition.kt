@@ -24,12 +24,17 @@ const val ARCHIVE_FILE: String = "acquisition.age"
 class EncryptedAcquisitionWriter(
     private val acquisitionDir: File,
     vault: KeyVault,
+    reserveBytes: Long = ACQUISITION_FREE_SPACE_RESERVE_BYTES,
 ) : ArtifactSink {
     private val writer = AgeZipArchiveWriter(FileOutputStream(File(acquisitionDir, ARCHIVE_FILE)), vault)
     private val writtenPaths = mutableSetOf<String>()
     private var indexWritten = false
     private val hashManifest = ByteArrayOutputStream()
     private var hashManifestArchived = false
+    private val guard = FreeSpaceGuard(reserveBytes) { availableAcquisitionBytes(acquisitionDir) }
+
+    /** True once a write hit the free-space reserve. */
+    val outOfSpace: Boolean get() = guard.tripped
 
     override fun openArtifact(path: String, modifiedTime: Long?): OutputStream {
         check(!hashManifestArchived) { "hash manifest already written" }
@@ -37,8 +42,11 @@ class EncryptedAcquisitionWriter(
         if (isReservedArtifact(name) || !writtenPaths.add(name)) {
             throw IOException("Artifact already exists: $path")
         }
-        return DigestingOutputStream(writer.putEntry(name, modifiedTime)) { sha256 ->
-            hashManifest.write(ArtifactHashes.formatLine(name, sha256).toByteArray(Charsets.UTF_8))
+        return DigestingOutputStream(writer.putEntry(name, modifiedTime), guard) { sha256 ->
+            // A truncated artifact's hash would be wrong; skip its manifest entry.
+            if (!guard.tripped) {
+                hashManifest.write(ArtifactHashes.formatLine(name, sha256).toByteArray(Charsets.UTF_8))
+            }
         }
     }
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -74,7 +75,7 @@ private fun ScanModuleCard(
                     text = formatModuleDisplayName(name),
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                 )
-                if (status != ModuleScanStatus.Waiting) {
+                if (status != ModuleScanStatus.Waiting && status != ModuleScanStatus.Skipped) {
                     Text(
                         text = " ${Utils.formatBytes(bytes)}",
                         style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
@@ -104,6 +105,12 @@ private fun ModuleStatusIcon(status: ModuleScanStatus) {
             imageVector = Icons.Default.Close,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(22.dp),
+        )
+        ModuleScanStatus.Skipped -> Icon(
+            imageVector = Icons.Default.Remove,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
             modifier = Modifier.size(22.dp),
         )
         ModuleScanStatus.Waiting -> Spacer(modifier = Modifier.size(22.dp))
@@ -159,12 +166,14 @@ fun ScanScreen() {
     val totalModules = AcquisitionProgressTracker.totalModules.collectAsStateWithLifecycle()
     val pendingAcquisition = AcquisitionProgressTracker.pendingAcquisition.collectAsStateWithLifecycle()
     val failedModules = AcquisitionProgressTracker.failedModules.collectAsStateWithLifecycle()
+    val skippedForSpace = AcquisitionProgressTracker.skippedForSpace.collectAsStateWithLifecycle()
     val showDisableDialog = AcquisitionProgressTracker.showDisableReminder.collectAsStateWithLifecycle()
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isScanning = adbState.value == AdbState.ConnectedAcquiring || adbState.value == AdbState.Cancelling
     val failed = failedModules.value
-    val showProgressUi = isScanning || failed != null
+    val skipped = skippedForSpace.value
+    val showProgressUi = isScanning || failed != null || skipped != null
 
     fun startAcquisition() {
         AcquisitionProgressTracker.start(context, adbManager, File(context.filesDir, "acquisitions"))
@@ -285,6 +294,37 @@ fun ScanScreen() {
                     ) {
                         Text(
                             text = stringResource(R.string.scan_acquisition_failed_rescan),
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                        )
+                    }
+                } else if (skipped != null) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.scan_acquisition_low_space_message,
+                                skipped.joinToString(", ") { formatModuleDisplayName(it) },
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    Button(
+                        onClick = { AcquisitionProgressTracker.dismissSkippedForSpace() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.scan_acquisition_low_space_dismiss),
                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                         )
                     }
