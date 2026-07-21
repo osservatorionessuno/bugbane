@@ -32,6 +32,7 @@ class EncryptedAcquisitionWriter(
     private var hashManifestArchived = false
 
     override fun openArtifact(path: String, modifiedTime: Long?): OutputStream {
+        check(!hashManifestArchived) { "hash manifest already written" }
         val name = normalizeArtifactPath(path)
         if (isReservedArtifact(name) || !writtenPaths.add(name)) {
             throw IOException("Artifact already exists: $path")
@@ -92,7 +93,7 @@ class EncryptedAcquisitionReader(
         forEachArtifact { artifact ->
             if (artifact.path != METADATA_FILE) return@forEachArtifact
             index = AcquisitionIndex.fromJsonObject(
-                JSONObject(artifact.reopenable.openStream().bufferedReader().readText()),
+                JSONObject(artifact.reopenable.openStream().bufferedReader().use { it.readText() }),
             )
         }
         return index
@@ -103,7 +104,7 @@ class EncryptedAcquisitionReader(
         forEachArtifact { artifact ->
             if (artifact.path != HASHES_FILE) return@forEachArtifact
             hashes = ArtifactHashes.parse(
-                artifact.reopenable.openStream().bufferedReader().readText(),
+                artifact.reopenable.openStream().bufferedReader().use { it.readText() },
             )
         }
         return hashes
