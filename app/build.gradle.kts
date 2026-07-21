@@ -5,7 +5,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.junit5)
     alias(libs.plugins.protobuf)
-    alias(libs.plugins.kotlin.kapt)
 }
 
 android {
@@ -130,6 +129,12 @@ val checkBundledIndicators by tasks.registering {
 }
 tasks.named("preBuild") { dependsOn(checkBundledIndicators) }
 
+// The ACRA modules leak the auto-service annotation processor onto the
+// runtime classpath; their service files are pre-generated, so drop it.
+configurations.all {
+    exclude(group = "com.google.auto.service", module = "auto-service")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -167,7 +172,6 @@ dependencies {
     implementation(libs.acra.core)
     implementation(libs.acra.mail)
     implementation(libs.acra.notification)
-    kapt(libs.acra.core)
 
     // --- Unit test (JUnit 5) ---
     testImplementation(libs.junit.jupiter.api)

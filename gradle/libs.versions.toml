@@ -25,7 +25,6 @@ acra                  = "5.13.1"
 [plugins]
 android-application   = { id = "com.android.application",            version.ref = "agp" }
 kotlin-android        = { id = "org.jetbrains.kotlin.android",       version.ref = "kotlin" }
-kotlin-kapt           = { id = "org.jetbrains.kotlin.kapt",          version.ref = "kotlin" }
 kotlin-jvm            = { id = "org.jetbrains.kotlin.jvm",           version.ref = "kotlin" }
 kotlin-compose        = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 junit5                = { id = "de.mannodermaus.android-junit5",     version = "1.13.1.0" }
