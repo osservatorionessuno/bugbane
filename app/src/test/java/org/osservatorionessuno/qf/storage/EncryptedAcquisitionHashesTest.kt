@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.osservatorionessuno.qf.crypto.InMemoryKeyVault
+import org.osservatorionessuno.qf.crypto.age.X25519Identity
 import java.nio.file.Files
 import java.security.MessageDigest
 
@@ -72,7 +72,8 @@ class EncryptedAcquisitionHashesTest {
     @Test
     fun `hashes csv is reserved from module artifacts`() {
         val dir = tempDir()
-        EncryptedAcquisitionWriter(dir, InMemoryKeyVault(), reserveBytes = 0).use { writer ->
+        val id = X25519Identity.generate()
+        EncryptedAcquisitionWriter(dir, listOf(id.recipient()), reserveBytes = 0).use { writer ->
             val error = runCatching { writer.openArtifact(HASHES_FILE) }.exceptionOrNull()
             assertNotNull(error)
             assertTrue(error!!.message!!.contains(HASHES_FILE))
@@ -82,20 +83,20 @@ class EncryptedAcquisitionHashesTest {
     @Test
     fun `written hashes round-trip and match the artifact contents`() {
         val dir = tempDir()
-        val vault = InMemoryKeyVault()
+        val id = X25519Identity.generate()
         val artifacts = mapOf(
             "getprop.txt" to "ro.product.model=Pixel 7\n".toByteArray(),
             "logs/anr/trace.txt" to ByteArray(1 shl 16) { it.toByte() },
             // Hostile device filename: quoting must keep it one manifest record.
             "logs/innocent.txt,${"0".repeat(64)}\nbugreport.zip" to "boom".toByteArray(),
         )
-        EncryptedAcquisitionWriter(dir, vault, reserveBytes = 0).use { writer ->
+        EncryptedAcquisitionWriter(dir, listOf(id.recipient()), reserveBytes = 0).use { writer ->
             artifacts.forEach { (path, data) ->
                 writer.useArtifact(path) { it.write(data) }
             }
         }
 
-        val hashes = EncryptedAcquisitionReader(dir, vault).use { it.readHashes() }
+        val hashes = EncryptedAcquisitionReader(dir, listOf(id)).use { it.readHashes() }
         assertNotNull(hashes)
         assertEquals(
             artifacts.mapValues { sha256Hex(it.value) },
@@ -106,7 +107,7 @@ class EncryptedAcquisitionHashesTest {
     @Test
     fun `artifacts cannot be added after the manifest is archived`() {
         val dir = tempDir()
-        val writer = EncryptedAcquisitionWriter(dir, InMemoryKeyVault(), reserveBytes = 0)
+        val writer = EncryptedAcquisitionWriter(dir, listOf(X25519Identity.generate().recipient()), reserveBytes = 0)
         writer.useArtifact("getprop.txt") { it.write(1) }
         writer.close()
         assertThrows<IllegalStateException> { writer.openArtifact("late.txt") }
@@ -116,7 +117,7 @@ class EncryptedAcquisitionHashesTest {
     fun `writer stops writing once free space is below the reserve`() {
         val dir = tempDir()
         // The unit-test StatFs stub reports 0 free bytes, so any positive reserve trips.
-        EncryptedAcquisitionWriter(dir, InMemoryKeyVault(), reserveBytes = 1).use { writer ->
+        EncryptedAcquisitionWriter(dir, listOf(X25519Identity.generate().recipient()), reserveBytes = 1).use { writer ->
             assertThrows<InsufficientStorageException> {
                 writer.useArtifact("big.bin") { it.write(ByteArray(4 * 1024 * 1024)) }
             }
@@ -128,7 +129,7 @@ class EncryptedAcquisitionHashesTest {
     fun `refreshOutOfSpace trips before any write when the disk is already full`() {
         val dir = tempDir()
         // StatFs reports 0 free bytes in tests, so a full disk is detected upfront.
-        EncryptedAcquisitionWriter(dir, InMemoryKeyVault(), reserveBytes = 1).use { writer ->
+        EncryptedAcquisitionWriter(dir, listOf(X25519Identity.generate().recipient()), reserveBytes = 1).use { writer ->
             assertFalse(writer.outOfSpace)
             writer.refreshOutOfSpace()
             assertTrue(writer.outOfSpace)
