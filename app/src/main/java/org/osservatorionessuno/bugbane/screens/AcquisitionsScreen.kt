@@ -2,8 +2,6 @@ package org.osservatorionessuno.bugbane.screens
 
 import android.content.Intent
 import android.widget.Toast
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,8 +21,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.DateFormat
 import java.time.Instant
@@ -45,8 +45,6 @@ fun AcquisitionsScreen() {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var acquisitionItems by remember { mutableStateOf(listOf<AcquisitionItem>()) }
-    var pendingDeletion by remember { mutableStateOf<AcquisitionItem?>(null) }
-    var isUndoClicked by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf<AcquisitionItem?>(null) }
 
     fun loadAcquisitions() {
@@ -66,75 +64,30 @@ fun AcquisitionsScreen() {
         }?.sortedByDescending { it.completed } ?: emptyList()
     }
 
-    fun deleteItem(item: AcquisitionItem) {
-        item.dir.deleteRecursively()
-        loadAcquisitions()
-        pendingDeletion = null
-        
-        // Show "deleted" snackbar without undo button
-        scope.launch {
-            snackbarHostState.showSnackbar(
-                message = context.getString(R.string.acquisitions_deleted_message, item.name),
-                duration = SnackbarDuration.Short,
-                withDismissAction = false
-            )
-        }
-    }
-
     fun handleDelete(item: AcquisitionItem) {
         // Show confirmation dialog first
         showDeleteConfirmDialog = item
     }
-    
+
     fun confirmDelete(item: AcquisitionItem) {
         showDeleteConfirmDialog = null
-        // Reset undo flag and set pending deletion
-        isUndoClicked = false
-        pendingDeletion = item
-        
-        // Show snackbar and handle deletion based on result
         scope.launch {
-            val result = snackbarHostState.showSnackbar(
-                message = context.getString(R.string.acquisitions_delete_message, item.name),
-                duration = SnackbarDuration.Short,
-                withDismissAction = true
-            )
-            
-            // Only delete if snackbar was dismissed by timeout and undo was not clicked
-            if (result == SnackbarResult.Dismissed && !isUndoClicked && pendingDeletion == item) {
-                deleteItem(item)
+            // Finish the delete even if the user leaves the screen.
+            withContext(NonCancellable + Dispatchers.IO) {
+                item.dir.deleteRecursively()
             }
+            loadAcquisitions()
+            snackbarHostState.showSnackbar(
+                message = context.getString(R.string.acquisitions_deleted_message, item.name),
+                duration = SnackbarDuration.Short,
+            )
         }
-    }
-
-    fun handleUndo() {
-        isUndoClicked = true
-        pendingDeletion = null
     }
 
     LaunchedEffect(Unit) { loadAcquisitions() }
 
     Scaffold(
-        snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState) { snackbarData ->
-                Snackbar(
-                    action = if (snackbarData.visuals.withDismissAction) {
-                        {
-                            TextButton(
-                                onClick = {
-                                    snackbarData.dismiss()
-                                    handleUndo()
-                                }
-                            ) {
-                                Text(stringResource(R.string.acquisitions_undo))
-                            }
-                        }
-                    } else null
-                ) {
-                    Text(snackbarData.visuals.message)
-                }
-            }
-        }
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -177,48 +130,40 @@ fun AcquisitionsScreen() {
                     items = acquisitionItems,
                     key = { it.dir.absolutePath }
                 ) { item ->
-                    AnimatedVisibility(
-                        visible = item != pendingDeletion,
-                        exit = fadeOut(animationSpec = tween(300)) + 
-                               shrinkVertically(animationSpec = tween(300)),
-                        enter = fadeIn(animationSpec = tween(300)) + 
-                               expandVertically(animationSpec = tween(300))
-                    ) {
-                        AcquisitionItemRow(
-                            item = item,
-                            onClick = {
-                                val intent = Intent(context, AcquisitionActivity::class.java).apply {
-                                    putExtra(AcquisitionActivity.EXTRA_PATH, item.dir.absolutePath)
-                                }
-                                context.startActivity(intent)
-                            },
-                            onRename = { newName ->
-                                val invalid = newName.contains('/') || newName.contains("\\") ||
-                                    newName == "." || newName == ".."
-                                if (invalid) {
+                    AcquisitionItemRow(
+                        item = item,
+                        onClick = {
+                            val intent = Intent(context, AcquisitionActivity::class.java).apply {
+                                putExtra(AcquisitionActivity.EXTRA_PATH, item.dir.absolutePath)
+                            }
+                            context.startActivity(intent)
+                        },
+                        onRename = { newName ->
+                            val invalid = newName.contains('/') || newName.contains("\\") ||
+                                newName == "." || newName == ".."
+                            if (invalid) {
+                                Toast.makeText(
+                                    context,
+                                    R.string.acquisitions_rename_invalid,
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                val newDir = File(item.dir.parentFile, newName)
+                                if (!newDir.exists() && item.dir.renameTo(newDir)) {
+                                    loadAcquisitions()
+                                } else {
                                     Toast.makeText(
                                         context,
-                                        R.string.acquisitions_rename_invalid,
+                                        R.string.acquisitions_rename_failed,
                                         Toast.LENGTH_SHORT
                                     ).show()
-                                } else {
-                                    val newDir = File(item.dir.parentFile, newName)
-                                    if (!newDir.exists() && item.dir.renameTo(newDir)) {
-                                        loadAcquisitions()
-                                    } else {
-                                        Toast.makeText(
-                                            context,
-                                            R.string.acquisitions_rename_failed,
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
                                 }
-                            },
-                            onDelete = {
-                                handleDelete(item)
                             }
-                        )
-                    }
+                        },
+                        onDelete = {
+                            handleDelete(item)
+                        }
+                    )
                 }
             }
         }

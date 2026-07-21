@@ -62,9 +62,7 @@
     <string name="acquisitions_delete">Eliminar</string>
     <string name="acquisitions_delete_confirm_title">Eliminar Adquisición</string>
     <string name="acquisitions_delete_confirm_message">¿Seguro que desea eliminar %1$s? Esta acción no puede ser deshecha.</string>
-    <string name="acquisitions_delete_message">Eliminando %1$s…</string>
     <string name="acquisitions_deleted_message">%1$s eliminado</string>
-    <string name="acquisitions_undo">Deshacer</string>
     <string name="acquisitions_empty_message">Sin adquisiciones aún. Realice una para verla aquí.</string>
     <string name="acquisitions_rename_invalid">Nombre no válido</string>
     <string name="acquisitions_rename_failed">No es capaz de renombrar adquisición</string>

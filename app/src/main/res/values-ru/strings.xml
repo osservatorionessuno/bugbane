@@ -62,9 +62,7 @@
     <string name="acquisitions_delete">Удалить</string>
     <string name="acquisitions_delete_confirm_title">Удалить сбор данных</string>
     <string name="acquisitions_delete_confirm_message">Вы уверены, что хотите удалить %1$s? Это действие нельзя отменить.</string>
-    <string name="acquisitions_delete_message">Удаление %1$s…</string>
     <string name="acquisitions_deleted_message">%1$s удалён</string>
-    <string name="acquisitions_undo">Отменить</string>
     <string name="acquisitions_empty_message">Ещё нет сборов данных. Выполните сбор, чтобы увидеть его здесь.</string>
     <string name="acquisitions_rename_invalid">Некорректное имя</string>
     <string name="acquisitions_rename_failed">Не удалось переименовать сбор данных</string>

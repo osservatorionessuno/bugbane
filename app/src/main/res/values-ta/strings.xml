@@ -62,9 +62,7 @@
     <string name="acquisitions_delete">நீக்கு</string>
     <string name="acquisitions_delete_confirm_title">கையகப்படுத்துதலை நீக்கு</string>
     <string name="acquisitions_delete_confirm_message">%1$sஐ நிச்சயமாக நீக்க விரும்புகிறீர்களா? இந்தச் செயலைச் செயல்தவிர்க்க முடியாது.</string>
-    <string name="acquisitions_delete_message">%1$sஐ நீக்குகிறது…</string>
     <string name="acquisitions_deleted_message">%1$s நீக்கப்பட்டது</string>
-    <string name="acquisitions_undo">செயல்தவிர்</string>
     <string name="acquisitions_empty_message">இன்னும் கையகப்படுத்தல் இல்லை. அதை இங்கே பார்க்க ஒன்றைச் செய்யவும்.</string>
     <string name="acquisitions_rename_invalid">தவறான பெயர்</string>
     <string name="acquisitions_rename_failed">கையகப்படுத்துதலை மறுபெயரிட முடியவில்லை</string>
