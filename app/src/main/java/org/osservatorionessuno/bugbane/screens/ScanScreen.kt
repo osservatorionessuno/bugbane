@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -122,7 +123,18 @@ private fun ScanModuleList(
     modules: List<AcquisitionProgressTracker.ModuleProgress>,
     modifier: Modifier = Modifier,
 ) {
+    val listState = rememberLazyListState()
+    val runningIndex = modules.indexOfFirst { it.status == ModuleScanStatus.Running }
+
+    // Follow the running module, unless the user is scrolling.
+    LaunchedEffect(runningIndex) {
+        if (runningIndex >= 0 && !listState.isScrollInProgress) {
+            listState.animateScrollToItem(runningIndex)
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(bottom = 16.dp),
