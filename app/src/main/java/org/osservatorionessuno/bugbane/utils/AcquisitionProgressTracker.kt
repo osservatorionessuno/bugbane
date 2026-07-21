@@ -51,6 +51,7 @@ object AcquisitionProgressTracker {
         Running,
         Completed,
         Error,
+        Skipped,
     }
 
     data class ModuleProgress(
@@ -79,6 +80,10 @@ object AcquisitionProgressTracker {
     private val _failedModules = MutableStateFlow<List<String>?>(null)
     val failedModules: StateFlow<List<String>?> = _failedModules.asStateFlow()
 
+    /** Set when the last acquisition ran low on storage, until the UI dismisses it. */
+    private val _skippedForSpace = MutableStateFlow<List<String>?>(null)
+    val skippedForSpace: StateFlow<List<String>?> = _skippedForSpace.asStateFlow()
+
     /** True after a successful acquisition until the user dismisses the reminder. */
     private val _showDisableReminder = MutableStateFlow(false)
     val showDisableReminder: StateFlow<Boolean> = _showDisableReminder.asStateFlow()
@@ -96,6 +101,7 @@ object AcquisitionProgressTracker {
         _totalModules.value = AcquisitionRunner.MODULE_NAMES.size
         _pendingAcquisition.value = null
         _failedModules.value = null
+        _skippedForSpace.value = null
 
         adbManager.runQuickForensics(baseDir, object : AcquisitionRunner.ProgressListener {
             override fun onModuleStart(name: String, completed: Int, total: Int) {
@@ -136,6 +142,12 @@ object AcquisitionProgressTracker {
                 }
             }
 
+            override fun onModuleSkipped(name: String) {
+                _modules.update { list ->
+                    list.map { if (it.name == name) it.copy(status = ModuleScanStatus.Skipped) else it }
+                }
+            }
+
             override fun isCancelled(): Boolean = adbManager.isQuickForensicsCancelled
 
             override fun onFinished(cancelled: Boolean, output: File?) {
@@ -143,14 +155,16 @@ object AcquisitionProgressTracker {
                 val failed = _modules.value
                     .filter { it.status == ModuleScanStatus.Error }
                     .map { it.name }
-                if (failed.isNotEmpty()) {
-                    Log.w(TAG, "Acquisition finished with failed modules: $failed")
-                    _failedModules.value = failed
-                } else {
-                    _pendingAcquisition.value = output
+                val skipped = _modules.value
+                    .filter { it.status == ModuleScanStatus.Skipped }
+                    .map { it.name }
+                when {
+                    skipped.isNotEmpty() -> _skippedForSpace.value = skipped
+                    failed.isNotEmpty() -> _failedModules.value = failed
+                    else -> _pendingAcquisition.value = output
                 }
                 _showDisableReminder.value = true
-                autoAnalyze(appContext, output, failed)
+                autoAnalyze(appContext, output, failed, skipped)
             }
         })
     }
@@ -160,7 +174,12 @@ object AcquisitionProgressTracker {
      * background the completion notification is deferred until the analysis
      * is done, so tapping it lands on the results.
      */
-    private fun autoAnalyze(context: Context, acquisitionDir: File, failed: List<String>) {
+    private fun autoAnalyze(
+        context: Context,
+        acquisitionDir: File,
+        failed: List<String>,
+        skipped: List<String>,
+    ) {
         _analyzing.value = acquisitionDir
         analysisScope.launch {
             var analyzed = false
@@ -173,10 +192,10 @@ object AcquisitionProgressTracker {
                 _analyzing.value = null
             }
             if (!isAppInForeground()) {
-                if (failed.isNotEmpty()) {
-                    postFailedNotification(context, failed)
-                } else {
-                    postFinishedNotification(context, analyzed)
+                when {
+                    skipped.isNotEmpty() -> postLowSpaceNotification(context)
+                    failed.isNotEmpty() -> postFailedNotification(context, failed)
+                    else -> postFinishedNotification(context, analyzed)
                 }
             } else {
                 Log.d(TAG, "Skipping completion notification; app is in the foreground")
@@ -196,6 +215,10 @@ object AcquisitionProgressTracker {
 
     fun dismissFailedModules() {
         _failedModules.value = null
+    }
+
+    fun dismissSkippedForSpace() {
+        _skippedForSpace.value = null
     }
 
     private fun isAppInForeground(): Boolean {
@@ -267,6 +290,19 @@ object AcquisitionProgressTracker {
                     failed.joinToString(", "),
                 )
             )
+            .setContentIntent(reopenAppIntent(context))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+
+        postAcquisitionNotification(context, notification)
+    }
+
+    private fun postLowSpaceNotification(context: Context) {
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_bugbane_zoom)
+            .setContentTitle(context.getString(R.string.notification_acquisition_low_space_title))
+            .setContentText(context.getString(R.string.notification_acquisition_low_space_text))
             .setContentIntent(reopenAppIntent(context))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

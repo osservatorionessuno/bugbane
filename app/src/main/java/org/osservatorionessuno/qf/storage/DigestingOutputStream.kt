@@ -10,6 +10,7 @@ import java.security.MessageDigest
  */
 class DigestingOutputStream(
     private val delegate: OutputStream,
+    private val guard: FreeSpaceGuard? = null,
     private val onClosed: ((sha256Hex: String) -> Unit)? = null,
 ) : OutputStream() {
     private val digest = MessageDigest.getInstance("SHA-256")
@@ -20,6 +21,7 @@ class DigestingOutputStream(
 
     @Throws(IOException::class)
     override fun write(b: Int) {
+        guard?.record(1)
         digest.update(b.toByte())
         delegate.write(b)
         bytesWritten++
@@ -27,6 +29,7 @@ class DigestingOutputStream(
 
     @Throws(IOException::class)
     override fun write(b: ByteArray, off: Int, len: Int) {
+        guard?.record(len)
         digest.update(b, off, len)
         delegate.write(b, off, len)
         bytesWritten += len

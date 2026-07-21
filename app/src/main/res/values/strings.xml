@@ -72,6 +72,8 @@
     <string name="scan_module_completed">Completed %1$s: %2$s</string>
     <string name="scan_acquisition_failed_message">Warning: Acquisition is incomplete.\nYou can find it in the Acquisitions screen.\nFailed modules: %1$s</string>
     <string name="scan_acquisition_failed_rescan">Perform another acquisition</string>
+    <string name="scan_acquisition_low_space_message">Skipped, not enough free space: %1$s</string>
+    <string name="scan_acquisition_low_space_dismiss">OK</string>
 
     <string name="beta_warning_title">Beta Version Warning</string>
     <string name="beta_warning_message">This is a beta version: use it at your own risk. Please report any bugs on GitHub.</string>
@@ -193,6 +195,8 @@
     <string name="notification_acquisition_complete_analyzed_text">Analysis finished. Tap to view the results</string>
     <string name="notification_acquisition_failed_title">Acquisition failed</string>
     <string name="notification_acquisition_failed_text">Failed modules: %1$s</string>
+    <string name="notification_acquisition_low_space_title">Storage ran low</string>
+    <string name="notification_acquisition_low_space_text">Some modules were skipped. Tap to view the results.</string>
 
     <!-- MVT strings -->
     <string name="mvt_ioc_title">Indicators of Compromise found</string>

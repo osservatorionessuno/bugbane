@@ -26,6 +26,7 @@ import org.osservatorionessuno.qf.modules.Temp
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.qf.storage.AcquisitionIndex
 import org.osservatorionessuno.qf.storage.EncryptedAcquisitionWriter
+import org.osservatorionessuno.qf.storage.InsufficientStorageException
 import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
 import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault.StrongBoxPolicy
 
@@ -48,22 +49,25 @@ class AcquisitionRunner(
     companion object {
         const val ACQUISITION_KEY_ALIAS = "bugbane.acquisition.kek"
 
+        // The two space-hungry modules run last, so low storage only ever costs
+        // them and never the smaller high-value modules.
         val DEFAULT_MODULES: List<Module> = listOf(
             Env(),
             Dumpsys(),
             Files(),
-            Bugreport(),
             Logs(),
             Logcat(),
             GetProp(),
             Mounts(),
-            Packages(),
             Processes(),
             RootBinaries(),
             Services(),
             Settings(),
             SELinux(),
-            Temp()
+            Temp(),
+            // Large and poorly compressible; skipped first under low storage.
+            Bugreport(),
+            Packages(),
         )
 
         val MODULE_NAMES: List<String> = DEFAULT_MODULES.map { it.name }
@@ -79,6 +83,8 @@ class AcquisitionRunner(
         fun onModuleStart(name: String, completed: Int, total: Int)
         fun onModuleProgress(name: String, bytes: Long)
         fun onModuleComplete(name: String, completed: Int, total: Int, success: Boolean)
+        /** A module skipped because storage ran low. */
+        fun onModuleSkipped(name: String) {}
         fun isCancelled(): Boolean
         fun onFinished(cancelled: Boolean, output: File?)
     }
@@ -152,6 +158,11 @@ class AcquisitionRunner(
                     cancelled = true
                     break
                 }
+                // Once out of space, skip this and every remaining module.
+                if (writer.outOfSpace) {
+                    listener?.onModuleSkipped(module.name)
+                    continue
+                }
 
                 var moduleBytes = 0L
                 val progressCb: (Long) -> Unit = { delta ->
@@ -165,25 +176,29 @@ class AcquisitionRunner(
                 try {
                     module.run(context, manager, writer, progressCb)
                     Log.i(TAG, "Module ${module.name} finished")
+                } catch (ise: InsufficientStorageException) {
+                    Log.w(TAG, "Module ${module.name} hit the storage reserve")
                 } catch (t: Throwable) {
                     success = false
                     Log.e(TAG, "Module ${module.name} failed", t)
                     // TODO: display error message to the user
+                }
+                // The latched guard, not the throw, is authoritative (modules may swallow it).
+                if (writer.outOfSpace) {
+                    Log.w(TAG, "Skipping ${module.name}: out of space")
+                    listener?.onModuleSkipped(module.name)
+                    continue
                 }
                 completedCount++
                 listener?.onModuleComplete(module.name, completedCount, total, success)
             }
 
             val completed = Instant.now()
-            index = if (cancelled) {
-                index.markAsCancelled(completed)
-            } else {
-                index.markAsComplete(completed)
-            }
+            index = if (cancelled) index.markAsCancelled(completed) else index.markAsComplete(completed)
             writer.writeIndex(index)
         }
 
-        Log.i(TAG, "Acquisition complete in ${acquisitionDir.absolutePath}")
+        Log.i(TAG, "Acquisition finished in ${acquisitionDir.absolutePath}")
         listener?.onFinished(cancelled, acquisitionDir)
         return acquisitionDir
     }
