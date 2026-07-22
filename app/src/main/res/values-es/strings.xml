@@ -40,7 +40,7 @@
     <string name="scan_module_running">Ejecutando %1$s: %2$s</string>
     <string name="scan_module_completed">Completado %1$s: %2$s</string>
     <string name="beta_warning_title">Aviso Versión Beta</string>
-    <string name="beta_warning_message">Esta es una versión beta: úsela bajo su propia responsabilidad. Informe de cualquier error en GitHub o de forma privada a través de Signal.</string>
+    <string name="beta_warning_message">Esta es una versión beta: úsela bajo su propia responsabilidad. Informe de cualquier error en GitHub.</string>
     <string name="beta_warning_understand">Comprendo</string>
     <string name="beta_warning_quit">Salir de la app</string>
     <string name="settings_description">Configure sus preferencias y los ajustes de app aquí.</string>

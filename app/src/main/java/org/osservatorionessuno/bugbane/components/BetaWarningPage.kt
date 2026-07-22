@@ -103,18 +103,15 @@ fun BetaWarningPage(onAcknowledge: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         val githubUrl = stringResource(R.string.beta_warning_github_url)
-        val contactUrl = stringResource(R.string.about_contact_url)
-        for (url in listOf(githubUrl, contactUrl)) {
-            Text(
-                text = url.removePrefix("https://").trimEnd('/'),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                textDecoration = TextDecoration.Underline,
-                modifier = Modifier
-                    .clickable { uriHandler.openUri(url) }
-                    .padding(4.dp),
-            )
-        }
+        Text(
+            text = githubUrl.removePrefix("https://"),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier
+                .clickable { uriHandler.openUri(githubUrl) }
+                .padding(4.dp),
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
