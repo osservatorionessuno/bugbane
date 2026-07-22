@@ -655,7 +655,7 @@ private fun ScanList(
                     ),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isSelected && isSelectionMode) {
-                        MaterialTheme.colorScheme.primaryContainer
+                        MaterialTheme.colorScheme.surfaceVariant
                     } else {
                         MaterialTheme.colorScheme.surfaceContainer
                     }

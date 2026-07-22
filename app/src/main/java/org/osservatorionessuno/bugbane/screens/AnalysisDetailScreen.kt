@@ -326,7 +326,7 @@ private fun AlertLevel.getColor(): Color {
     return when (this) {
         AlertLevel.CRITICAL -> MaterialTheme.colorScheme.error
         AlertLevel.HIGH -> MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
-        AlertLevel.MEDIUM -> MaterialTheme.colorScheme.tertiary
+        AlertLevel.MEDIUM -> MaterialTheme.colorScheme.secondary
         AlertLevel.LOW -> MaterialTheme.colorScheme.primary
         AlertLevel.INFO -> MaterialTheme.colorScheme.onSurfaceVariant
         AlertLevel.LOG -> MaterialTheme.colorScheme.onSurfaceVariant
