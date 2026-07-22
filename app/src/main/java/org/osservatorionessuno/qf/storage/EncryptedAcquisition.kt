@@ -36,6 +36,9 @@ class EncryptedAcquisitionWriter(
     /** True once a write hit the free-space reserve. */
     val outOfSpace: Boolean get() = guard.tripped
 
+    /** Proactively samples free space, tripping the guard if it is already low. */
+    fun refreshOutOfSpace() = guard.checkNow()
+
     override fun openArtifact(path: String, modifiedTime: Long?): OutputStream {
         check(!hashManifestArchived) { "hash manifest already written" }
         val name = normalizeArtifactPath(path)

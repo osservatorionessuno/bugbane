@@ -1,6 +1,7 @@
 package org.osservatorionessuno.qf.storage
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -119,6 +120,17 @@ class EncryptedAcquisitionHashesTest {
             assertThrows<InsufficientStorageException> {
                 writer.useArtifact("big.bin") { it.write(ByteArray(4 * 1024 * 1024)) }
             }
+            assertTrue(writer.outOfSpace)
+        }
+    }
+
+    @Test
+    fun `refreshOutOfSpace trips before any write when the disk is already full`() {
+        val dir = tempDir()
+        // StatFs reports 0 free bytes in tests, so a full disk is detected upfront.
+        EncryptedAcquisitionWriter(dir, InMemoryKeyVault(), reserveBytes = 1).use { writer ->
+            assertFalse(writer.outOfSpace)
+            writer.refreshOutOfSpace()
             assertTrue(writer.outOfSpace)
         }
     }
