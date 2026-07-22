@@ -165,57 +165,61 @@ fun SlideshowScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.surface
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Page indicator
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            repeat(totalSteps) { index ->
-                Box(
-                    modifier = Modifier
-                        .padding(4.dp)
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (currentPage == index) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                            }
-                        )
-                )
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Page indicator
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(totalSteps) { index ->
+                    Box(
+                        modifier = Modifier
+                            .padding(4.dp)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (currentPage == index) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                }
+                            )
+                    )
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-        // Horizontal pager (swipe disabled)
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.weight(1f),
-            userScrollEnabled = false
-        ) { pageIndex ->
-            if (state.value == AppState.NeedAdbVulnerabilityWarning) {
-                AdbVulnerabilityWarningPage(
-                    onContinue = { viewModel.onChangeStateRequest(state.value) }
-                )
-            } else {
-                SlideshowPage(
-                    state = state.value,
-                    onClickContinue = {
-                        Log.d(TAG, "onClickContinue with state $state")
-                        viewModel.onChangeStateRequest(state.value)
-                    }
-                )
+            // Horizontal pager (swipe disabled)
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f),
+                userScrollEnabled = false
+            ) { pageIndex ->
+                if (state.value == AppState.NeedAdbVulnerabilityWarning) {
+                    AdbVulnerabilityWarningPage(
+                        onContinue = { viewModel.onChangeStateRequest(state.value) }
+                    )
+                } else {
+                    SlideshowPage(
+                        state = state.value,
+                        onClickContinue = {
+                            Log.d(TAG, "onClickContinue with state $state")
+                            viewModel.onChangeStateRequest(state.value)
+                        }
+                    )
+                }
             }
         }
     }
