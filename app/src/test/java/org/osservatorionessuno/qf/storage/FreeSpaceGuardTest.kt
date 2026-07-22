@@ -38,4 +38,26 @@ class FreeSpaceGuardTest {
         repeat(10) { guard.record(100) }
         assertFalse(guard.tripped)
     }
+
+    @Test
+    fun `checkNow trips when space is already below the reserve`() {
+        val guard = FreeSpaceGuard(reserve) { 50L }
+        guard.checkNow() // no bytes written yet, but the disk is already full
+        assertTrue(guard.tripped)
+        assertThrows<InsufficientStorageException> { guard.record(1) }
+    }
+
+    @Test
+    fun `checkNow leaves the guard untripped when space is sufficient`() {
+        val guard = FreeSpaceGuard(reserve) { 1_000L }
+        guard.checkNow()
+        assertFalse(guard.tripped)
+    }
+
+    @Test
+    fun `checkNow respects a disabled reserve`() {
+        val guard = FreeSpaceGuard(0L) { 0L }
+        guard.checkNow()
+        assertFalse(guard.tripped)
+    }
 }

@@ -49,12 +49,11 @@ class AcquisitionRunner(
     companion object {
         const val ACQUISITION_KEY_ALIAS = "bugbane.acquisition.kek"
 
-        // The two space-hungry modules run last, so low storage only ever costs
+        // The space-hungry modules run last, so low storage only ever costs
         // them and never the smaller high-value modules.
         val DEFAULT_MODULES: List<Module> = listOf(
             Env(),
             Dumpsys(),
-            Files(),
             Logs(),
             Logcat(),
             GetProp(),
@@ -65,7 +64,10 @@ class AcquisitionRunner(
             Settings(),
             SELinux(),
             Temp(),
-            // Large and poorly compressible; skipped first under low storage.
+            // Large; skipped first under low storage. The whole-filesystem
+            // listing can be big, and Bugreport/Packages are also poorly
+            // compressible.
+            Files(),
             Bugreport(),
             Packages(),
         )
@@ -151,13 +153,17 @@ class AcquisitionRunner(
         val writer = EncryptedAcquisitionWriter(acquisitionDir, vault)
 
         var cancelled = false
-        writer.use {
+        try {
             for (module in modules) {
                 if (listener?.isCancelled() == true) {
                     Log.i(TAG, "Acquisition cancelled before module ${module.name}")
                     cancelled = true
                     break
                 }
+                // Re-check free space at each boundary so a disk that was
+                // already full at the start, or filled by another app between
+                // modules, trips before we write anything.
+                writer.refreshOutOfSpace()
                 // Once out of space, skip this and every remaining module.
                 if (writer.outOfSpace) {
                     listener?.onModuleSkipped(module.name)
@@ -196,6 +202,14 @@ class AcquisitionRunner(
             val completed = Instant.now()
             index = if (cancelled) index.markAsCancelled(completed) else index.markAsComplete(completed)
             writer.writeIndex(index)
+        } catch (io: IOException) {
+            // Finalizing hit the disk despite the reserve. Keep whatever was
+            // collected and still report finished so the UI leaves the scanning
+            // state instead of hanging.
+            Log.e(TAG, "Failed to finalize acquisition", io)
+        } finally {
+            runCatching { writer.close() }
+                .onFailure { Log.e(TAG, "Failed to close acquisition archive", it) }
         }
 
         Log.i(TAG, "Acquisition finished in ${acquisitionDir.absolutePath}")

@@ -20,7 +20,8 @@ class InsufficientStorageException(val availableBytes: Long, val reserveBytes: L
 
 /**
  * Latches [tripped] and throws once free space drops below [reserveBytes],
- * re-checking every [checkIntervalBytes] rather than per write. [availableBytes]
+ * re-checking every [checkIntervalBytes] rather than per write. [checkNow]
+ * forces an out-of-band sample (e.g. before a module starts). [availableBytes]
  * is injected for testing.
  */
 class FreeSpaceGuard(
@@ -35,17 +36,28 @@ class FreeSpaceGuard(
     private var bytesSinceCheck: Long = 0
 
     /** Records bytes about to be written; throws before the write once space runs low. */
+    @Synchronized
     fun record(len: Int) {
         if (tripped) throw exception()
         bytesSinceCheck += len
         if (bytesSinceCheck >= checkIntervalBytes) {
             bytesSinceCheck = 0
-            if (reserveBytes > 0 && availableBytes() < reserveBytes) {
+            if (isLow()) {
                 tripped = true
                 throw exception()
             }
         }
     }
+
+    /** Samples free space immediately and trips (without throwing) if it is already low. */
+    @Synchronized
+    fun checkNow() {
+        if (tripped) return
+        bytesSinceCheck = 0
+        if (isLow()) tripped = true
+    }
+
+    private fun isLow() = reserveBytes > 0 && availableBytes() < reserveBytes
 
     private fun exception() = InsufficientStorageException(availableBytes(), reserveBytes)
 }
