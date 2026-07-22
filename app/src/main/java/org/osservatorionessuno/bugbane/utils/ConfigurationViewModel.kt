@@ -69,6 +69,8 @@ class ConfigurationViewModel private constructor(
     private val autoConnectAttempts = AtomicInt(0)
     private val _MAX_AUTOCONNECT_ATTEMPTS = 2
 
+    private val isBetaBuild = appContext.packageName.contains("beta", ignoreCase = true)
+
     init {
         observeCombinedState()
         observeAppState()
@@ -172,6 +174,8 @@ class ConfigurationViewModel private constructor(
 
         // We need to go through some part of the pairing flow
         // (The order here informs the onboarding order)
+        // Beta builds gate onboarding on a "use at your own risk" warning, once.
+        if (isBetaBuild && !appProgress.hasAckedBetaWarning) return AppState.NeedBetaWarning
         if (!notificationsEnabled) return AppState.NeedNotificationPermission
         if (!isConnectedToWifi) return AppState.NeedWifi
         // Before enabling any debugging surface (bugbane is about to turn on
@@ -235,6 +239,10 @@ class ConfigurationViewModel private constructor(
             AppState.NeedAdbVulnerabilityWarning -> {
                 // The warning page renders in the slideshow; "Continue" acknowledges it.
                 appManager.setAckedAdbWarning()
+            }
+
+            AppState.NeedBetaWarning -> {
+                appManager.setAckedBetaWarning()
             }
 
             AppState.NeedWifi,

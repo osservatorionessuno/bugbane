@@ -74,7 +74,8 @@
     <string name="scan_acquisition_failed_rescan">Perform another acquisition</string>
 
     <string name="beta_warning_title">Beta Version Warning</string>
-    <string name="beta_warning_message">This is a Beta version. Install and test it on a spare phone, NOT on your everyday device. Only proceed if you understand the risks.</string>
+    <string name="beta_warning_message">This is a beta version: use it at your own risk. Please report any bugs on GitHub, or privately via Signal.</string>
+    <string name="beta_warning_github_url" translatable="false">https://github.com/osservatorionessuno/bugbane/issues</string>
     <string name="beta_warning_understand">I understand</string>
     <string name="beta_warning_quit">Quit the app</string>
 

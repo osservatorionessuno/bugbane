@@ -40,7 +40,7 @@
     <string name="scan_module_running">Выполняется %1$s: %2$s</string>
     <string name="scan_module_completed">Завершено %1$s: %2$s</string>
     <string name="beta_warning_title">Предупреждение о бета-версии</string>
-    <string name="beta_warning_message">Это бета-версия. Устанавливайте и тестируйте её на запасном телефоне, а не на основном устройстве. Продолжайте только если понимаете риски.</string>
+    <string name="beta_warning_message">Это бета-версия: используйте её на свой страх и риск. Сообщайте об ошибках на GitHub или конфиденциально через Signal.</string>
     <string name="beta_warning_understand">Понятно</string>
     <string name="beta_warning_quit">Выйти из приложения</string>
     <string name="settings_description">Настройте здесь свои предпочтения и параметры приложения.</string>

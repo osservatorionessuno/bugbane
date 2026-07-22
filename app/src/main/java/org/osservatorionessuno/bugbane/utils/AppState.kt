@@ -6,6 +6,9 @@ package org.osservatorionessuno.bugbane.utils
 private const val EXCLUDED_STEP = 999
 enum class AppState(val step: Int) {
     NeedWelcomeScreen(0),
+    // Shown only on beta builds, right after the welcome screen. Shares step 1
+    // so it adds no extra progress dot on production builds.
+    NeedBetaWarning(1),
     NeedNotificationPermission(1),
     DeviceUnsupported(1), // Alternative to step 1: device isn't compatible
     NeedWifi(2),
