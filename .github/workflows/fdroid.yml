@@ -11,6 +11,9 @@ on:
         type: string
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 env:
   TZ: UTC
   LANG: C.UTF-8
