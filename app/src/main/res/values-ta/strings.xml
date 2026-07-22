@@ -40,7 +40,7 @@
     <string name="scan_module_running">%1$s இயங்குகிறது: %2$s</string>
     <string name="scan_module_completed">%1$s முடிந்தது: %2$s</string>
     <string name="beta_warning_title">பீட்டா பதிப்பு முன்னறிவிப்பு</string>
-    <string name="beta_warning_message">இது பீட்டா பதிப்பு: உங்கள் சொந்தப் பொறுப்பில் பயன்படுத்தவும். பிழைகளை GitHub-இல் அல்லது Signal வழியாக தனிப்பட்ட முறையில் தெரிவிக்கவும்.</string>
+    <string name="beta_warning_message">இது பீட்டா பதிப்பு: உங்கள் சொந்தப் பொறுப்பில் பயன்படுத்தவும். பிழைகளை GitHub-இல் தெரிவிக்கவும்.</string>
     <string name="beta_warning_understand">எனக்கு புரிகிறது</string>
     <string name="beta_warning_quit">பயன்பாட்டிலிருந்து வெளியேறு</string>
     <string name="settings_description">உங்கள் விருப்பத்தேர்வுகள் மற்றும் பயன்பாட்டு அமைப்புகளை இங்கே உள்ளமைக்கவும்.</string>
