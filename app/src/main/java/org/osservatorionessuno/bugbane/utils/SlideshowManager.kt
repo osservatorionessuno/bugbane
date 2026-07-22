@@ -15,14 +15,15 @@ object SlideshowManager {
         val hasCompletedOnboarding: Boolean,
         val hasSeenWelcomeScreen: Boolean,
         val hasAckedAdbWarning: Boolean,
+        val hasAckedBetaWarning: Boolean,
     )
-    private var _appProgress: MutableStateFlow<AppProgress> = MutableStateFlow(AppProgress(false, false, false))
+    private var _appProgress: MutableStateFlow<AppProgress> = MutableStateFlow(AppProgress(false, false, false, false))
     var appProgress: StateFlow<AppProgress> = _appProgress.asStateFlow()
     private lateinit var sharedPrefs: SharedPreferences
     private var sharedPrefsListener: SharedPreferences.OnSharedPreferenceChangeListener =
         SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
             when (key) {
-                Keys.KEY_HAS_SEEN_HOMEPAGE, Keys.KEY_HAS_SEEN_WELCOME_SCREEN, Keys.KEY_ACKED_ADB_WARNING -> {
+                Keys.KEY_HAS_SEEN_HOMEPAGE, Keys.KEY_HAS_SEEN_WELCOME_SCREEN, Keys.KEY_ACKED_ADB_WARNING, Keys.KEY_BETA_WARNING_ACKNOWLEDGED -> {
                     checkState()
                 }
             }
@@ -57,6 +58,10 @@ object SlideshowManager {
             hasAckedAdbWarning = sharedPrefs.getBoolean(
                 Keys.KEY_ACKED_ADB_WARNING,
                 false
+            ),
+            hasAckedBetaWarning = sharedPrefs.getBoolean(
+                Keys.KEY_BETA_WARNING_ACKNOWLEDGED,
+                false
             )
         )
         if (_appProgress.value != newState) {
@@ -67,6 +72,10 @@ object SlideshowManager {
 
     fun setAckedAdbWarning() {
         sharedPrefs.edit { putBoolean(Keys.KEY_ACKED_ADB_WARNING, true) }
+    }
+
+    fun setAckedBetaWarning() {
+        sharedPrefs.edit { putBoolean(Keys.KEY_BETA_WARNING_ACKNOWLEDGED, true) }
     }
 
     fun hasSeenHomepage(): Boolean {
@@ -107,7 +116,7 @@ object Keys {
     // Skips the "Get Started" page after the first onboarding flow
     const val KEY_HAS_SEEN_HOMEPAGE = "has_seen_homepage"
 
-    // Skips the beta warning countdown after the user has acknowledged it once
+    // Set once the user has acknowledged the beta warning slide (beta builds only)
     const val KEY_BETA_WARNING_ACKNOWLEDGED = "beta_warning_acknowledged"
 
     // Set once the user has acknowledged the ADB vulnerability warning

@@ -46,7 +46,7 @@
     <string name="scan_acquisition_failed_message">Attenzione: L\'acquisizione è incompleta.\nPuoi trovarla nella scheda Acquisizioni.\nModuli falliti: %1$s</string>
     <string name="scan_acquisition_failed_rescan">Acquisisci nuovamente</string>
     <string name="beta_warning_title">Avviso Versione Beta</string>
-    <string name="beta_warning_message">Questa è una versione Beta. Installala e testala su un telefono di riserva, NON su quello che usi quotidianamente. Procedi solo se hai compreso i rischi.</string>
+    <string name="beta_warning_message">Questa è una versione beta: usala a tuo rischio. Segnala eventuali bug su GitHub, o privatamente via Signal.</string>
     <string name="beta_warning_quit">Esci dall\'app</string>
     <string name="beta_warning_understand">Ho capito</string>
     <string name="settings_description">Configura qui le tue preferenze e le impostazioni dell\'app.</string>

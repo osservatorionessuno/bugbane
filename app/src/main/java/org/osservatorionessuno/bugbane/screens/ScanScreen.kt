@@ -1,8 +1,6 @@
 package org.osservatorionessuno.bugbane.screens
 
-import android.app.Activity
 import android.app.Application
-import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -15,7 +13,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,9 +24,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.delay
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
@@ -40,12 +35,9 @@ import org.osservatorionessuno.cadb.AdbState
 import org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker
 import org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker.ModuleScanStatus
 import org.osservatorionessuno.bugbane.utils.AppState
-import org.osservatorionessuno.bugbane.utils.Keys
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
 import org.osservatorionessuno.bugbane.utils.Utils
 import java.io.File
-
-private const val BETA_COUNTDOWN_SECONDS = 10
 
 private fun formatModuleDisplayName(name: String): String =
     name.split('_')
@@ -149,52 +141,6 @@ private fun ScanModuleList(
     }
 }
 
-/**
- * Beta gate dialog. [deadlineMs] is a wall-clock deadline shared via rememberSaveable
- * so rotation / reopen resumes the same countdown.
- */
-@Composable
-private fun BetaWarningDialog(
-    countdownMs: Long,
-    onAcknowledge: () -> Unit,
-    onQuit: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var remainingSec by remember(countdownMs) {
-        mutableIntStateOf(
-            ((countdownMs - System.currentTimeMillis() + 999) / 1000).toInt().coerceAtLeast(0)
-        )
-    }
-
-    LaunchedEffect(countdownMs) {
-        while (true) {
-            val leftMs = (countdownMs - System.currentTimeMillis()).coerceAtLeast(0L)
-            remainingSec = ((leftMs + 999) / 1000).toInt()
-            if (leftMs == 0L) break
-            delay(leftMs.coerceAtMost(1000L))
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.beta_warning_title)) },
-        text = { Text(stringResource(R.string.beta_warning_message)) },
-        confirmButton = {
-            Button(onClick = onAcknowledge, enabled = remainingSec == 0) {
-                Text(
-                    if (remainingSec == 0) stringResource(R.string.beta_warning_understand)
-                    else "$remainingSec"
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onQuit) {
-                Text(stringResource(R.string.beta_warning_quit))
-            }
-        },
-    )
-}
-
 @Composable
 fun ScanScreen() {
     val context = LocalContext.current
@@ -214,17 +160,6 @@ fun ScanScreen() {
     val pendingAcquisition = AcquisitionProgressTracker.pendingAcquisition.collectAsStateWithLifecycle()
     val failedModules = AcquisitionProgressTracker.failedModules.collectAsStateWithLifecycle()
     val showDisableDialog = AcquisitionProgressTracker.showDisableReminder.collectAsStateWithLifecycle()
-
-    val isBetaVersion = context.packageName.contains("beta", ignoreCase = true)
-    val appPrefs = remember {
-        context.getSharedPreferences(Keys.PREFS_NAME, Context.MODE_PRIVATE)
-    }
-    var showBetaWarningDialog by rememberSaveable { mutableStateOf(false) }
-    var betaAcknowledged by remember {
-        mutableStateOf(appPrefs.getBoolean(Keys.KEY_BETA_WARNING_ACKNOWLEDGED, false))
-    }
-    // 0 = not started yet; otherwise wall-clock end of the countdown.
-    var betaCountdownMs by rememberSaveable { mutableLongStateOf(0L) }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isScanning = adbState.value == AdbState.ConnectedAcquiring || adbState.value == AdbState.Cancelling
@@ -509,14 +444,6 @@ fun ScanScreen() {
                     onClick = {
                         when (appState.value) {
                             AppState.AdbConnected -> {
-                                if (isBetaVersion && !betaAcknowledged) {
-                                    if (betaCountdownMs == 0L) {
-                                        betaCountdownMs =
-                                            System.currentTimeMillis() + BETA_COUNTDOWN_SECONDS * 1000L
-                                    }
-                                    showBetaWarningDialog = true
-                                    return@Button
-                                }
                                 startAcquisition()
                             }
                             AppState.AdbConnecting, AppState.TryAutoConnect -> {
@@ -564,24 +491,6 @@ fun ScanScreen() {
                     )
                 }
             }
-        }
-
-        if (showBetaWarningDialog) {
-            BetaWarningDialog(
-                countdownMs = betaCountdownMs,
-                onAcknowledge = {
-                    appPrefs.edit { putBoolean(Keys.KEY_BETA_WARNING_ACKNOWLEDGED, true) }
-                    betaAcknowledged = true
-                    showBetaWarningDialog = false
-                    startAcquisition()
-                },
-                onQuit = {
-                    showBetaWarningDialog = false
-                    (context as? Activity)?.finishAffinity()
-                    System.exit(0)
-                },
-                onDismiss = { showBetaWarningDialog = false },
-            )
         }
     }
 }
