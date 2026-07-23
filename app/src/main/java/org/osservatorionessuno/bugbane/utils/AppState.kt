@@ -6,28 +6,31 @@ package org.osservatorionessuno.bugbane.utils
 private const val EXCLUDED_STEP = 999
 enum class AppState(val step: Int) {
     NeedWelcomeScreen(0),
-    // Shown only on beta builds, right after the welcome screen. Shares step 1
-    // so it adds no extra progress dot on production builds.
+    // Ghost states share the next real step's dot, so conditional pages that most
+    // users never see add no extra progress dot.
+    // Beta builds only, right after the welcome screen.
     NeedBetaWarning(1),
+    // Only on devices still exposed to the wireless-ADB bypass (CVE-2026-0073).
+    NeedAdbVulnerabilityWarning(1),
     NeedNotificationPermission(1),
     DeviceUnsupported(1), // Alternative to step 1: device isn't compatible
-    NeedWifi(2),
-    // Shown before developer options, only on devices still exposed to the
-    // wireless-ADB bypass (CVE-2026-0073). Shares step 3 so it adds no extra
-    // progress dot for unaffected users who never see it.
-    NeedAdbVulnerabilityWarning(3),
-    NeedDeveloperOptions(3),
+    // Lock the acquisition encryption key to the device (one fingerprint). Only
+    // shown on devices with a hardware keystore and a secure lock; otherwise the
+    // password is asked after the first acquisition instead.
+    NeedAcquisitionProtection(2),
+    NeedWifi(3),
+    NeedDeveloperOptions(4),
 
-    // Step 4: ADB/Wireless ADB/Pairing
-    NeedWirelessDebuggingAndPair(4),
-    NeedWirelessDebugging(4),
+    // Step 5: ADB/Wireless ADB/Pairing
+    NeedWirelessDebuggingAndPair(5),
+    NeedWirelessDebugging(5),
 
-    // Step 5: ADB connection attempt
-    AdbConnecting(5),
-    AdbConnectedFinishOnboarding(5),
-    AdbConnected(5),
-    TryAutoConnect(5),
-    AdbConnectionError(5),
+    // Step 6: ADB connection attempt
+    AdbConnecting(6),
+    AdbConnectedFinishOnboarding(6),
+    AdbConnected(6),
+    TryAutoConnect(6),
+    AdbConnectionError(6),
 
     // Not part of our slideshow
     AdbScanning(EXCLUDED_STEP);

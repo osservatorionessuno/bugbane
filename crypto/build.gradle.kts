@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.android.lint)
 }
 
 java {
@@ -29,6 +30,8 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     // Match the platform launcher to Jupiter 5.13.x (Gradle bundles an older one).
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.13.4")
+
+    lintChecks(project(":lint-rules"))
 }
 
 tasks.test {

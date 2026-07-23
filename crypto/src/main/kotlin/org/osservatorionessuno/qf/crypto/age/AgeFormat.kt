@@ -21,6 +21,12 @@ interface AgeIdentity {
     fun unwrap(stanzas: List<AgeStanza>): ByteArray?
 }
 
+/** An [AgeIdentity] holding secret material that can (and should) be zeroed after use. */
+interface DestroyableAgeIdentity : AgeIdentity {
+    /** Zero the secret when the action using this identity ends; unusable afterwards. */
+    fun destroy()
+}
+
 internal class ParsedHeader(val stanzas: List<AgeStanza>, val mac: ByteArray, val headerBytes: Long)
 
 /**

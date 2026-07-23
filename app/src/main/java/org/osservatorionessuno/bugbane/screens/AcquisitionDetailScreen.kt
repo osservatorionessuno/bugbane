@@ -5,7 +5,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -28,12 +30,19 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.osservatorionessuno.qf.AcquisitionScanner
+import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
+import org.osservatorionessuno.qf.crypto.SessionKeyCache
+import org.osservatorionessuno.qf.crypto.age.DestroyableAgeIdentity
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.components.AcquisitionIdentityLostDialog
+import org.osservatorionessuno.bugbane.utils.AcquisitionRecovery
 import org.osservatorionessuno.bugbane.share.AcquisitionShareProvider
 import org.osservatorionessuno.bugbane.share.AcquisitionExport
 import org.osservatorionessuno.bugbane.share.EXPORT_FILE_NAME
@@ -62,6 +71,69 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     var passphrase by remember { mutableStateOf<String?>(null) }
     var showPassDialog by remember { mutableStateOf(false) }
 
+    // Reading an acquisition unlocks the device identity, per tier: a biometric
+    // prompt, the acquisition password, or both. The fresh acquisition is free
+    // within the session-cache window. A non-null pendingUnlock shows the password
+    // dialog and holds the resumed action (plus, on the stacked tier, the
+    // already-unwrapped inner blob so retries need no further prompt).
+    var pendingUnlock by remember { mutableStateOf<PendingUnlock?>(null) }
+    var exportIdentity by remember { mutableStateOf<DestroyableAgeIdentity?>(null) }
+    // Set when the biometric-gated key was destroyed by the screen lock being
+    // removed — the acquisitions can no longer be decrypted (see the dialog below).
+    var identityLost by remember { mutableStateOf(false) }
+    // Guards the async unlock window: a double-tap must not launch two biometric prompts.
+    var unlocking by remember { mutableStateOf(false) }
+
+    fun withUnlockedIdentity(onUnlocked: (DestroyableAgeIdentity) -> Unit) {
+        // One unlock at a time: a password dialog is up, or an async unlock is in flight.
+        if (unlocking || pendingUnlock != null) return
+        unlocking = true
+        // Right after an acquisition its file key is still cached, so the fresh
+        // archive's first actions need no unlock. The cache never holds the
+        // identity, so every other acquisition keeps its full gate.
+        SessionKeyCache.identityFor(acquisitionDir)?.let { onUnlocked(it); unlocking = false; return }
+
+        fun launchBiometric(block: suspend () -> Unit) = scope.launch {
+            try {
+                block()
+            } catch (_: android.security.keystore.KeyPermanentlyInvalidatedException) {
+                // Screen lock was removed → the auth-gated key is gone for good.
+                identityLost = true
+            } catch (_: AcquisitionIdentityVault.UserAuthenticationException) {
+                // user dismissed or failed the system prompt — abort silently
+            } catch (_: Exception) {
+                Toast.makeText(context, R.string.acquisition_unlock_failed, Toast.LENGTH_LONG).show()
+            } finally {
+                unlocking = false
+            }
+        }
+        val tier = AcquisitionIdentityVault.tier(context)
+        when {
+            tier == AcquisitionIdentityVault.Tier.STRONGBOX ||
+                tier == AcquisitionIdentityVault.Tier.TEE_AUTH ->
+                launchBiometric { onUnlocked(AcquisitionIdentityVault.unlockWithBiometric(context)) }
+
+            tier != null && tier.usesPassphrase -> launchBiometric {
+                // Unwrap the outer layer (a fingerprint prompt on a two-factor tier; silent
+                // on password-only). If the session already has the derived key, finish
+                // without a password prompt; otherwise raise the dialog with the inner blob.
+                val inner = AcquisitionIdentityVault.unlockPassphraseOuter(context)
+                val cached = AcquisitionIdentityVault.tryCachedPassphrase(inner)
+                if (cached != null) {
+                    inner.fill(0)
+                    onUnlocked(cached)
+                } else {
+                    pendingUnlock = PendingUnlock(inner, onUnlocked)
+                }
+            }
+
+            else -> {
+                Toast.makeText(context, R.string.acquisition_unlock_failed, Toast.LENGTH_LONG).show()
+                unlocking = false
+            }
+        }
+    }
+
     // Bottom sheet state
     val screenHeight = configuration.screenHeightDp.dp
     val sheetState = rememberModalBottomSheetState(
@@ -89,6 +161,14 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
         }
     }
 
+    // Zero any secret material still held when the composition leaves (rotation, navigation).
+    DisposableEffect(Unit) {
+        onDispose {
+            pendingUnlock?.dispose()
+            exportIdentity?.destroy()
+        }
+    }
+
     LaunchedEffect(acquisitionDir) {
         size = Utils.calculateSize(acquisitionDir)
         val metaFile = File(acquisitionDir, "acquisition.json")
@@ -99,70 +179,91 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             }
         }
         scans = loadScans(acquisitionDir)
-        // Temporary disabled: scan only when user requests it
-        //if (scans.isEmpty()) {
-        //    startAnalysis()
-        //}
+        // If the screen lock was removed, the biometric-gated key is already dead;
+        // surface it on open rather than waiting for a failed unlock.
+        if (AcquisitionIdentityVault.isIdentityInvalidatedByLockRemoval(context)) {
+            identityLost = true
+        }
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
         val pass = passphrase
-        if (uri != null && pass != null) {
+        val identity = exportIdentity
+        exportIdentity = null
+        if (uri != null && pass != null && identity != null) {
             scope.launch(Dispatchers.IO) {
                 processing = ProcessingState.EXPORTING
-                // Stream the verbatim re-wrap straight into the chosen destination
-                context.contentResolver.openOutputStream(uri)?.use { out ->
-                    AcquisitionExport.writeTo(File(acquisitionDir, ARCHIVE_FILE), pass, out)
+                try {
+                    // Stream the verbatim re-wrap straight into the chosen destination
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        AcquisitionExport.writeTo(File(acquisitionDir, ARCHIVE_FILE), identity, pass, out)
+                    }
+                } finally {
+                    identity.destroy()
                 }
                 processing = ProcessingState.OFF
                 showPassDialog = true
             }
+        } else {
+            identity?.destroy()
         }
     }
 
     fun startExport() {
-        passphrase = Utils.generatePassphrase()
-        exportLauncher.launch(EXPORT_FILE_NAME)
+        withUnlockedIdentity { identity ->
+            // Destroy any identity from a prior, unconsumed export so it's never leaked.
+            exportIdentity?.destroy()
+            exportIdentity = identity
+            passphrase = Utils.generatePassphrase()
+            exportLauncher.launch(EXPORT_FILE_NAME)
+        }
     }
 
     fun startShare() {
-        // No upfront work: the archive is re-wrapped lazily as the share target
-        // reads the streaming content URI, so nothing is staged on disk first.
-        val pass = Utils.generatePassphrase()
-        val uri = AcquisitionShareProvider.enqueue(
-            context,
-            File(acquisitionDir, ARCHIVE_FILE),
-            pass,
-            EXPORT_FILE_NAME,
-        )
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/octet-stream"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(
-                Intent.EXTRA_TEXT,
-                context.getString(org.osservatorionessuno.bugbane.R.string.acquisition_share_message, pass)
+        withUnlockedIdentity { identity ->
+            // No upfront work: the archive is re-wrapped lazily as the share target
+            // reads the streaming content URI, so nothing is staged on disk first.
+            val pass = Utils.generatePassphrase()
+            val uri = AcquisitionShareProvider.enqueue(
+                context,
+                File(acquisitionDir, ARCHIVE_FILE),
+                identity,
+                pass,
+                EXPORT_FILE_NAME,
             )
-            // The read grant only reliably follows a URI in ClipData; EXTRA_STREAM
-            // alone isn't covered. This grants read only to the app the user picks
-            // from the chooser (at launch) — the ciphertext is never exposed to
-            // other apps, and the decryption passphrase rides in EXTRA_TEXT, which
-            // only the chosen app receives.
-            clipData = ClipData.newRawUri(EXPORT_FILE_NAME, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/octet-stream"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(
+                    Intent.EXTRA_TEXT,
+                    context.getString(org.osservatorionessuno.bugbane.R.string.acquisition_share_message, pass)
+                )
+                // The read grant only reliably follows a URI in ClipData; EXTRA_STREAM
+                // alone isn't covered. Only the app the user picks receives the grant
+                // and the EXTRA_TEXT passphrase.
+                clipData = ClipData.newRawUri(EXPORT_FILE_NAME, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, null))
         }
-        context.startActivity(Intent.createChooser(intent, null))
     }
 
     fun startAnalysis() {
-        scope.launch {
-            processing = ProcessingState.SCANNING
-            withContext(Dispatchers.IO) {
-                AcquisitionScanner.scan(context, acquisitionDir)
+        withUnlockedIdentity { identity ->
+            scope.launch {
+                processing = ProcessingState.SCANNING
+                try {
+                    withContext(Dispatchers.IO) {
+                        AcquisitionScanner.scan(context, acquisitionDir, identity)
+                    }
+                } finally {
+                    identity.destroy()
+                }
+                scans = loadScans(acquisitionDir)
+                processing = ProcessingState.OFF
             }
-            scans = loadScans(acquisitionDir)
-            processing = ProcessingState.OFF
         }
     }
 
@@ -472,6 +573,94 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 }
             }
         }
+
+    }
+
+    // Passphrase tiers: ask for the acquisition password, derive the Argon2id key
+    // off the main thread, and resume the gated action on success. On the stacked
+    // tier the outer layer was already unwrapped by the biometric prompt, so
+    // retries here need no further prompt.
+    pendingUnlock?.let { pending ->
+        var password by remember(pending) { mutableStateOf("") }
+        var wrongPassword by remember(pending) { mutableStateOf(false) }
+        var checking by remember(pending) { mutableStateOf(false) }
+
+        fun dismiss() {
+            pending.dispose()
+            pendingUnlock = null
+        }
+
+        fun attempt() {
+            checking = true
+            scope.launch {
+                val identity = AcquisitionIdentityVault.withPasswordBytes(password) {
+                    AcquisitionIdentityVault.openPassphraseWithPassword(context, pending.inner, it)
+                }
+                checking = false
+                if (identity == null) {
+                    wrongPassword = true
+                } else {
+                    val resume = pending.onUnlocked
+                    dismiss()
+                    resume(identity)
+                }
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { if (!checking) dismiss() },
+            title = { Text(stringResource(R.string.acquisition_unlock_password_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it; wrongPassword = false },
+                        label = { Text(stringResource(R.string.acquisition_password_label)) },
+                        singleLine = true,
+                        isError = wrongPassword,
+                        enabled = !checking,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        // Argon2id derivation isn't instant — say what the wait is for.
+                        supportingText = when {
+                            wrongPassword -> {
+                                { Text(stringResource(R.string.acquisition_unlock_password_wrong)) }
+                            }
+                            checking -> {
+                                { Text(stringResource(R.string.acquisition_unlock_password_checking)) }
+                            }
+                            else -> null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { attempt() }, enabled = !checking && password.isNotEmpty()) {
+                    if (checking) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.acquisition_unlock_button))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { dismiss() }, enabled = !checking) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+
+    // Screen lock removed → the auth-gated key is permanently invalidated and the
+    // acquisitions can't be decrypted. Explain it, then reset protection: discard
+    // the dead identity, drop its unreadable acquisitions, and route the user to
+    // re-establish protection. Non-dismissible: the identity is dead, so there's
+    // nothing to go back to.
+    if (identityLost) {
+        AcquisitionIdentityLostDialog(
+            onReset = { AcquisitionRecovery.begin(context) },
+        )
     }
 
     if (showPassDialog && passphrase != null) {
@@ -748,4 +937,17 @@ enum class ProcessingState {
     OFF,
     EXPORTING,
     SCANNING,
+}
+
+/**
+ * A read action waiting on the acquisition password. [inner] is the already-unwrapped
+ * Argon2id blob (the outer layer was opened first — on a two-factor tier gated by the
+ * screen lock, on the password-only tier a silent device-bind unwrap), so password
+ * retries need no further prompt.
+ */
+class PendingUnlock(
+    val inner: ByteArray,
+    val onUnlocked: (DestroyableAgeIdentity) -> Unit,
+) {
+    fun dispose() = inner.fill(0)
 }

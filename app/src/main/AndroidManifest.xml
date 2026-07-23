@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Currently used only to fetch IOCs -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Biometric/credential prompt gating the acquisition identity -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!-- Package visibility (Android 11+): needed to read the Mainline train date
          (modulemetadata versionName) for the ADB vulnerability check. -->
@@ -21,9 +23,8 @@
 
     <application
         android:name=".BugbaneApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

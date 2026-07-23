@@ -1,6 +1,7 @@
 package org.osservatorionessuno.qf.crypto
 
 import org.apache.commons.compress.archivers.zip.ZipFile
+import org.osservatorionessuno.qf.crypto.age.AgeIdentity
 import org.osservatorionessuno.qf.crypto.age.AgePayload
 import java.io.Closeable
 import java.io.File
@@ -31,9 +32,9 @@ internal class FileRandomAccess(file: File) : RandomAccessData {
  * artifact straight from the encrypted envelope, without touching the rest and
  * without writing any plaintext to disk.
  */
-class SeekableArchive(private val file: File, vault: KeyVault) : Closeable {
+class SeekableArchive(private val file: File, identities: List<AgeIdentity>) : Closeable {
     private val access = FileRandomAccess(file)
-    private val zip = ZipFile(AgePayloadChannel(AgePayload.open(access, listOf(KeyVaultIdentity(vault)))))
+    private val zip = ZipFile(AgePayloadChannel(AgePayload.open(access, identities)))
 
     fun names(): Set<String> {
         val out = LinkedHashSet<String>()

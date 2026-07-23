@@ -30,9 +30,9 @@ class EncryptedArchiveTest {
         },
     )
 
-    private fun encrypt(vault: KeyVault, entries: List<Entry>): ByteArray =
+    private fun encrypt(id: X25519Identity, entries: List<Entry>): ByteArray =
         ByteArrayOutputStream().also { out ->
-            AgeZipArchiveWriter(out, vault).use { writer ->
+            AgeZipArchiveWriter(out, listOf(id.recipient())).use { writer ->
                 for (e in entries) {
                     writer.putEntry(e.name, e.modifiedTime).use { sink ->
                         e.open().use { it.copyTo(sink, 64 * 1024) }
@@ -41,9 +41,9 @@ class EncryptedArchiveTest {
             }
         }.toByteArray()
 
-    private fun readAll(bytes: ByteArray, vault: KeyVault): Map<String, ByteArray> {
+    private fun readAll(bytes: ByteArray, id: X25519Identity): Map<String, ByteArray> {
         val map = LinkedHashMap<String, ByteArray>()
-        AgeZipArchiveReader.forEachEntry(tempAgeFile(bytes), vault) { name, _, open ->
+        AgeZipArchiveReader.forEachEntry(tempAgeFile(bytes), listOf(id)) { name, _, open ->
             map[name] = open().use { it.readBytes() }
         }
         return map
@@ -63,22 +63,22 @@ class EncryptedArchiveTest {
 
     @Test
     fun `streaming acquire then analyze preserves every entry`() {
-        val vault = InMemoryKeyVault()
-        val out = readAll(encrypt(vault, entries()), vault)
+        val id = X25519Identity.generate()
+        val out = readAll(encrypt(id, entries()), id)
         assertEquals(setOf("acquisition.json", "getprop.txt", "dumpsys/large.bin"), out.keys)
         entries().forEach { e -> assertArrayEquals(e.open().readBytes(), out[e.name], e.name) }
     }
 
     @Test
     fun `at-rest is an age file whose payload is a standard ZIP, with no plaintext`() {
-        val vault = InMemoryKeyVault()
-        val atRest = encrypt(vault, entries())
+        val id = X25519Identity.generate()
+        val atRest = encrypt(id, entries())
 
         assertEquals("age-encryption.org/v1", String(atRest, 0, 21, Charsets.US_ASCII))
         assertFalse(indexOf(atRest, "ro.product.model=Pixel 7".toByteArray()) >= 0, "plaintext leaked")
 
         // decrypted payload is a real ZIP that stock tools can read
-        val payload = readAgeFile(tempAgeFile(atRest), listOf(KeyVaultIdentity(vault)))
+        val payload = readAgeFile(tempAgeFile(atRest), listOf(id))
         assertEquals(0x50, payload[0].toInt() and 0xFF) // 'P'
         assertEquals(0x4B, payload[1].toInt() and 0xFF) // 'K'
         assertEquals(setOf("acquisition.json", "getprop.txt", "dumpsys/large.bin"), unzip(payload).keys)
@@ -86,20 +86,20 @@ class EncryptedArchiveTest {
 
     @Test
     fun `compression shrinks compressible data`() {
-        val vault = InMemoryKeyVault()
+        val id = X25519Identity.generate()
         val raw = ("I/ActivityManager: state=1 foo=bar\n".repeat(100_000)).toByteArray()
-        val atRest = encrypt(vault, listOf(Entry("logcat.txt") { ByteArrayInputStream(raw) }))
+        val atRest = encrypt(id, listOf(Entry("logcat.txt") { ByteArrayInputStream(raw) }))
         assertTrue(atRest.size < raw.size / 5, "expected >5x, got ${raw.size} -> ${atRest.size}")
     }
 
     @Test
     fun `production export to a passphrase recipient decrypts with the passphrase`() {
-        val vault = InMemoryKeyVault()
-        val atRest = encrypt(vault, entries())
+        val id = X25519Identity.generate()
+        val atRest = encrypt(id, entries())
         val pass = "correct horse battery staple".toByteArray()
 
         val exportBytes = ByteArrayOutputStream().also {
-            AgeExporter.export(ByteArrayInputStream(atRest), vault, ScryptRecipient(pass, logN = 10), it)
+            AgeExporter.export(ByteArrayInputStream(atRest), listOf(id), ScryptRecipient(pass, logN = 10), it)
         }.toByteArray()
 
         assertArrayEquals(bodyOf(atRest), bodyOf(exportBytes), "payload copied verbatim")
@@ -109,27 +109,27 @@ class EncryptedArchiveTest {
 
     @Test
     fun `a stripped payload is rejected, not read as an empty archive`() {
-        val vault = InMemoryKeyVault()
-        val atRest = encrypt(vault, entries())
+        val id = X25519Identity.generate()
+        val atRest = encrypt(id, entries())
         // Keep the header + 16-byte payload nonce only — i.e. zero STREAM chunks.
         val payloadStart = atRest.size - bodyOf(atRest).size
         val truncated = atRest.copyOfRange(0, payloadStart + 16)
         assertThrows(AgeFormatException::class.java) {
-            readAgeFile(tempAgeFile(truncated), listOf(KeyVaultIdentity(vault)))
+            readAgeFile(tempAgeFile(truncated), listOf(id))
         }
     }
 
     @Test
     fun `exportedSize equals the actual exported byte count`() {
-        val vault = InMemoryKeyVault()
-        val atRest = encrypt(vault, entries())
+        val id = X25519Identity.generate()
+        val atRest = encrypt(id, entries())
         val pass = "correct horse battery staple".toByteArray()
 
         val predicted = AgeExporter.exportedSize(
-            ByteArrayInputStream(atRest), vault, ScryptRecipient(pass, logN = 10), atRest.size.toLong(),
+            ByteArrayInputStream(atRest), listOf(id), ScryptRecipient(pass, logN = 10), atRest.size.toLong(),
         )
         val actual = ByteArrayOutputStream().also {
-            AgeExporter.export(ByteArrayInputStream(atRest), vault, ScryptRecipient(pass, logN = 10), it)
+            AgeExporter.export(ByteArrayInputStream(atRest), listOf(id), ScryptRecipient(pass, logN = 10), it)
         }.size().toLong()
 
         // The share provider answers OpenableColumns.SIZE from exportedSize before
@@ -139,16 +139,16 @@ class EncryptedArchiveTest {
 
     @Test
     fun `verbatim age export copies payload and decrypts under recipient key`() {
-        val vault = InMemoryKeyVault()
-        val atRest = encrypt(vault, entries())
+        val atRestId = X25519Identity.generate()
+        val atRest = encrypt(atRestId, entries())
 
-        val identity = X25519Identity.generate()
+        val recipientId = X25519Identity.generate()
         val exportBytes = ByteArrayOutputStream().also {
-            AgeExporter.export(ByteArrayInputStream(atRest), vault, identity.recipient(), it)
+            AgeExporter.export(ByteArrayInputStream(atRest), listOf(atRestId), recipientId.recipient(), it)
         }.toByteArray()
 
         assertArrayEquals(bodyOf(atRest), bodyOf(exportBytes), "payload copied verbatim")
-        val recovered = decryptZip(exportBytes, listOf(identity))
+        val recovered = decryptZip(exportBytes, listOf(recipientId))
         entries().forEach { e -> assertArrayEquals(e.open().readBytes(), recovered[e.name], e.name) }
 
         System.getProperty("bugbane.dumpExport")?.let { dir ->

@@ -1,6 +1,8 @@
 package org.osservatorionessuno.qf.crypto
 
 import org.osservatorionessuno.qf.crypto.age.Age
+import org.osservatorionessuno.qf.crypto.age.AgeIdentity
+import org.osservatorionessuno.qf.crypto.age.AgeRecipient
 import java.io.Closeable
 import java.io.File
 import java.io.InputStream
@@ -28,8 +30,12 @@ class Entry(val name: String, val modifiedTime: Long? = null, val open: () -> In
  * Entries are written one at a time: close the stream from [putEntry] before the
  * next.
  */
-class AgeZipArchiveWriter(out: OutputStream, vault: KeyVault) : Closeable {
-    private val ageOut: OutputStream = Age.encryptingStream(listOf(KeyVaultRecipient(vault)), out)
+class AgeZipArchiveWriter(
+    out: OutputStream,
+    recipients: List<AgeRecipient>,
+    onFileKey: ((ByteArray) -> Unit)? = null,
+) : Closeable {
+    private val ageOut: OutputStream = Age.encryptingStream(recipients, out, onFileKey)
     private val zip = ZipOutputStream(ageOut).apply { setLevel(Deflater.BEST_SPEED) }
     private var entryOpen = false
 
@@ -70,13 +76,13 @@ class AgeZipArchiveWriter(out: OutputStream, vault: KeyVault) : Closeable {
  */
 object AgeZipArchiveReader {
 
-    /** Decrypt + unzip [file], invoking [action] per entry. */
+    /** Decrypt + unzip [file] with the given [identities] (tried in order), invoking [action] per entry. */
     fun forEachEntry(
         file: File,
-        vault: KeyVault,
+        identities: List<AgeIdentity>,
         action: (name: String, modifiedTime: Long?, open: () -> InputStream) -> Unit,
     ) {
-        SeekableArchive(file, vault).use { seekable ->
+        SeekableArchive(file, identities).use { seekable ->
             for (name in seekable.names()) {
                 action(name, null) { seekable.open(name) }
             }

@@ -1,5 +1,7 @@
 package org.osservatorionessuno.qf.crypto.age
 
+import org.osservatorionessuno.qf.crypto.Secret
+
 /**
  * age spec "X25519 recipient" stanza:
  * ```
@@ -17,8 +19,14 @@ class X25519Recipient(private val publicKey: ByteArray) : AgeRecipient {
         val shared = AgePrimitives.x25519(ephemeral, publicKey)
             ?: throw IllegalArgumentException("X25519 recipient is a low-order point")
         val wrapKey = AgePrimitives.hkdf(share + publicKey, shared, INFO, 32)
-        val body = AgePrimitives.chachaSeal(wrapKey, ZERO_NONCE, fileKey)
-        return listOf(AgeStanza("X25519", listOf(AgeFormat.encodeArg(share)), body))
+        try {
+            val body = AgePrimitives.chachaSeal(wrapKey, ZERO_NONCE, fileKey)
+            return listOf(AgeStanza("X25519", listOf(AgeFormat.encodeArg(share)), body))
+        } finally {
+            ephemeral.fill(0)
+            shared.fill(0)
+            wrapKey.fill(0)
+        }
     }
 
     internal companion object {
@@ -27,24 +35,69 @@ class X25519Recipient(private val publicKey: ByteArray) : AgeRecipient {
     }
 }
 
-class X25519Identity(private val secretKey: ByteArray) : AgeIdentity {
-    private val publicKey = AgePrimitives.x25519Base(secretKey)
+/** Takes ownership of [secretKey] (held off-heap in a [Secret] and zeroed on [destroy]). */
+class X25519Identity(secretKey: ByteArray) : DestroyableAgeIdentity {
+    private val secret = Secret(secretKey)
+    private val publicKey = secret.withBytes { AgePrimitives.x25519Base(it) }
+    private var destroyed = false
+
     fun recipient(): X25519Recipient = X25519Recipient(publicKey)
 
+    /** The X25519 public key acquisitions are encrypted to. Safe to store in the clear. */
+    fun publicKeyBytes(): ByteArray = publicKey.copyOf()
+
+    override fun destroy() {
+        destroyed = true
+        secret.close()
+    }
+
     override fun unwrap(stanzas: List<AgeStanza>): ByteArray? {
-        for (s in stanzas) {
-            if (s.type != "X25519" || s.args.size != 1) continue
-            val share = runCatching { AgeFormat.decodeArg(s.args[0]) }.getOrNull() ?: continue
-            if (share.size != 32) continue
-            val shared = AgePrimitives.x25519(secretKey, share) ?: continue
-            val wrapKey = AgePrimitives.hkdf(share + publicKey, shared, X25519Recipient.INFO, 32)
-            runCatching { AgePrimitives.chachaOpen(wrapKey, X25519Recipient.ZERO_NONCE, s.body) }
-                .getOrNull()?.let { if (it.size == AgeFormat.FILE_KEY_SIZE) return it }
+        if (destroyed) return null
+        return secret.withBytes { secretKey ->
+            for (s in stanzas) {
+                if (s.type != "X25519" || s.args.size != 1) continue
+                val share = runCatching { AgeFormat.decodeArg(s.args[0]) }.getOrNull() ?: continue
+                if (share.size != 32) continue
+                val shared = AgePrimitives.x25519(secretKey, share) ?: continue
+                val wrapKey = AgePrimitives.hkdf(share + publicKey, shared, X25519Recipient.INFO, 32)
+                try {
+                    runCatching { AgePrimitives.chachaOpen(wrapKey, X25519Recipient.ZERO_NONCE, s.body) }
+                        .getOrNull()?.let { if (it.size == AgeFormat.FILE_KEY_SIZE) return@withBytes it }
+                } finally {
+                    shared.fill(0)
+                    wrapKey.fill(0)
+                }
+            }
+            null
         }
-        return null
     }
 
     companion object { fun generate(): X25519Identity = X25519Identity(AgePrimitives.randomBytes(32)) }
+}
+
+/**
+ * Identity backed by an already-known file key — e.g. one retained in memory
+ * right after writing the archive, so the writer's session can read it back
+ * without unlocking any identity. Ignores the stanzas entirely; safe because
+ * [AgePayload.open] verifies the header MAC with the returned key and rejects
+ * any file this key does not belong to.
+ */
+class FileKeyIdentity(fileKey: ByteArray) : DestroyableAgeIdentity {
+    private val secret: Secret
+    private var destroyed = false
+
+    init {
+        require(fileKey.size == AgeFormat.FILE_KEY_SIZE) { "invalid file key size ${fileKey.size}" }
+        // copyOf: the caller may retain fileKey (e.g. a cache entry), so we must not zero it.
+        secret = Secret(fileKey.copyOf())
+    }
+
+    override fun unwrap(stanzas: List<AgeStanza>): ByteArray? = if (destroyed) null else secret.copyBytes()
+
+    override fun destroy() {
+        destroyed = true
+        secret.close()
+    }
 }
 
 /**
@@ -59,8 +112,12 @@ class ScryptRecipient(private val passphrase: ByteArray, private val logN: Int =
     override fun wrap(fileKey: ByteArray): List<AgeStanza> {
         val salt = AgePrimitives.randomBytes(16)
         val wrapKey = AgePrimitives.scrypt(passphrase, LABEL + salt, logN)
-        val body = AgePrimitives.chachaSeal(wrapKey, X25519Recipient.ZERO_NONCE, fileKey)
-        return listOf(AgeStanza("scrypt", listOf(AgeFormat.encodeArg(salt), logN.toString()), body))
+        try {
+            val body = AgePrimitives.chachaSeal(wrapKey, X25519Recipient.ZERO_NONCE, fileKey)
+            return listOf(AgeStanza("scrypt", listOf(AgeFormat.encodeArg(salt), logN.toString()), body))
+        } finally {
+            wrapKey.fill(0)
+        }
     }
 
     internal companion object {
@@ -83,6 +140,10 @@ class ScryptIdentity(private val passphrase: ByteArray) : AgeIdentity {
             throw AgeFormatException("invalid or unsafe scrypt work factor (logN=$logN)")
         }
         val wrapKey = AgePrimitives.scrypt(passphrase, ScryptRecipient.LABEL + salt, logN)
-        return runCatching { AgePrimitives.chachaOpen(wrapKey, X25519Recipient.ZERO_NONCE, s.body) }.getOrNull()
+        try {
+            return runCatching { AgePrimitives.chachaOpen(wrapKey, X25519Recipient.ZERO_NONCE, s.body) }.getOrNull()
+        } finally {
+            wrapKey.fill(0)
+        }
     }
 }
