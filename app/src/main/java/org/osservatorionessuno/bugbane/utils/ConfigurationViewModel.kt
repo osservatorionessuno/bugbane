@@ -156,9 +156,18 @@ class ConfigurationViewModel private constructor(
         // TODO: This can be defined in the manifest if it's just about API level
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return AppState.DeviceUnsupported
         if (!appProgress.hasSeenWelcomeScreen) return AppState.NeedWelcomeScreen
-        // Before anything else: on devices that use the fingerprint gate, lock the
-        // acquisition key to the device now (one prompt). Devices without it defer
-        // the password to after the first acquisition, so this passes for them.
+        // The order of these checks defines the onboarding order.
+        // Beta builds gate onboarding on a "use at your own risk" warning, once.
+        if (isBetaBuild && !appProgress.hasAckedBetaWarning) return AppState.NeedBetaWarning
+        // Warn devices still exposed to the wireless-ADB bypass (CVE-2026-0073),
+        // once, until acknowledged.
+        if (DeviceVulnerabilityChecker.isAtRisk(appContext) && !appProgress.hasAckedAdbWarning) {
+            return AppState.NeedAdbVulnerabilityWarning
+        }
+        if (!notificationsEnabled) return AppState.NeedNotificationPermission
+        // On devices that use the fingerprint gate, lock the acquisition key to the
+        // device now (one prompt). Devices without it defer the password to after
+        // the first acquisition, so this passes for them.
         if (!appProgress.hasAcquisitionProtection) return AppState.NeedAcquisitionProtection
 
         // Wireless debug + usb debug were separate settings from Android 11-14
@@ -177,17 +186,7 @@ class ConfigurationViewModel private constructor(
         }
 
         // We need to go through some part of the pairing flow
-        // (The order here informs the onboarding order)
-        // Beta builds gate onboarding on a "use at your own risk" warning, once.
-        if (isBetaBuild && !appProgress.hasAckedBetaWarning) return AppState.NeedBetaWarning
-        if (!notificationsEnabled) return AppState.NeedNotificationPermission
         if (!isConnectedToWifi) return AppState.NeedWifi
-        // Before enabling any debugging surface (bugbane is about to turn on
-        // wireless debugging), warn devices still exposed to the wireless-ADB
-        // bypass (CVE-2026-0073), once, until acknowledged.
-        if (DeviceVulnerabilityChecker.isAtRisk(appContext) && !appProgress.hasAckedAdbWarning) {
-            return AppState.NeedAdbVulnerabilityWarning
-        }
         if (!developerOptionsEnabled) return AppState.NeedDeveloperOptions
         if ((!wirelessDebuggingEnabled || needAdb) && !appProgress.hasCompletedOnboarding) return AppState.NeedWirelessDebuggingAndPair
 

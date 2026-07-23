@@ -6,20 +6,19 @@ package org.osservatorionessuno.bugbane.utils
 private const val EXCLUDED_STEP = 999
 enum class AppState(val step: Int) {
     NeedWelcomeScreen(0),
-    // Lock the acquisition encryption key to the device (one fingerprint). Only
-    // shown on devices with a hardware keystore and a secure lock; otherwise the
-    // password is asked after the first acquisition instead.
-    NeedAcquisitionProtection(1),
     // Ghost states share the next real step's dot, so conditional pages that most
     // users never see add no extra progress dot.
     // Beta builds only, right after the welcome screen.
-    NeedBetaWarning(2),
-    NeedNotificationPermission(2),
-    DeviceUnsupported(2), // Alternative to step 2: device isn't compatible
+    NeedBetaWarning(1),
+    // Only on devices still exposed to the wireless-ADB bypass (CVE-2026-0073).
+    NeedAdbVulnerabilityWarning(1),
+    NeedNotificationPermission(1),
+    DeviceUnsupported(1), // Alternative to step 1: device isn't compatible
+    // Lock the acquisition encryption key to the device (one fingerprint). Only
+    // shown on devices with a hardware keystore and a secure lock; otherwise the
+    // password is asked after the first acquisition instead.
+    NeedAcquisitionProtection(2),
     NeedWifi(3),
-    // Only on devices still exposed to the wireless-ADB bypass (CVE-2026-0073),
-    // shown before developer options.
-    NeedAdbVulnerabilityWarning(4),
     NeedDeveloperOptions(4),
 
     // Step 5: ADB/Wireless ADB/Pairing
