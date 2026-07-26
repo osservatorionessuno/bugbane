@@ -20,8 +20,8 @@ RepoType: git
 Repo: https://github.com/osservatorionessuno/bugbane.git
 
 Builds:
-  - versionName: 0.1.5
-    versionCode: 5
+  - versionName: 0.2.0
+    versionCode: 6
     commit: HEAD
     subdir: .
     prebuild: |

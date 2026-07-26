@@ -15,8 +15,8 @@ android {
         applicationId = "org.osservatorionessuno.bugbane"
         minSdk = 30
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.1.5"
+        versionCode = 6
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "CRASH_REPORT_EMAIL", "\"bugbane@osservatorionessuno.org\"")
     }
