@@ -57,6 +57,9 @@ fun SettingsScreen() {
     val everUpdated = (indicatorVersion ?: 0) > 0
     fun orNa(value: String): String = if (everUpdated) value else "N/A"
 
+    val versionString = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME) +
+        if (BuildConfig.FLAVOR == "beta") " ${stringResource(R.string.beta_label)}" else ""
+
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val s = store.readState()
@@ -74,7 +77,7 @@ fun SettingsScreen() {
             .padding(16.dp)
     ) {
         Text(
-            text = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
+            text = versionString,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             textAlign = TextAlign.Center,

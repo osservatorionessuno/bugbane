@@ -1,6 +1,5 @@
 package org.osservatorionessuno.bugbane.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -8,6 +7,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import org.osservatorionessuno.bugbane.BuildConfig
 import org.osservatorionessuno.bugbane.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,23 +26,7 @@ fun AppTopBar(
     onSettingsClick: () -> Unit = {}
 ) {
     TopAppBar(
-        title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_bugbane_zoom),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-        },
+        title = { TopBarTitle() },
         actions = {
             IconButton(onClick = onSettingsClick) {
                 Icon(
@@ -67,23 +52,7 @@ fun MergedTopBar(
     onSettingsClick: () -> Unit = {},
 ) {
     TopAppBar(
-        title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_bugbane_zoom),
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.titleLarge
-                )
-            }
-        },
+        title = { TopBarTitle() },
         actions = {
             // Navigation tabs in landscape mode
             Row(
@@ -110,4 +79,36 @@ fun MergedTopBar(
             actionIconContentColor = MaterialTheme.colorScheme.onPrimary
         )
     )
-} 
+}
+
+@Composable
+private fun TopBarTitle() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_bugbane_zoom),
+            contentDescription = null,
+            modifier = Modifier.size(32.dp),
+            tint = MaterialTheme.colorScheme.onPrimary
+        )
+        Text(
+            text = stringResource(R.string.app_name),
+            style = MaterialTheme.typography.titleLarge
+        )
+        if (BuildConfig.FLAVOR == "beta") {
+            Surface(
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
+                shape = MaterialTheme.shapes.extraSmall
+            ) {
+                Text(
+                    text = stringResource(R.string.beta_label),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        }
+    }
+}
