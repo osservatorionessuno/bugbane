@@ -78,10 +78,13 @@ object AcquisitionScanner {
             // analyze each artifact from its stream — no plaintext is written to disk.
             EncryptedAcquisitionReader(acquisitionDir, identities).use { reader ->
                 reader.forEachArtifact { artifact ->
-                    if (ForensicRunner.findModuleIndices(artifact.path).isEmpty()) return@forEachArtifact
+                    if (!ForensicRunner.isAnalyzable(artifact.path)) return@forEachArtifact
                     // runCatching: a malformed artifact (exactly what a compromised device might
                     // produce) skips that artifact instead of aborting the whole scan.
-                    runCatching { runner.streamFileAnalysis(artifact.reopenable) }.getOrNull()?.let { parsed ->
+                    val parsedEntries = runCatching {
+                        runner.streamFileAnalysis(artifact.reopenable)
+                    }.getOrDefault(emptyMap())
+                    for ((path, parsed) in parsedEntries) {
                         // Keep only the detections: the parsed Artifact drags its full results
                         // list (e.g. the entire device file list), and retaining every artifact
                         // until the end of the scan would hold all of them in memory at once.
@@ -91,7 +94,7 @@ object AcquisitionScanner {
                             override fun checkIndicators() = Unit
                         }
                         detectionsOnly.detected.addAll(parsed.detected)
-                        artifacts[artifact.path] = detectionsOnly
+                        artifacts[path] = detectionsOnly
                     }
                 }
             }
