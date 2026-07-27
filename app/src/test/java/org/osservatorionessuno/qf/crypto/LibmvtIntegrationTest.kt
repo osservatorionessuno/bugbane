@@ -73,17 +73,17 @@ class LibmvtIntegrationTest {
         var sawGetprop = false
 
         AgeZipArchiveReader.forEachEntry(archiveFile, listOf(id)) { name, _, open ->
-                if (ForensicRunner.findModuleIndices(name).isEmpty()) return@forEachEntry
+                if (!ForensicRunner.isAnalyzable(name)) return@forEachEntry
                 val reopenable = ReopenableInput.of(name) { open() }
-                runner().streamFileAnalysis(reopenable)?.let { viaEncrypted[name] = it }
+                viaEncrypted.putAll(runner().streamFileAnalysis(reopenable))
                 if (name == "getprop.txt") sawGetprop = true
         }
 
         val viaPlain = LinkedHashMap<String, Artifact>()
         for (name in artifactBytes.keys) {
-            if (ForensicRunner.findModuleIndices(name).isEmpty()) continue
+            if (!ForensicRunner.isAnalyzable(name)) continue
             val reopenable = ReopenableInput.of(name) { ByteArrayInputStream(artifactBytes[name]) }
-            runner().streamFileAnalysis(reopenable)?.let { viaPlain[name] = it }
+            viaPlain.putAll(runner().streamFileAnalysis(reopenable))
         }
 
         assertTrue(sawGetprop, "expected getprop.txt to be analyzed from the encrypted archive")

@@ -136,7 +136,7 @@ class AcquisitionRunner(
             status = AcquisitionIndex.STATUS_RUNNING,
             created = started.toString(),
             completed = null,
-            androidqfVersion = BuildConfig.VERSION_NAME,
+            bugbaneVersion = BuildConfig.VERSION_NAME,
             storagePath = acquisitionDir.absolutePath,
             tmpDir = tmpDir,
             sdcard = sdCard,

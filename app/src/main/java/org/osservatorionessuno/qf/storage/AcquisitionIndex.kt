@@ -11,7 +11,7 @@ data class AcquisitionIndex(
     val status: String,
     val created: String,
     val completed: String?,
-    val androidqfVersion: String,
+    val bugbaneVersion: String,
     val storagePath: String,
     val tmpDir: String,
     val sdcard: String,
@@ -25,7 +25,8 @@ data class AcquisitionIndex(
         root.put("status", status)
         root.put("created", created)
         root.put("completed", completed ?: JSONObject.NULL)
-        root.put("androidqf_version", androidqfVersion)
+        root.put("bugbane_version", bugbaneVersion)
+        root.put("androidqf_version", "Bugbane-$bugbaneVersion")
         root.put("storage_path", storagePath)
         root.put("tmp_dir", tmpDir)
         root.put("sdcard", sdcard)
@@ -56,7 +57,7 @@ data class AcquisitionIndex(
                 status = root.optString("status", STATUS_COMPLETE),
                 created = root.optString("created", root.optString("started")),
                 completed = root.optString("completed").ifBlank { null },
-                androidqfVersion = root.optString("androidqf_version"),
+                bugbaneVersion = root.optString("bugbane_version"),
                 storagePath = root.optString("storage_path"),
                 tmpDir = root.optString("tmp_dir"),
                 sdcard = root.optString("sdcard"),
