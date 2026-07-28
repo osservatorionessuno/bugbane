@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 private const val TAG = "ConfigurationManager"
 
 /**
- * Observe device configuration (developer mode, ADB, wireless debug) and emit values as StateFlow.
+ * Observe device configuration (developer mode, wireless debug) and emit values as StateFlow.
  * Also observes state of notification permissions, but those can't be subscribed to except in
  * a Composable function (with rememberPermissionState), so expose a handler to invoke from
  * Composable.
@@ -33,13 +33,10 @@ object ConfigurationManager {
     private val contentResolver get() = appContext.contentResolver
     private var developerOptsObserver: ContentObserver? = null
     private var wirelessDebugObserver: ContentObserver? = null
-    private var adbObserver: ContentObserver? = null
     private val _developerOptionsEnabled = MutableStateFlow(false)
     val developerOptionsEnabled: StateFlow<Boolean> = _developerOptionsEnabled.asStateFlow()
     private val _wirelessDebuggingEnabled = MutableStateFlow(false)
     val wirelessDebuggingEnabled: StateFlow<Boolean> = _wirelessDebuggingEnabled.asStateFlow()
-    private val _adbEnabled = MutableStateFlow(false)
-    val adbEnabled: StateFlow<Boolean> = _adbEnabled.asStateFlow()
     private val _notificationsEnabled = MutableStateFlow(false)
     val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled.asStateFlow()
 
@@ -79,16 +76,6 @@ object ConfigurationManager {
                 it
             )
         }
-
-        adbObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
-            override fun onChange(selfChange: Boolean) = adbObserverCheck()
-        }.also {
-            contentResolver.registerContentObserver(
-                Settings.Global.getUriFor(Settings.Global.ADB_ENABLED),
-                false,
-                it
-            )
-        }
     }
 
     // Run all checks
@@ -96,7 +83,6 @@ object ConfigurationManager {
         developerOptionsCheck()
         wirelessDebugCheck()
         notificationsCheck()
-        adbObserverCheck()
     }
 
     private fun developerOptionsCheck() {
@@ -118,14 +104,6 @@ object ConfigurationManager {
                 "adb_wifi_enabled", 0
             ) == 1
             _wirelessDebuggingEnabled.emit(enabled)
-        }
-    }
-
-    private fun adbObserverCheck() {
-        scope.launch {
-            val enabled =
-                Settings.Global.getInt(contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
-            _adbEnabled.emit(enabled)
         }
     }
 
@@ -152,11 +130,6 @@ object ConfigurationManager {
         wirelessDebugObserver?.let {
             contentResolver.unregisterContentObserver(it)
             wirelessDebugObserver = null
-        }
-
-        adbObserver?.let {
-            contentResolver.unregisterContentObserver(it)
-            adbObserver = null
         }
 
         scope.cancel()
