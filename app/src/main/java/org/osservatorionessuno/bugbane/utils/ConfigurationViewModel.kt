@@ -82,7 +82,6 @@ class ConfigurationViewModel private constructor(
     data class SettingsState(
         val notificationsEnabled: Boolean,
         val developerOptionsEnabled: Boolean,
-        val adbEnabled: Boolean,
         val wirelessDebuggingEnabled: Boolean,
         val wifiConnected: Boolean
     )
@@ -96,11 +95,10 @@ class ConfigurationViewModel private constructor(
         viewModelScope.launch {
             val settingsFlow = combine(configurationManager.notificationsEnabled,
                 configurationManager.developerOptionsEnabled,
-                configurationManager.adbEnabled,
                 configurationManager.wirelessDebuggingEnabled,
                 wifiConnectivityMonitor.wifiState,
-            ) { notifications, devOpts, adbEnabled, wirelessDebug, wifiConnected ->
-                SettingsState(notifications, devOpts, adbEnabled, wirelessDebug, wifiConnected) }
+            ) { notifications, devOpts, wirelessDebug, wifiConnected ->
+                SettingsState(notifications, devOpts, wirelessDebug, wifiConnected) }
 
             combine(settingsFlow, adbManager.adbState, appManager.appProgress) { settings, adbState, appProgress ->
                 if (adbState == AdbState.RequisitesMissing) {
@@ -121,7 +119,6 @@ class ConfigurationViewModel private constructor(
                 checkState(
                     settings.notificationsEnabled,
                     settings.developerOptionsEnabled,
-                    settings.adbEnabled,
                     settings.wirelessDebuggingEnabled,
                     settings.wifiConnected,
                     adbState,
@@ -147,7 +144,6 @@ class ConfigurationViewModel private constructor(
     private fun checkState(
         notificationsEnabled: Boolean,
         developerOptionsEnabled: Boolean,
-        adbEnabled: Boolean,
         wirelessDebuggingEnabled: Boolean,
         isConnectedToWifi: Boolean,
         adbState: AdbState,
@@ -170,10 +166,11 @@ class ConfigurationViewModel private constructor(
         // the first acquisition, so this passes for them.
         if (!appProgress.hasAcquisitionProtection) return AppState.NeedAcquisitionProtection
 
-        // Wireless debug + usb debug were separate settings from Android 11-14
-        val needAdb = (!adbEnabled && Build.VERSION.SDK_INT > Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-
-        if (wirelessDebuggingEnabled && !needAdb) {
+        // We require adb_wifi_enabled (Wireless Debugging), not Settings.Global.ADB_ENABLED
+        // (USB Debugging). Those are independent settings; wireless ADB does not depend on
+        // USB Debugging being on, including on Android 15+. An earlier check on ADB_ENABLED
+        // for API 35+ was removed for that reason.
+        if (wirelessDebuggingEnabled) {
             if (adbState == AdbState.ConnectedIdle && !appProgress.hasCompletedOnboarding) return AppState.AdbConnectedFinishOnboarding
             if (adbState == AdbState.ConnectedIdle) return AppState.AdbConnected
             if (adbState == AdbState.ConnectedAcquiring) return AppState.AdbScanning
@@ -188,10 +185,10 @@ class ConfigurationViewModel private constructor(
         // We need to go through some part of the pairing flow
         if (!isConnectedToWifi) return AppState.NeedWifi
         if (!developerOptionsEnabled) return AppState.NeedDeveloperOptions
-        if ((!wirelessDebuggingEnabled || needAdb) && !appProgress.hasCompletedOnboarding) return AppState.NeedWirelessDebuggingAndPair
+        if (!wirelessDebuggingEnabled && !appProgress.hasCompletedOnboarding) return AppState.NeedWirelessDebuggingAndPair
 
-        if ((!wirelessDebuggingEnabled || needAdb)) {
-            // Wireless adb or adb are off, but we've connected before. Enable wireless adb. Then autoconnect will be attempted.
+        if (!wirelessDebuggingEnabled) {
+            // Wireless adb is off, but we've connected before. Enable wireless adb. Then autoconnect will be attempted.
             Log.d(TAG, "Wireless adb is disabled, but we have previously connected successfully.")
             return AppState.NeedWirelessDebugging
         }
