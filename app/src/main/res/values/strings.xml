@@ -323,4 +323,6 @@
     <string name="mvt_anr_package_name_message">The following potentially suspicious ANR crashes were found:</string>
     <string name="mvt_selinux_status_title">SELinux protection status</string>
     <string name="mvt_selinux_status_message">SELinux is not being enforced.</string>
+    <string name="mvt_artifact_parse_failed_title">Incomplete analysis</string>
+    <string name="mvt_artifact_parse_failed_message">These parts of the acquisition could not be read, so they were left unanalysed:</string>
 </resources>
