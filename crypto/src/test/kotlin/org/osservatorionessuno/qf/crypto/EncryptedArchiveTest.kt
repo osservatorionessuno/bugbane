@@ -93,6 +93,29 @@ class EncryptedArchiveTest {
     }
 
     @Test
+    fun `already-compressed entries are stored and the level switch does not leak to the next entry`() {
+        val id = X25519Identity.generate()
+        val incompressible = ByteArray(2_000_000).also { java.util.Random(42).nextBytes(it) }
+        val compressible = "I/ActivityManager: state=1 foo=bar\n".repeat(60_000).toByteArray()
+
+        val atRest = encrypt(id, listOf(
+            Entry("bugreport.zip") { ByteArrayInputStream(incompressible) },
+            Entry("logcat.txt") { ByteArrayInputStream(compressible) },
+        ))
+
+        // If the level switch applied one entry late, logcat.txt would be stored too
+        // and the total would be ~4 MB.
+        assertTrue(
+            atRest.size < incompressible.size + compressible.size / 5,
+            "logcat.txt was not compressed: total ${atRest.size}",
+        )
+
+        val out = readAll(atRest, id)
+        assertArrayEquals(incompressible, out["bugreport.zip"])
+        assertArrayEquals(compressible, out["logcat.txt"])
+    }
+
+    @Test
     fun `production export to a passphrase recipient decrypts with the passphrase`() {
         val id = X25519Identity.generate()
         val atRest = encrypt(id, entries())
