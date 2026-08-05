@@ -1,6 +1,7 @@
 package org.osservatorionessuno.cadb
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import io.github.muntashirakon.adb.AbsAdbConnectionManager
 import org.bouncycastle.asn1.x500.X500Name
@@ -35,6 +36,8 @@ class AdbConnectionManager private constructor(context: Context) : AbsAdbConnect
     private val certificate: Certificate
 
     init {
+        // The library defaults to API 1, which negotiates 4 KiB packets with checksums.
+        setApi(Build.VERSION.SDK_INT)
         var key = readPrivateKeyFromFile(context)
         var cert = readCertificateFromFile(context)
         if (key == null) {
