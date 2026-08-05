@@ -14,11 +14,13 @@ class AdbShell(
     private val manager: AdbConnectionManager,
     private val tag: String = "AdbShell",
     private val progress: ((Long) -> Unit)? = null,
-    private val timeoutMs: Long = 30_000L,
-    private val inactivityMs: Long = 5_000L
+    // Generous defaults: full dumpsys/logcat dumps run for minutes and can stay quiet ~10s.
+    private val timeoutMs: Long = 5 * 60_000L,
+    private val inactivityMs: Long = 30_000L
 ) {
     companion object {
         private const val RETRIES = 1
+        private const val READ_BUFFER_SIZE = 1 shl 20
     }
 
     @Deprecated("This method buffers and could use a lot of memory. Use execToStream or execForEachLine whenever possible")
@@ -79,24 +81,27 @@ class AdbShell(
      */
     private fun runWithStream(command: String, sink: OutputStream, marker: String): Boolean {
         val stream = manager.openStream(command)
-        val input = stream.openInputStream().buffered()
+        val input = stream.openInputStream()
         val executor = Executors.newSingleThreadExecutor { Thread(it, "ShellReader").apply { isDaemon = true } }
 
-        val buf = ByteArray(DEFAULT_BUFFER_SIZE)
         val markerBytes = marker.toByteArray(StandardCharsets.UTF_8)
-        val sliding = ArrayDeque<Byte>(markerBytes.size)
+        // Hold back the last markerBytes.size - 1 bytes across reads so a marker
+        // split between chunks is neither missed nor leaked into the sink.
+        val keep = markerBytes.size - 1
+        val work = ByteArray(READ_BUFFER_SIZE + keep)
+        var carry = 0
         var markerMatched = false
         val startTime = System.nanoTime()
 
         try {
-            loop@ while (true) {
+            while (true) {
                 // Hard timeout always enforced
                 if (System.nanoTime() - startTime > TimeUnit.MILLISECONDS.toNanos(timeoutMs)) {
                     throw ShellTimeoutException("Shell command timed out after ${timeoutMs}ms: $command")
                 }
 
                 val bytesRead = try {
-                    readOnceWithTimeout(executor, input, buf, inactivityMs)
+                    readOnceWithTimeout(executor, input, work, carry, work.size - carry, inactivityMs)
                 } catch (e: TimeoutException) {
                     throw ShellInactivityException(
                         "Shell command inactive for ${inactivityMs}ms: $command",
@@ -116,29 +121,33 @@ class AdbShell(
                     break
                 }
 
-                var writeUntil = bytesRead
-
-                // Fast byte scanner for marker (no decoding).
-                for (i in 0 until bytesRead) {
-                    sliding.addLast(buf[i])
-                    if (sliding.size > markerBytes.size) sliding.removeFirst()
-
-                    if (sliding.size == markerBytes.size && slidingMatches(sliding, markerBytes)) {
-                        markerMatched = true
-                        writeUntil = i - markerBytes.size + 1 // exclude the marker itself
-                        break
+                val length = carry + bytesRead
+                val markerAt = indexOf(work, length, markerBytes)
+                if (markerAt >= 0) {
+                    if (markerAt > 0) {
+                        sink.write(work, 0, markerAt)
+                        progress?.invoke(markerAt.toLong())
                     }
-                }
-
-                if (writeUntil > 0) {
-                    sink.write(buf, 0, writeUntil)
-                    progress?.invoke(writeUntil.toLong())
-                }
-
-                if (markerMatched) {
+                    markerMatched = true
                     Log.d(tag, "[exec] Marker matched; command complete")
-                    break@loop
+                    break
                 }
+
+                val flush = length - keep
+                if (flush > 0) {
+                    sink.write(work, 0, flush)
+                    progress?.invoke(flush.toLong())
+                    System.arraycopy(work, flush, work, 0, keep)
+                    carry = keep
+                } else {
+                    carry = length
+                }
+            }
+
+            // Stream ended without marker: the held-back tail is real output.
+            if (!markerMatched && carry > 0) {
+                sink.write(work, 0, carry)
+                progress?.invoke(carry.toLong())
             }
 
             sink.flush()
@@ -149,22 +158,30 @@ class AdbShell(
         }
     }
 
-    private fun slidingMatches(q: ArrayDeque<Byte>, bytes: ByteArray): Boolean {
-        if (q.size != bytes.size) return false
+    private fun indexOf(haystack: ByteArray, length: Int, needle: ByteArray): Int {
+        val first = needle[0]
+        val max = length - needle.size
         var i = 0
-        for (b in q) {
-            if (b != bytes[i++]) return false
+        while (i <= max) {
+            if (haystack[i] == first) {
+                var j = 1
+                while (j < needle.size && haystack[i + j] == needle[j]) j++
+                if (j == needle.size) return i
+            }
+            i++
         }
-        return true
+        return -1
     }
 
     private fun readOnceWithTimeout(
         executor: ExecutorService,
         input: InputStream,
         buf: ByteArray,
+        off: Int,
+        len: Int,
         timeoutMs: Long
     ): Int {
-        val f = executor.submit<Int> { input.read(buf) }
+        val f = executor.submit<Int> { input.read(buf, off, len) }
         return try {
             f.get(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (e: TimeoutException) {
