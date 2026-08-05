@@ -18,13 +18,7 @@ class Logcat : Module {
         writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
-        // logcat -d can dump large buffers and stay quiet while the device reads them
-        val shell = AdbShell(
-            manager = manager,
-            progress = progress,
-            timeoutMs = 5 * 60_000L,
-            inactivityMs = 30_000L,
-        )
+        val shell = AdbShell(manager, progress = progress)
         writer.useArtifact("logcat.txt") { output ->
             shell.execToStream("logcat -d -b all \"*:V\"", output)
         }
