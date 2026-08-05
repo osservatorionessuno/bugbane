@@ -39,9 +39,22 @@ class AgeZipArchiveWriter(
     private val zip = ZipOutputStream(ageOut).apply { setLevel(Deflater.BEST_SPEED) }
     private var entryOpen = false
 
+    private companion object {
+        // Deflating these burns CPU for ~0% gain; emit stored deflate blocks instead.
+        // (Still DEFLATED entries, so no size/CRC needed up front on the non-seekable stream.)
+        private val INCOMPRESSIBLE_EXTENSIONS = setOf(
+            "zip", "apk", "apex", "jar", "ab", "gz", "zst", "br",
+            "png", "jpg", "jpeg", "webp", "heic", "mp4", "webm",
+        )
+    }
+
     fun putEntry(name: String, modifiedTime: Long? = null): OutputStream {
         // TODO: handle case where previous modules didn't close the entry
         check(!entryOpen) { "previous entry not closed" }
+        val extension = name.substringAfterLast('.', "").lowercase()
+        zip.setLevel(
+            if (extension in INCOMPRESSIBLE_EXTENSIONS) Deflater.NO_COMPRESSION else Deflater.BEST_SPEED
+        )
         zip.putNextEntry(ZipEntry(name).apply { if (modifiedTime != null) time = modifiedTime })
         entryOpen = true
         return EntryStream()
