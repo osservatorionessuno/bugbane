@@ -11,6 +11,8 @@ import org.osservatorionessuno.libmvt.android.parsers.CertificateParser
 import org.osservatorionessuno.qf.ArtifactProtobuf
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
+import java.io.FileInputStream
+import java.security.MessageDigest
 
 /**
  * Collects the list of installed packages using `pm list packages`.
@@ -19,6 +21,14 @@ import java.io.File
 class Packages : Module {
     override val name: String = "packages"
     private val TAG = "PackagesModule"
+
+    companion object {
+        private val WHITESPACE = Regex("\\s+")
+        private val HEX = Regex("[0-9a-f]+")
+        // Packages per batched `pm path` exec, to bound single-command output and runtime.
+        private const val PM_PATH_BATCH = 50
+        private val HASH_ALGORITHMS = listOf("MD5", "SHA-1", "SHA-256", "SHA-512")
+    }
 
     // Data class to hold package info
     data class Package(
@@ -41,6 +51,13 @@ class Packages : Module {
         var suspicious: Boolean,
         var certificates: List<CertificateParser.CertificateInfo>,
         var infiles: List<String>,
+    )
+
+    private data class FileHashes(
+        val md5: String,
+        val sha1: String,
+        val sha256: String,
+        val sha512: String,
     )
 
     // Helper function to parse package info line
@@ -71,83 +88,117 @@ class Packages : Module {
         return "apks/$localPath"
     }
 
-    fun getPackageFiles(
+    /**
+     * Resolve APK paths for [packageNames] with batched `pm path` loops instead of
+     * one exec per package.
+     */
+    private fun collectPackagePaths(shell: AdbShell, packageNames: List<String>): Map<String, List<String>> {
+        val paths = HashMap<String, LinkedHashSet<String>>()
+        for (batch in packageNames.chunked(PM_PATH_BATCH)) {
+            val names = batch.joinToString(" ") { "'$it'" }
+            var current: LinkedHashSet<String>? = null
+            runCatching {
+                shell.execForEachLine("for p in $names; do echo \"PKG:\$p\"; pm path \"\$p\"; done") { line ->
+                    val trimmed = line.trim()
+                    when {
+                        // exec retries re-stream the same lines: the per-package set dedups paths
+                        trimmed.startsWith("PKG:") ->
+                            current = paths.getOrPut(trimmed.removePrefix("PKG:")) { LinkedHashSet() }
+                        trimmed.startsWith("package:") ->
+                            current?.add(trimmed.removePrefix("package:"))
+                    }
+                }
+            }.onFailure { Log.w(TAG, "pm path batch failed: ${it.message}") }
+        }
+        return paths.mapValues { it.value.toList() }
+    }
+
+    /** Hash the APK with a single local read; the app can read other packages' APKs directly. */
+    private fun hashFileLocally(file: File): FileHashes? {
+        val digests = HASH_ALGORITHMS.map { MessageDigest.getInstance(it) }
+        try {
+            FileInputStream(file).use { input ->
+                val buf = ByteArray(1 shl 16)
+                while (true) {
+                    val read = input.read(buf)
+                    if (read < 0) break
+                    for (digest in digests) digest.update(buf, 0, read)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Local hashing failed for ${file.path}: ${e.message}")
+            return null
+        }
+        val (md5, sha1, sha256, sha512) = digests.map { digest ->
+            digest.digest().joinToString("") { "%02x".format(it) }
+        }
+        return FileHashes(md5, sha1, sha256, sha512)
+    }
+
+    /** Fallback: all four sums in one exec, matched to fields by digest length. */
+    private fun hashFileRemotely(shell: AdbShell, path: String): FileHashes {
+        var md5 = ""
+        var sha1 = ""
+        var sha256 = ""
+        var sha512 = ""
+        runCatching {
+            val quoted = "\"$path\""
+            shell.execForEachLine("md5sum $quoted; sha1sum $quoted; sha256sum $quoted; sha512sum $quoted") { line ->
+                val token = line.trim().split(WHITESPACE, 2).firstOrNull().orEmpty()
+                if (token.matches(HEX)) when (token.length) {
+                    32 -> md5 = token
+                    40 -> sha1 = token
+                    64 -> sha256 = token
+                    128 -> sha512 = token
+                }
+            }
+        }
+        return FileHashes(md5, sha1, sha256, sha512)
+    }
+
+    private fun buildPackageFile(
         shell: AdbShell,
         sync: AdbSync,
         writer: ArtifactSink,
         packageName: String,
-        isSystem: Boolean,
-    ): List<PackageFile> {
-        val files = mutableListOf<PackageFile>()
-        // exec retries re-stream the same lines: dedup by path so a mid-stream retry cannot
-        // hash a file twice or pull a duplicate copy of a suspicious APK into the archive.
-        val seenPaths = HashSet<String>()
-        try {
-            shell.execForEachLine("pm path $packageName") { line ->
-            val packagePath = line.trim().removePrefix("package:").trim()
-            if (packagePath.isEmpty() || !seenPaths.add(packagePath)) return@execForEachLine
-            // we don't need to test system packages
-            if (isSystem) return@execForEachLine
+        packagePath: String,
+    ): PackageFile {
+        val hashes = hashFileLocally(File(packagePath)) ?: hashFileRemotely(shell, packagePath)
+        val packageFile = PackageFile(
+            path = packagePath,
+            localName = "", // not set/used here
+            md5 = hashes.md5,
+            sha1 = hashes.sha1,
+            sha256 = hashes.sha256,
+            sha512 = hashes.sha512,
+            suspicious = false,
+            certificates = emptyList(),
+            infiles = emptyList(),
+        )
 
-            val packageFile = PackageFile(
-                path = packagePath,
-                localName = "", // not set/used here
-                md5 = "",
-                sha1 = "",
-                sha256 = "",
-                sha512 = "",
-                suspicious = false,
-                certificates = emptyList(),
-                infiles = emptyList(),
-            )
-
-            runCatching {
-                shell.execForEachLine("md5sum ${packagePath}") { md5Out ->
-                    packageFile.md5 = md5Out.trim().split(Regex("\\s+"), 2).getOrElse(0) { "" }
-                }
-            }
-            runCatching {
-                shell.execForEachLine("sha1sum ${packagePath}") { sha1Out ->
-                    packageFile.sha1 = sha1Out.trim().split(Regex("\\s+"), 2).getOrElse(0) { "" }
-                }
-            }
-            runCatching {
-                shell.execForEachLine("sha256sum ${packagePath}") { sha256Out ->
-                    packageFile.sha256 = sha256Out.trim().split(Regex("\\s+"), 2).getOrElse(0) { "" }
-                }
-            }
-            runCatching {
-                shell.execForEachLine("sha512sum ${packagePath}") { sha512Out ->
-                    packageFile.sha512 = sha512Out.trim().split(Regex("\\s+"), 2).getOrElse(0) { "" }
-                }
-            }
-
+        runCatching {
             val apkInfo = APKParser.parseAPK(File(packagePath))
             packageFile.suspicious = apkInfo.suspicious
             packageFile.certificates = apkInfo.certificates
             packageFile.infiles = apkInfo.files
+        }.onFailure { Log.w(TAG, "Failed to parse $packagePath: ${it.message}") }
 
-            if (packageFile.suspicious) {
-                val archivePath = getLocalFileName(writer, packageName, packageFile.path)
-                packageFile.localName = archivePath
-                Log.i(TAG, "downloading $packagePath")
-                val result = runCatching {
-                    writer.useArtifact(archivePath) { output ->
-                        sync.pull(packagePath, output)
-                    }
-                }
-                if (result.isFailure) {
-                    // TODO: write this feedback to the acquisition report in some way
-                    Log.e(TAG, "Failed to copy $packagePath", result.exceptionOrNull())
+        if (packageFile.suspicious) {
+            val archivePath = getLocalFileName(writer, packageName, packageFile.path)
+            packageFile.localName = archivePath
+            Log.i(TAG, "downloading $packagePath")
+            val result = runCatching {
+                writer.useArtifact(archivePath) { output ->
+                    sync.pull(packagePath, output)
                 }
             }
-
-            files.add(packageFile)
+            if (result.isFailure) {
+                // TODO: write this feedback to the acquisition report in some way
+                Log.e(TAG, "Failed to copy $packagePath", result.exceptionOrNull())
             }
-        } catch (_: Throwable) {
-            return files
         }
-        return files
+
+        return packageFile
     }
 
     override fun run(
@@ -169,7 +220,7 @@ class Packages : Module {
 
         fun addPackage(line: String) {
             if (line.isBlank()) return
-            val fields = line.trim().split(Regex("\\s+"))
+            val fields = line.trim().split(WHITESPACE)
             val (packageName, installer, uid) = parsePackageLine(fields, withInstaller)
             if (packageName.isBlank() || !seen.add(packageName)) return
 
@@ -224,13 +275,14 @@ class Packages : Module {
             "thirdParty" to { p: Package -> p.thirdParty = true }
         )
 
+        val byName = packages.associateBy { it.name }
         for ((fieldName, arg) in filters) {
             val setFlag = fieldMap[fieldName]
             try {
                 shell.execForEachLine("pm list packages $arg") { line ->
                     val packageName = line.trim().removePrefix("package:")
                     if (packageName.isBlank()) return@execForEachLine
-                    packages.find { it.name == packageName }?.let { p ->
+                    byName[packageName]?.let { p ->
                         setFlag?.invoke(p)
                     }
                 }
@@ -239,10 +291,16 @@ class Packages : Module {
             }
         }
 
+        // System packages don't need path resolution or hashing.
+        val pathsByPackage = collectPackagePaths(
+            shell,
+            packages.filter { !it.system }.map { it.name },
+        )
         for (i in packages.indices) {
             val pkg = packages[i]
+            val packagePaths = pathsByPackage[pkg.name] ?: continue
             packages[i] = pkg.copy(
-                files = getPackageFiles(shell, sync, writer, pkg.name, pkg.system),
+                files = packagePaths.map { buildPackageFile(shell, sync, writer, pkg.name, it) },
             )
         }
 
