@@ -12,6 +12,10 @@ import org.osservatorionessuno.qf.storage.ArtifactSink
 class Files : Module {
     override val name = "files"
 
+    private companion object {
+        private val WHITESPACE = Regex("\\s+")
+    }
+
     override fun run(
         context: Context,
         manager: AdbConnectionManager,
@@ -56,7 +60,7 @@ class Files : Module {
                 if (supportsPrintf) {
                     // "%T@ %m %s %u %g %p"
                     runCatching { sh.execForEachLine(cmd) { line ->
-                        val parts = line.trim().split(Regex("\\s+"), limit = 6)
+                        val parts = line.trim().split(WHITESPACE, limit = 6)
                         if (parts.size < 6) return@execForEachLine
                         val mtime = parts[0].toDoubleOrNull()
                         val mode  = parts[1]

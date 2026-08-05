@@ -71,6 +71,11 @@ class AcquisitionRunner(
         )
 
         val MODULE_NAMES: List<String> = DEFAULT_MODULES.map { it.name }
+
+        // Byte-level callbacks arrive per transfer chunk; cap what reaches the
+        // UI at ~10 Hz or every 4 MiB, whichever comes first.
+        private const val PROGRESS_REPORT_INTERVAL_NANOS = 100_000_000L
+        private const val PROGRESS_REPORT_BYTES = 4L shl 20
     }
 
     /**
@@ -180,9 +185,18 @@ class AcquisitionRunner(
                 }
 
                 var moduleBytes = 0L
+                var lastReportBytes = 0L
+                var lastReportNanos = 0L
                 val progressCb: (Long) -> Unit = { delta ->
                     moduleBytes += delta
-                    listener?.onModuleProgress(module.name, moduleBytes)
+                    val now = System.nanoTime()
+                    if (moduleBytes - lastReportBytes >= PROGRESS_REPORT_BYTES ||
+                        now - lastReportNanos >= PROGRESS_REPORT_INTERVAL_NANOS
+                    ) {
+                        lastReportBytes = moduleBytes
+                        lastReportNanos = now
+                        listener?.onModuleProgress(module.name, moduleBytes)
+                    }
                     Unit
                 }
                 Log.i(TAG, "Running module ${module.name}")
@@ -190,6 +204,10 @@ class AcquisitionRunner(
                 var success = true
                 try {
                     module.run(context, manager, writer, progressCb)
+                    // Flush the throttled tail so the completed card shows the real total.
+                    if (moduleBytes > lastReportBytes) {
+                        listener?.onModuleProgress(module.name, moduleBytes)
+                    }
                     Log.i(TAG, "Module ${module.name} finished")
                 } catch (ise: InsufficientStorageException) {
                     Log.w(TAG, "Module ${module.name} hit the storage reserve")
