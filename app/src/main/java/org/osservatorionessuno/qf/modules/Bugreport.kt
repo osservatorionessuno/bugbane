@@ -63,18 +63,25 @@ class Bugreport : Module {
      * find the newest ZIP in the shell bugreports directory. Then fall back to legacy.
      */
     private fun discoverBugreportPath(shell: AdbShell): String {
-        // A) Modern bugreportz (-p then plain)
+        // A) Modern bugreportz: if the OK line is missing from quiet output, look for the
+        // written ZIP before generating a whole second bugreport. Only accept ZIPs written
+        // after we started, so a stale report from an earlier run is never pulled.
+        val startedEpochSec = runCatching {
+            shell.exec("date +%s").trim().toLong()
+        }.getOrDefault(0L)
+
         runCatching {
             val outP = shell.exec("bugreportz -p").trim()
             Log.d(TAG, "bugreportz -p output:\n$outP")
             parseBugreportzOutput(outP)?.let { return it }
 
+            findNewestShellBugreport(shell, startedEpochSec)?.let { return it }
+
             val out = shell.exec("bugreportz").trim()
             Log.d(TAG, "bugreportz output:\n$out")
             parseBugreportzOutput(out)?.let { return it }
 
-            // Try to discover the latest file where bugreportz usually writes
-            findNewestShellBugreport(shell)?.let { return it }
+            findNewestShellBugreport(shell, startedEpochSec)?.let { return it }
         }.onFailure {
             Log.w(TAG, "bugreportz invocation failed: ${it.message}")
         }
@@ -124,8 +131,9 @@ class Bugreport : Module {
 
     /**
      * Find the newest ZIP where bugreportz typically writes on modern Android.
+     * Rejects files older than [notBeforeEpochSec] (0 disables the check).
      */
-    private fun findNewestShellBugreport(shell: AdbShell): String? {
+    private fun findNewestShellBugreport(shell: AdbShell, notBeforeEpochSec: Long): String? {
         val candidateDirs = listOf(
             "/data/user_de/0/com.android.shell/files/bugreports",
             "/data/user/0/com.android.shell/files/bugreports"
@@ -138,10 +146,18 @@ class Bugreport : Module {
                     newest = trimmed
                 }
             }
-            if (newest != null) {
-                Log.i(TAG, "Found newest bugreport ZIP in $dir: $newest")
-                return newest
+            val candidate = newest ?: continue
+            if (notBeforeEpochSec > 0) {
+                val mtime = runCatching {
+                    shell.exec("""stat -c %Y "$candidate"""").trim().toLong()
+                }.getOrDefault(0L)
+                if (mtime < notBeforeEpochSec) {
+                    Log.w(TAG, "Ignoring stale bugreport ZIP: $candidate (mtime=$mtime)")
+                    continue
+                }
             }
+            Log.i(TAG, "Found newest bugreport ZIP in $dir: $candidate")
+            return candidate
         }
         return null
     }

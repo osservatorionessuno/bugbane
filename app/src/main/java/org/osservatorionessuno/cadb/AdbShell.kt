@@ -67,6 +67,11 @@ class AdbShell(
                     Log.w(tag, "[exec] Marker not seen; stream ended/idle before marker (accepting output)")
                 }
                 return
+            } catch (t: ShellTimeoutException) {
+                // Timeouts are deterministic-slow, not flaky: retrying just doubles the stall.
+                throw IOException("All attempts failed", t)
+            } catch (t: ShellInactivityException) {
+                throw IOException("All attempts failed", t)
             } catch (t: Throwable) {
                 Log.w(tag, "[exec] Attempt $attempt failed: ${t.message}")
                 lastErr = t

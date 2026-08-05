@@ -40,25 +40,27 @@ class RootBinaries : Module {
         val shell = AdbShell(manager, tag = "ShellQF", progress = null)
 
         val found = LinkedHashSet<String>()
-        for (bin in targets) {
-            val script = """
-                # Expand PATH to include common root locations
-                PATH="${'$'}PATH:/system/bin:/system/xbin:/sbin:/su/bin:/vendor/bin"
-                # If command -v finds it, enumerate all matches along PATH; else try which -a
-                if command -v $bin >/dev/null 2>&1; then
-                  IFS=:; for d in ${'$'}PATH; do
-                    [ -x "${'$'}d/$bin" ] && printf "%s\n" "${'$'}d/$bin"
-                  done
-                else
-                  which -a $bin 2>/dev/null || true
-                fi
-            """.trimIndent()
+        // One exec for all targets instead of one per binary.
+        val script = """
+            # Expand PATH to include common root locations
+            PATH="${'$'}PATH:/system/bin:/system/xbin:/sbin:/su/bin:/vendor/bin"
+            for bin in ${targets.joinToString(" ")}; do
+              # If command -v finds it, enumerate all matches along PATH; else try which -a
+              if command -v "${'$'}bin" >/dev/null 2>&1; then
+                IFS=:; for d in ${'$'}PATH; do
+                  [ -x "${'$'}d/${'$'}bin" ] && printf "%s\n" "${'$'}d/${'$'}bin"
+                done
+                unset IFS
+              else
+                which -a "${'$'}bin" 2>/dev/null || true
+              fi
+            done
+        """.trimIndent()
 
-            runCatching {
-                shell.execForEachLine(script) { line ->
-                    val trimmed = line.trim()
-                    if (trimmed.startsWith("/")) found.add(trimmed)
-                }
+        runCatching {
+            shell.execForEachLine(script) { line ->
+                val trimmed = line.trim()
+                if (trimmed.startsWith("/")) found.add(trimmed)
             }
         }
 
