@@ -256,7 +256,8 @@ class AdbSync(
     private fun receiveFile(input: InputStream, output: OutputStream) {
         val header = ByteArray(4)
         val lenBuf = ByteArray(4)
-        val buf = ByteArray(8192)
+        // Sync DATA frames are at most 64 KiB: drain a whole frame per read.
+        val buf = ByteArray(64 * 1024)
         while (true) {
             readFully(input, header, 0, 4)
             when (String(header, StandardCharsets.US_ASCII)) {
