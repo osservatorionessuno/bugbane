@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import io.github.muntashirakon.adb.AbsAdbConnectionManager
+import io.github.muntashirakon.adb.AdbHostKey
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
@@ -27,6 +28,7 @@ import java.security.PrivateKey
 import java.security.SecureRandom
 import java.security.cert.Certificate
 import java.security.cert.CertificateFactory
+import java.security.interfaces.RSAPublicKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.Date
 
@@ -57,6 +59,13 @@ class AdbConnectionManager private constructor(context: Context) : AbsAdbConnect
     override fun getCertificate(): Certificate = certificate
 
     override fun getDeviceName(): String = "Bugbane"
+
+    /**
+     * The adb_keys line the device records for this host on authorization. Stored with
+     * acquisitions (androidqf parity) so analysis can exclude it from unknown-key checks.
+     */
+    fun hostPublicKey(): String =
+        AdbHostKey.adbKeysLine(certificate.publicKey as RSAPublicKey, getDeviceName())
 
     companion object {
         private const val TAG = "AdbConnectionManager"

@@ -17,6 +17,7 @@ data class AcquisitionIndex(
     val sdcard: String,
     val cpu: String,
     val analysisDir: String,
+    val adbHostPublicKey: String? = null,
 ) {
     fun toJsonObject(): JSONObject {
         val root = JSONObject()
@@ -34,6 +35,7 @@ data class AcquisitionIndex(
         root.put("streaming_mode", true)
         root.put("encrypted", true)
         root.put("analysis_dir", analysisDir)
+        adbHostPublicKey?.let { root.put("adb_host_public_key", it) }
         return root
     }
 
@@ -63,6 +65,7 @@ data class AcquisitionIndex(
                 sdcard = root.optString("sdcard"),
                 cpu = root.optString("cpu"),
                 analysisDir = root.optString("analysis_dir", ANALYSIS_DIR),
+                adbHostPublicKey = root.optString("adb_host_public_key").ifBlank { null },
             )
         }
     }
