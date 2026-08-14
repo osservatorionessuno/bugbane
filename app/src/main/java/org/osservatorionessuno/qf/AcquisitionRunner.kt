@@ -136,6 +136,10 @@ class AcquisitionRunner(
         val total = modules.size
         var completedCount = 0
 
+        val adbHostKey = runCatching { manager.hostPublicKey() }
+            .onFailure { Log.w(TAG, "Could not encode host adb public key", it) }
+            .getOrNull()
+
         var index = AcquisitionIndex(
             uuid = acquisitionDir.name,
             status = AcquisitionIndex.STATUS_RUNNING,
@@ -147,6 +151,7 @@ class AcquisitionRunner(
             sdcard = sdCard,
             cpu = cpu,
             analysisDir = AcquisitionIndex.ANALYSIS_DIR,
+            adbHostPublicKey = adbHostKey,
         )
 
         // Encrypting needs only the public acquisition identity, so it never
@@ -168,6 +173,12 @@ class AcquisitionRunner(
 
         var cancelled = false
         try {
+            adbHostKey?.let { key ->
+                runCatching {
+                    writer.useArtifact("adb_host_key.pub") { it.write((key + "\n").toByteArray()) }
+                }.onFailure { Log.w(TAG, "Failed to write adb_host_key.pub", it) }
+            }
+
             for (module in modules) {
                 if (listener?.isCancelled() == true) {
                     Log.i(TAG, "Acquisition cancelled before module ${module.name}")
