@@ -77,6 +77,9 @@ object AcquisitionScanner {
             // Encrypted acquisition: decrypt + unzip in one bounded-memory pass and
             // analyze each artifact from its stream — no plaintext is written to disk.
             EncryptedAcquisitionReader(acquisitionDir, identities).use { reader ->
+                // From the encrypted index, not the plaintext sidecar: the host key demotes
+                // detections, so it must come from the authenticated copy.
+                reader.readIndex()?.adbHostPublicKey?.let { runner.setAdbHostKeys(listOf(it)) }
                 reader.forEachArtifact { artifact ->
                     if (!ForensicRunner.isAnalyzable(artifact.path)) return@forEachArtifact
                     // runCatching: a malformed artifact (exactly what a compromised device might

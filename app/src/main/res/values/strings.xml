@@ -281,6 +281,8 @@
     <string name="mvt_ioc_message">The following traces of compromission were found:</string>
     <string name="mvt_adb_fingerprint_title">ADB Fingerprints</string>
     <string name="mvt_adb_fingerprint_message">Fingerprints of past devices connected via Android Debug Bridge (ADB) were found:</string>
+    <string name="mvt_adb_host_fingerprint_title">Acquisition ADB key</string>
+    <string name="mvt_adb_host_fingerprint_message">This ADB key belongs to the tool that performed the acquisition:</string>
     <string name="mvt_appops_risky_permission_title">Apps with risky permissions</string>
     <string name="mvt_appops_risky_permission_message">The following apps have risky permissions set:</string>
     <string name="mvt_packages_root_package_title">Root package installed</string>
