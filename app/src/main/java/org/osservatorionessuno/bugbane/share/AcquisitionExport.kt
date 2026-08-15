@@ -7,10 +7,13 @@ import java.io.File
 import java.io.OutputStream
 
 /**
- * File name presented for an exported/shared acquisition. The `.zip.age` suffix
- * reflects the payload: an age file whose plaintext is a ZIP (`age -d … | unzip`).
+ * File name presented for an exported/shared acquisition: `acquisition-<id>.zip.age`,
+ * where `<id>` is the first block of the acquisition UUID, so exports of different
+ * acquisitions don't overwrite each other. The `.zip.age` suffix reflects the
+ * payload: an age file whose plaintext is a ZIP (`age -d … | unzip`).
  */
-const val EXPORT_FILE_NAME: String = "acquisition.zip.age"
+fun exportFileName(acquisitionDir: File): String =
+    "acquisition-${acquisitionDir.name.substringBefore('-')}.zip.age"
 
 /**
  * Passphrase re-wrap of an at-rest acquisition archive: rewrites the ~200-byte
