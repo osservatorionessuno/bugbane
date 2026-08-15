@@ -56,6 +56,31 @@ class AdbSync(
     }
 
     /**
+     * Whether adbd can stat [remotePath]. Uses the v1 STAT request, which reports
+     * mode 0 for missing and unreadable paths alike.
+     */
+    @Throws(IOException::class)
+    fun canStat(remotePath: String): Boolean {
+        manager.openStream(LocalServices.SYNC).use { stream ->
+            val out = stream.openOutputStream()
+            val input = stream.openInputStream()
+            sendSyncRequest(out, AdbConstants.STAT, remotePath)
+
+            val header = ByteArray(4)
+            readFully(input, header, 0, 4)
+            val response = String(header, StandardCharsets.US_ASCII)
+            if (response != AdbConstants.STAT) {
+                throw IOException("Unexpected stat response: $response (${cmdHex(header)})")
+            }
+            // mode (4), size (4), mtime (4) — little endian
+            val fields = ByteArray(12)
+            readFully(input, fields, 0, 12)
+            val mode = ByteBuffer.wrap(fields, 0, 4).order(ByteOrder.LITTLE_ENDIAN).int
+            return mode != 0
+        }
+    }
+
+    /**
      * List remote files in a directory.
      *
      * @param remoteDir Path on the device to list from.
