@@ -10,7 +10,6 @@ import org.osservatorionessuno.libmvt.common.GroupedDetection
 import org.osservatorionessuno.libmvt.common.Indicators
 import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.bugbane.utils.AndroidStringResolver
-import org.osservatorionessuno.libmvt.common.AbstractInput
 import org.osservatorionessuno.libmvt.common.Artifact
 import org.osservatorionessuno.qf.crypto.SessionKeyCache
 import org.osservatorionessuno.qf.crypto.age.AgeIdentity
@@ -88,16 +87,9 @@ object AcquisitionScanner {
                         runner.streamFileAnalysis(artifact.reopenable)
                     }.getOrDefault(emptyMap())
                     for ((path, parsed) in parsedEntries) {
-                        // Keep only the detections: the parsed Artifact drags its full results
-                        // list (e.g. the entire device file list), and retaining every artifact
-                        // until the end of the scan would hold all of them in memory at once.
-                        // Grouping only reads `detected`, so a stub carries just that.
-                        val detectionsOnly = object : Artifact() {
-                            override fun parse(artifactInput: AbstractInput) = Unit
-                            override fun checkIndicators() = Unit
-                        }
-                        detectionsOnly.detected.addAll(parsed.detected)
-                        artifacts[path] = detectionsOnly
+                        // Modules stream records and retain only detections, so keeping the
+                        // parsed artifact is cheap.
+                        artifacts[path] = parsed
                     }
                 }
             }
