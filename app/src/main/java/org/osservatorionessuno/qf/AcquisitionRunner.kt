@@ -20,6 +20,7 @@ import org.osservatorionessuno.qf.modules.Settings
 import org.osservatorionessuno.qf.modules.Bugreport
 import org.osservatorionessuno.qf.modules.Logs
 import org.osservatorionessuno.qf.modules.Mounts
+import org.osservatorionessuno.qf.modules.OldBugreports
 import org.osservatorionessuno.qf.modules.Packages
 import org.osservatorionessuno.qf.modules.RootBinaries
 import org.osservatorionessuno.qf.modules.Temp
@@ -66,6 +67,7 @@ class AcquisitionRunner(
             // listing can be big, and Bugreport/Packages are also poorly
             // compressible.
             Files(),
+            OldBugreports(),
             Bugreport(),
             Packages(),
         )
