@@ -45,7 +45,7 @@ import org.osservatorionessuno.bugbane.components.AcquisitionIdentityLostDialog
 import org.osservatorionessuno.bugbane.utils.AcquisitionRecovery
 import org.osservatorionessuno.bugbane.share.AcquisitionShareProvider
 import org.osservatorionessuno.bugbane.share.AcquisitionExport
-import org.osservatorionessuno.bugbane.share.EXPORT_FILE_NAME
+import org.osservatorionessuno.bugbane.share.exportFileName
 import org.osservatorionessuno.libmvt.common.AlertLevel
 import org.json.JSONObject
 import java.io.File
@@ -217,7 +217,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
             exportIdentity?.destroy()
             exportIdentity = identity
             passphrase = Utils.generatePassphrase()
-            exportLauncher.launch(EXPORT_FILE_NAME)
+            exportLauncher.launch(exportFileName(acquisitionDir))
         }
     }
 
@@ -231,7 +231,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 File(acquisitionDir, ARCHIVE_FILE),
                 identity,
                 pass,
-                EXPORT_FILE_NAME,
+                exportFileName(acquisitionDir),
             )
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/octet-stream"
@@ -243,7 +243,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 // The read grant only reliably follows a URI in ClipData; EXTRA_STREAM
                 // alone isn't covered. Only the app the user picks receives the grant
                 // and the EXTRA_TEXT passphrase.
-                clipData = ClipData.newRawUri(EXPORT_FILE_NAME, uri)
+                clipData = ClipData.newRawUri(exportFileName(acquisitionDir), uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(Intent.createChooser(intent, null))
