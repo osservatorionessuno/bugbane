@@ -5,6 +5,7 @@ object AdbConstants {
     const val RECV = "RECV"
     const val LIST = "LIST"
     const val LIS2 = "LIS2"
+    const val STAT = "STAT"
 
     // Response commands
     const val DATA = "DATA"

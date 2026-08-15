@@ -33,22 +33,28 @@ class Logs : Module {
     ) {
         val sync = AdbSync(manager, progress)
 
-        val result = runCatching {
-            for (target in targets) {
+        // Several targets are root-only on production devices: skip per target so one
+        // denied path cannot cost the readable ones.
+        for (target in targets) {
+            runCatching {
                 if (target.endsWith("/")) {
                     sync.pullFolder(target, writer, "logs")
                 } else {
+                    // Stat first: a failed pull would still commit an empty artifact entry.
+                    if (!sync.canStat(target)) {
+                        Log.w(TAG, "Skipping $target: missing or inaccessible")
+                        return@runCatching
+                    }
                     val name = target.substringAfterLast('/')
                     writer.useArtifact("logs/$name") { output ->
                         sync.pull(target, output)
                     }
                 }
+            }.onFailure {
+                // TODO: write this feedback to the acquisition report in some way
+                Log.e(TAG, "Failed to pull $target", it)
             }
-            Log.i(TAG, "Pulled logs")
         }
-        if (result.isFailure) {
-            // TODO: write this feedback to the acquisition report in some way
-            Log.e(TAG, "Failed to pull logs", result.exceptionOrNull())
-        }
+        Log.i(TAG, "Pulled logs")
     }
 }
