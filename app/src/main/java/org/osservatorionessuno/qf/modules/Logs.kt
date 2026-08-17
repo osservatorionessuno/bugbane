@@ -15,11 +15,14 @@ class Logs : Module {
     override val name: String = "logs"
     private val TAG = "LogsModule"
 
-    // List of logs file and directories to collect. The live kernel ring buffer
-    // (/proc/kmsg) is NOT here: it is a stream that blocks on read with no EOF, so
-    // a file-sync pull hangs — it is captured via `dmesg` below, which exits.
+    // List of logs file and directories to collect. /proc/kmsg is the live kernel
+    // ring buffer — a stream that never EOFs, so a file-sync pull of it blocks
+    // where it is readable; kept here for parity/coverage because canStat skips it
+    // where denied and the AdbSync inactivity timeout bounds it where it streams.
+    // The kernel log is also captured non-blocking via `dmesg` below (see run()).
     private val targets = listOf(
 		"/data/system/uiderrors.txt",
+		"/proc/kmsg",
 		"/proc/last_kmsg",
 		"/sys/fs/pstore/console-ramoops",
         "/data/anr/",
@@ -35,8 +38,8 @@ class Logs : Module {
     ) {
         val sync = AdbSync(manager, progress)
 
-        // Kernel log via dmesg (syslog syscall, exits) rather than reading
-        // /proc/kmsg (a stream that never EOFs). AdbShell bounds it by timeout.
+        // Kernel log via dmesg (syslog syscall, exits) — the non-blocking companion
+        // to the /proc/kmsg pull above; whichever the device permits gets captured.
         runCatching {
             val shell = AdbShell(manager, progress = null)
             writer.useArtifact("logs/kmsg.txt") { output ->
