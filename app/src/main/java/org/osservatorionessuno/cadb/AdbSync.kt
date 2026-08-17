@@ -9,8 +9,53 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.math.min
 import org.osservatorionessuno.qf.storage.ArtifactSink
+
+/** A sync transfer went quiet past the inactivity window (likely a wedged file). */
+class SyncInactivityException(message: String) : IOException(message)
+
+/**
+ * Wraps an input stream so every read is bounded by [inactivityMs]. A read that
+ * stalls (a pseudo-file, FIFO, or a desynced stream) throws [SyncInactivityException]
+ * instead of blocking forever; the sync path has no other deadline. One daemon
+ * reader thread per instance, released on [close].
+ */
+internal class TimeoutInputStream(
+    private val delegate: InputStream,
+    private val inactivityMs: Long,
+) : InputStream() {
+    private val executor = Executors.newSingleThreadExecutor {
+        Thread(it, "SyncReader").apply { isDaemon = true }
+    }
+
+    override fun read(): Int {
+        val one = ByteArray(1)
+        return if (read(one, 0, 1) < 0) -1 else one[0].toInt() and 0xFF
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val future = executor.submit<Int> { delegate.read(b, off, len) }
+        try {
+            return future.get(inactivityMs, TimeUnit.MILLISECONDS)
+        } catch (e: TimeoutException) {
+            future.cancel(true)
+            throw SyncInactivityException("Sync read inactive for ${inactivityMs}ms")
+        } catch (e: ExecutionException) {
+            val cause = e.cause
+            throw if (cause is IOException) cause else IOException(cause)
+        }
+    }
+
+    override fun close() {
+        executor.shutdownNow()
+        delegate.close()
+    }
+}
 
 private data class SyncDirEntry(
     val name: String,
@@ -30,6 +75,9 @@ private data class RemoteFileEntry(
 class AdbSync(
     private val manager: AdbConnectionManager,
     private val progress: ((Long) -> Unit)? = null,
+    // A pull with no bytes for this long is treated as wedged and aborted; the
+    // sync path (unlike AdbShell) otherwise blocks forever on such a read.
+    private val inactivityMs: Long = 30_000L,
 ) {
     private companion object {
         private const val TAG = "AdbSync"
@@ -38,6 +86,8 @@ class AdbSync(
         private const val S_IFDIR = 0x4000
         private const val S_IFREG = 0x8000
     }
+
+    private fun timeoutInput(delegate: InputStream) = TimeoutInputStream(delegate, inactivityMs)
 
     /**
      * Pull a remote file to a local destination.
@@ -49,9 +99,10 @@ class AdbSync(
     fun pull(remotePath: String, output: OutputStream) {
         manager.openStream(LocalServices.SYNC).use { stream ->
             val out = stream.openOutputStream()
-            val input = stream.openInputStream()
-            sendRecv(out, remotePath)
-            receiveFile(input, output)
+            timeoutInput(stream.openInputStream()).use { input ->
+                sendRecv(out, remotePath)
+                receiveFile(input, output)
+            }
         }
     }
 
@@ -63,20 +114,21 @@ class AdbSync(
     fun canStat(remotePath: String): Boolean {
         manager.openStream(LocalServices.SYNC).use { stream ->
             val out = stream.openOutputStream()
-            val input = stream.openInputStream()
-            sendSyncRequest(out, AdbConstants.STAT, remotePath)
+            timeoutInput(stream.openInputStream()).use { input ->
+                sendSyncRequest(out, AdbConstants.STAT, remotePath)
 
-            val header = ByteArray(4)
-            readFully(input, header, 0, 4)
-            val response = String(header, StandardCharsets.US_ASCII)
-            if (response != AdbConstants.STAT) {
-                throw IOException("Unexpected stat response: $response (${cmdHex(header)})")
+                val header = ByteArray(4)
+                readFully(input, header, 0, 4)
+                val response = String(header, StandardCharsets.US_ASCII)
+                if (response != AdbConstants.STAT) {
+                    throw IOException("Unexpected stat response: $response (${cmdHex(header)})")
+                }
+                // mode (4), size (4), mtime (4) — little endian
+                val fields = ByteArray(12)
+                readFully(input, fields, 0, 12)
+                val mode = ByteBuffer.wrap(fields, 0, 4).order(ByteOrder.LITTLE_ENDIAN).int
+                return mode != 0
             }
-            // mode (4), size (4), mtime (4) — little endian
-            val fields = ByteArray(12)
-            readFully(input, fields, 0, 12)
-            val mode = ByteBuffer.wrap(fields, 0, 4).order(ByteOrder.LITTLE_ENDIAN).int
-            return mode != 0
         }
     }
 
@@ -90,14 +142,15 @@ class AdbSync(
     fun list(remoteDir: String): List<Map<String, Any>> {
         manager.openStream(LocalServices.SYNC).use { stream ->
             val out = stream.openOutputStream()
-            val input = stream.openInputStream()
-            return listEntries(input, out, remoteDir).map { entry ->
-                mapOf(
-                    "path" to entry.name,
-                    "mode" to entry.mode,
-                    "size" to 0,
-                    "mtime" to entry.mtime,
-                )
+            timeoutInput(stream.openInputStream()).use { input ->
+                return listEntries(input, out, remoteDir).map { entry ->
+                    mapOf(
+                        "path" to entry.name,
+                        "mode" to entry.mode,
+                        "size" to 0,
+                        "mtime" to entry.mtime,
+                    )
+                }
             }
         }
     }
@@ -120,21 +173,26 @@ class AdbSync(
         }
         manager.openStream(LocalServices.SYNC).use { stream ->
             val out = stream.openOutputStream()
-            val input = stream.openInputStream()
-            val files = mutableListOf<RemoteFileEntry>()
-            collectFiles(input, out, remoteDir, prefix, files)
-            for (file in files) {
-                try {
-                    writer.useArtifact(file.artifactPath, file.mtime.toLong() * 1000) { artifact ->
-                        // this does not call pull() explicitly cause otherwise a new manager->stream would be created
-                        sendRecv(out, file.remotePath)
-                        receiveFile(input, artifact)
+            timeoutInput(stream.openInputStream()).use { input ->
+                val files = mutableListOf<RemoteFileEntry>()
+                collectFiles(input, out, remoteDir, prefix, files)
+                for (file in files) {
+                    try {
+                        writer.useArtifact(file.artifactPath, file.mtime.toLong() * 1000) { artifact ->
+                            // this does not call pull() explicitly cause otherwise a new manager->stream would be created
+                            sendRecv(out, file.remotePath)
+                            receiveFile(input, artifact)
+                        }
+                    } catch (e: IOException) {
+                        // A denied open leaves the stream synced, so skip just that file.
+                        // A read-timeout desyncs the stream, so abort the folder (the
+                        // caller isolates per target) rather than pull garbage.
+                        if (e !is SyncInactivityException &&
+                            e.message.orEmpty().contains("Permission denied", ignoreCase = true)) {
+                            continue
+                        }
+                        throw e
                     }
-                } catch (e: IOException) {
-                    if (e.message.orEmpty().contains("Permission denied", ignoreCase = true)) {
-                        continue
-                    }
-                    throw e
                 }
             }
         }
