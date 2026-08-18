@@ -50,7 +50,7 @@ class Bugreport : Module {
         } finally {
             // Only delete remote if pull succeeded, to avoid races.
             if (pulled) {
-                runCatching { remotePath?.let { shell.exec("""rm -f "$it"""") } }
+                runCatching { remotePath?.let { shell.execForEachLine("""rm -f "$it"""") {} } }
                     .onFailure { Log.w(TAG, "Cleanup failed for $remotePath: ${it.message}") }
             } else {
                 Log.w(TAG, "Not cleaning up remote; pull failed.")
@@ -67,19 +67,15 @@ class Bugreport : Module {
         // written ZIP before generating a whole second bugreport. Only accept ZIPs written
         // after we started, so a stale report from an earlier run is never pulled.
         val startedEpochSec = runCatching {
-            shell.exec("date +%s").trim().toLong()
+            shell.execFirstLine("date +%s").toLong()
         }.getOrDefault(0L)
 
         runCatching {
-            val outP = shell.exec("bugreportz -p").trim()
-            Log.d(TAG, "bugreportz -p output:\n$outP")
-            parseBugreportzOutput(outP)?.let { return it }
+            runBugreportz(shell, "bugreportz -p")?.let { return it }
 
             findNewestShellBugreport(shell, startedEpochSec)?.let { return it }
 
-            val out = shell.exec("bugreportz").trim()
-            Log.d(TAG, "bugreportz output:\n$out")
-            parseBugreportzOutput(out)?.let { return it }
+            runBugreportz(shell, "bugreportz")?.let { return it }
 
             findNewestShellBugreport(shell, startedEpochSec)?.let { return it }
         }.onFailure {
@@ -90,11 +86,10 @@ class Bugreport : Module {
         val zipFallback = "/sdcard/Download/bugreport.zip"
         runCatching {
             Log.i(TAG, "Falling back to: bugreport -f \"$zipFallback\"")
-            val out = shell.exec("""bugreport -f "$zipFallback"""")
-            Log.d(TAG, "bugreport -f output:\n$out")
-            val stat = shell.exec("""ls -l "$zipFallback" || echo MISSING""")
-            Log.d(TAG, "ls -l zipFallback:\n$stat")
-            if (!stat.contains("MISSING")) return zipFallback
+            shell.execForEachLine("""bugreport -f "$zipFallback"""") { line ->
+                Log.d(TAG, "bugreport -f: $line")
+            }
+            if (remoteFileExists(shell, zipFallback)) return zipFallback
         }.onFailure {
             Log.w(TAG, "bugreport -f failed: ${it.message}")
         }
@@ -102,31 +97,43 @@ class Bugreport : Module {
         // C) Last resort: legacy text
         val txtFallback = "/sdcard/Download/bugreport.txt"
         Log.i(TAG, "Falling back to legacy text bugreport -> \"$txtFallback\"")
-        val outTxt = shell.exec("""bugreport >"$txtFallback" 2>/dev/null; echo $?""")
-        Log.d(TAG, "legacy bugreport exit?\n$outTxt")
-        val statTxt = shell.exec("""ls -l "$txtFallback" || echo MISSING""")
-        Log.d(TAG, "ls -l txtFallback:\n$statTxt")
-        if (!statTxt.contains("MISSING")) return txtFallback
+        val outTxt = shell.execFirstLine("""bugreport >"$txtFallback" 2>/dev/null; echo $?""")
+        Log.d(TAG, "legacy bugreport exit? $outTxt")
+        if (remoteFileExists(shell, txtFallback)) return txtFallback
 
         throw IOException("Unable to generate bugreport via bugreportz or bugreport (zip/text).")
     }
 
     /**
-     * Accepts outputs like:
+     * Runs bugreportz and parses lines like:
      *   OK: /data/user_de/0/com.android.shell/files/bugreports/bugreport-YYYY...zip
      *   FAILED: <reason>  -> throw
+     * Failure is thrown only after the command completes: an exception from the
+     * line callback would make AdbShell retry the whole bugreportz run.
      */
-    private fun parseBugreportzOutput(stdout: String): String? {
-        if (stdout.isBlank()) return null
-        val lines = stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    private fun runBugreportz(shell: AdbShell, command: String): String? {
+        var okPath: String? = null
+        var failLine: String? = null
+        shell.execForEachLine(command) { raw ->
+            val line = raw.trim()
+            if (line.isEmpty()) return@execForEachLine
+            Log.d(TAG, "$command: $line")
+            when {
+                line.startsWith("FAIL", ignoreCase = true) -> if (failLine == null) failLine = line
+                line.startsWith("OK:", ignoreCase = true) -> okPath = line.substringAfter("OK:").trim()
+            }
+        }
+        failLine?.let { throw IOException("bugreportz failed: $it") }
+        return okPath?.takeIf { it.startsWith("/") }
+    }
 
-        lines.firstOrNull {
-            it.startsWith("FAIL", ignoreCase = true) || it.startsWith("FAILED", ignoreCase = true)
-        }?.let { throw IOException("bugreportz failed: $it") }
-
-        val okLine = lines.lastOrNull { it.startsWith("OK:", ignoreCase = true) } ?: return null
-        val path = okLine.substringAfter("OK:", "").trim()
-        return if (path.startsWith("/")) path else null
+    private fun remoteFileExists(shell: AdbShell, path: String): Boolean {
+        var missing = false
+        shell.execForEachLine("""ls -l "$path" || echo MISSING""") { line ->
+            Log.d(TAG, "ls -l $path: $line")
+            if (line.contains("MISSING")) missing = true
+        }
+        return !missing
     }
 
     /**
@@ -149,7 +156,7 @@ class Bugreport : Module {
             val candidate = newest ?: continue
             if (notBeforeEpochSec > 0) {
                 val mtime = runCatching {
-                    shell.exec("""stat -c %Y "$candidate"""").trim().toLong()
+                    shell.execFirstLine("""stat -c %Y "$candidate"""").toLong()
                 }.getOrDefault(0L)
                 if (mtime < notBeforeEpochSec) {
                     Log.w(TAG, "Ignoring stale bugreport ZIP: $candidate (mtime=$mtime)")

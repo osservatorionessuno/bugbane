@@ -120,7 +120,7 @@ class AcquisitionRunner(
         Log.i(TAG, "Starting acquisition in ${acquisitionDir.absolutePath}")
 
         val shell = AdbShell(manager)
-        val cpu = shell.exec("getprop ro.product.cpu.abi").trim()
+        val cpu = shell.execFirstLine("getprop ro.product.cpu.abi")
         var tmpDir = "/data/local/tmp/"
         var sdCard = "/sdcard/"
         shell.execForEachLine("env") { line ->

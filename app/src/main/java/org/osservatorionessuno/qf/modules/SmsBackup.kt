@@ -24,8 +24,11 @@ class SmsBackup : Module {
         // Optional preflight: if allowBackup=false, likely no data.
         runCatching {
             val shell = AdbShell(manager, "ShellQF", progress = null, timeoutMs = 30_000, inactivityMs = 10_000)
-            val hint = shell.exec("""dumpsys package $TELEPHONY_PKG | grep -i allowBackup || true""").trim()
-            if (hint.contains("allowBackup=false", ignoreCase = true)) {
+            var backupBlocked = false
+            shell.execForEachLine("""dumpsys package $TELEPHONY_PKG | grep -i allowBackup || true""") { line ->
+                if (line.contains("allowBackup=false", ignoreCase = true)) backupBlocked = true
+            }
+            if (backupBlocked) {
                 Log.w(TAG, "Telephony has allowBackup=false; ADB backup may be empty.")
             }
         }

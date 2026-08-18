@@ -52,6 +52,18 @@ class AdbShell(
         }
     }
 
+    /** Returns the first non-blank output line, trimmed ("" if none). Memory-bounded. */
+    fun execFirstLine(command: String): String {
+        var first: String? = null
+        execForEachLine(command) { line ->
+            if (first == null) {
+                val trimmed = line.trim()
+                if (trimmed.isNotEmpty()) first = trimmed
+            }
+        }
+        return first ?: ""
+    }
+
     private fun execInternal(command: String, sink: OutputStream) {
         var lastErr: Throwable? = null
         repeat(RETRIES + 1) { attempt ->
