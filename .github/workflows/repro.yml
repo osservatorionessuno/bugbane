@@ -32,19 +32,19 @@ jobs:
 
     steps:
       - name: Download Build artifact (ubuntu-22.04)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: app-production-release-ubuntu-22.04
           path: artifacts/ubuntu-22.04
 
       - name: Download Build artifact (ubuntu-24.04)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: app-production-release-ubuntu-24.04
           path: artifacts/ubuntu-24.04
 
       - name: Download F-Droid artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: fdroids
           path: artifacts/fdroid
@@ -111,7 +111,7 @@ jobs:
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reproducibility-reports
           path: |
