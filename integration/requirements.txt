@@ -1,0 +1,2 @@
+# Host-side archive decrypt + verify. UI is driven by Maestro, so no OCR deps.
+pyrage>=1.1
