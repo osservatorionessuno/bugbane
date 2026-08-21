@@ -1,0 +1,126 @@
+name: Integration Tests
+
+on:
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platforms;android-36 build-tools;36.0.0
+
+      - name: Install Gradle (official distribution)
+        env:
+          GRADLE_VERSION: "8.13"
+        run: |
+          curl -L -o gradle-${GRADLE_VERSION}-bin.zip https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
+          unzip -q gradle-${GRADLE_VERSION}-bin.zip -d "$HOME/gradle"
+          echo "$HOME/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+
+      - name: Build release APK
+        run: gradle --no-daemon assembleProductionRelease
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: integration-apk
+          path: app/build/outputs/apk/production/release/app-production-release.apk
+          compression-level: 0
+          retention-days: 3
+
+  test:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    strategy:
+      fail-fast: false
+      matrix:
+        # google_apis_playstore (secure user build, adbd as shell, like a real phone)
+        # from API 33 up, where adbd trusts multiple wireless keys so bugbane's paired
+        # key connects alongside the harness's host adb key. On API 30-32 adbd trusts a
+        # single key, so the host key (unavoidable while driving over adb) blocks
+        # bugbane's paired key at connect; those use google_apis (userdebug, adb auth
+        # off) so acquisition can still run. Confirmed: clearing the host key lets 30-32
+        # autoconnect, but that also unauthorizes the control adb — not reliably usable.
+        # API 37 (Android 17) excluded until `platforms;android-37` reaches stable.
+        include:
+          - { api-level: 30, target: google_apis }
+          - { api-level: 31, target: google_apis }
+          - { api-level: 32, target: google_apis }
+          - { api-level: 33, target: google_apis_playstore }
+          - { api-level: 34, target: google_apis_playstore }
+          - { api-level: 35, target: google_apis_playstore }
+          - { api-level: 36, target: google_apis_playstore }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: integration-apk
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Maestro + host dependencies
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          pip install -r integration/requirements.txt
+
+      - name: Run integration E2E (Maestro)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          profile: pixel_5
+          cores: 2
+          ram-size: 4096M
+          disk-size: 8192M
+          disable-animations: true
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot
+          script: ./integration/run.sh app-production-release.apk
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          # run number in the name so downloaded artifacts are unambiguous across
+          # runs (higher = newer); RUN_INFO.txt inside carries the commit sha.
+          name: integration-artifacts-api${{ matrix.api-level }}-run${{ github.run_number }}
+          path: integration/artifacts/
+          retention-days: 7

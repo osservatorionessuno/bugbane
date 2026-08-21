@@ -1,0 +1,74 @@
+# Enter the pairing code, then acquire + export — in ONE flow so there is no
+# maestro-restart gap between pairing completing and acquisition (in that gap the
+# wireless connection drops and the app reverts to the pair page, esp. on userdebug).
+# The notification shade is already open (run.sh: `cmd statusbar expand-notifications`,
+# reliable — the swipe gesture misses over the pairing dialog on CI). CODE is passed
+# with `maestro test -e CODE=<6 digits>`.
+appId: org.osservatorionessuno.bugbane
+---
+- extendedWaitUntil:
+    visible:
+      text: ".*(Enter pairing code|ADB pairing service|Pairing with ADB).*"
+    timeout: 60000
+# Expand bugbane's notification if the inline-reply action isn't already showing.
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible: "Enter pairing code"
+          commands:
+            - tapOn:
+                text: "Expand"
+                optional: true
+            - extendedWaitUntil:
+                visible: "Enter pairing code"
+                timeout: 6000
+- assertVisible: "Enter pairing code"
+- tapOn: "Enter pairing code"
+- inputText: "${CODE}"
+- pressKey: Enter
+# Close the shade (Home is reliable) and land on the paired home screen.
+- pressKey: Home
+- launchApp
+- extendedWaitUntil:
+    visible:
+      text: ".*(Ready to Start|Get Started|Acquire Data).*"
+    timeout: 90000
+# --- acquisition + export (same flow, no relaunch gap after pairing) ---
+- runFlow:
+    when:
+      visible: "Get Started"
+    commands:
+      - tapOn: "Get Started"
+- extendedWaitUntil:
+    visible: "Start Acquisition"
+    timeout: 20000
+- tapOn: "Start Acquisition"
+- extendedWaitUntil:
+    visible: "Export"
+    timeout: 1200000
+# Auto-analysis runs after acquisition and disables Export until it finishes (slow on
+# CI). Waiting for a severity level to appear is both the gate and a detection smoke.
+- extendedWaitUntil:
+    visible:
+      text: ".*(CRITICAL|HIGH|MEDIUM|LOW|INFO).*"
+    timeout: 300000
+# Tapping Export right after can race the SAF picker, so retry until SAVE shows.
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible: "SAVE"
+          commands:
+            - tapOn: "Export"
+            - extendedWaitUntil:
+                visible: "SAVE"
+                timeout: 20000
+- assertVisible: "SAVE"
+- tapOn: "SAVE"
+# One-time passphrase dialog — left open for the host to scrape the 32-char value.
+- extendedWaitUntil:
+    visible: "Copy to clipboard"
+    timeout: 120000

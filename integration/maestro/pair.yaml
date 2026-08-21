@@ -1,0 +1,92 @@
+# Onboarding + open the Settings pairing dialog. Ends with the 6-digit code on screen
+# (dialog left open) so run.sh can scrape it and drive the notification shade via adb
+# (reliable), then enter-code.yaml types the code.
+appId: org.osservatorionessuno.bugbane
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Welcome to Bugbane"
+    timeout: 60000
+- tapOn:
+    text: "^I understand$"
+# CVE vulnerability page: API 34-36 only.
+- runFlow:
+    when:
+      visible: "I understand, continue anyway"
+    commands:
+      - tapOn: "I understand, continue anyway"
+# Developer options page (only when off): enable the real way via Build number x7.
+- runFlow:
+    when:
+      visible: "Enable Developer Options"
+    commands:
+      - tapOn:
+          text: "Enable"
+      - scrollUntilVisible:
+          element:
+            text: "Build number"
+          direction: DOWN
+          timeout: 20000
+      - repeat:
+          times: 7
+          commands:
+            - tapOn: "Build number"
+      - pressKey: Back
+- extendedWaitUntil:
+    visible: "Enable Wireless Debugging and Pair"
+    timeout: 25000
+- tapOn: "Pair"
+# The app redirects to Settings developer options; scroll to the row and enter it.
+- scrollUntilVisible:
+    element:
+      text: "^Wireless debugging$"
+    direction: DOWN
+    timeout: 40000
+- tapOn:
+    containsChild: "Wireless debugging"
+# Turn wireless debugging on if off. API 31+ has a labelled toggle; API 30 a bare
+# master switch (id switch_bar). Wait for the allow-dialog before the fallback so it
+# can't misfire while the toggle is settling.
+- runFlow:
+    when:
+      notVisible: "Pair device with pairing code"
+    commands:
+      - runFlow:
+          when:
+            visible: "Use wireless debugging"
+          commands:
+            - tapOn:
+                containsChild: "Use wireless debugging"
+            - extendedWaitUntil:
+                visible:
+                  text: ".*(Allow wireless debugging on this network|Pair device with pairing code).*"
+                timeout: 10000
+      - runFlow:
+          when:
+            notVisible: "Use wireless debugging"
+            notVisible:
+              text: ".*Allow wireless debugging on this network.*"
+          commands:
+            - tapOn:
+                id: "switch_bar"
+            - extendedWaitUntil:
+                visible:
+                  text: ".*(Allow wireless debugging on this network|Pair device with pairing code).*"
+                timeout: 10000
+      - runFlow:
+          when:
+            visible:
+              text: ".*Allow wireless debugging on this network.*"
+          commands:
+            - tapOn: "Allow"
+- extendedWaitUntil:
+    visible: "Pair device with pairing code"
+    timeout: 30000
+- tapOn:
+    containsChild: "Pair device with pairing code"
+# Leave the dialog open with the 6-digit code visible for run.sh to scrape.
+- extendedWaitUntil:
+    visible:
+      text: "[0-9]{6}"
+    timeout: 20000
