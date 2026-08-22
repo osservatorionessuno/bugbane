@@ -135,6 +135,8 @@ class AcquisitionRunner(
 
         val total = modules.size
         var completedCount = 0
+        val failedModules = mutableListOf<String>()
+        val skippedModules = mutableListOf<String>()
 
         val adbHostKey = runCatching { manager.hostPublicKey() }
             .onFailure { Log.w(TAG, "Could not encode host adb public key", it) }
@@ -191,6 +193,7 @@ class AcquisitionRunner(
                 writer.refreshOutOfSpace()
                 // Once out of space, skip this and every remaining module.
                 if (writer.outOfSpace) {
+                    skippedModules += module.name
                     listener?.onModuleSkipped(module.name)
                     continue
                 }
@@ -225,25 +228,25 @@ class AcquisitionRunner(
                 } catch (t: Throwable) {
                     success = false
                     Log.e(TAG, "Module ${module.name} failed", t)
-                    // TODO: display error message to the user
                 }
                 // The latched guard, not the throw, is authoritative (modules may swallow it).
                 if (writer.outOfSpace) {
                     Log.w(TAG, "Skipping ${module.name}: out of space")
+                    skippedModules += module.name
                     listener?.onModuleSkipped(module.name)
                     continue
                 }
+                if (!success) failedModules += module.name
                 completedCount++
                 listener?.onModuleComplete(module.name, completedCount, total, success)
             }
 
             val completed = Instant.now()
-            index = if (cancelled) index.markAsCancelled(completed) else index.markAsComplete(completed)
+            index = if (cancelled) index.markAsCancelled(completed)
+                else index.markAsFinished(completed, failedModules, skippedModules)
             writer.writeIndex(index)
         } catch (io: IOException) {
-            // Finalizing hit the disk despite the reserve. Keep whatever was
-            // collected and still report finished so the UI leaves the scanning
-            // state instead of hanging.
+            // Finalizing hit the disk despite the reserve; keep what was collected.
             Log.e(TAG, "Failed to finalize acquisition", io)
         } finally {
             runCatching { writer.close() }
