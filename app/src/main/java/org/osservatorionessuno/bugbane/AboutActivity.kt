@@ -98,7 +98,7 @@ fun AboutContent() {
                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                 data = Uri.parse(contactUrl)
                             }
-                            context.startActivity(intent)
+                            runCatching { context.startActivity(intent) }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
@@ -124,7 +124,7 @@ fun AboutContent() {
                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                 data = Uri.parse(donateUrl)
                             }
-                            context.startActivity(intent)
+                            runCatching { context.startActivity(intent) }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
@@ -177,7 +177,7 @@ fun AboutContent() {
                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                 data = Uri.parse(moreCreditsUrl)
                             }
-                            context.startActivity(intent)
+                            runCatching { context.startActivity(intent) }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(

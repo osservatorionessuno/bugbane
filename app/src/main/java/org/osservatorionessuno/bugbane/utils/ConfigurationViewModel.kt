@@ -256,7 +256,8 @@ class ConfigurationViewModel private constructor(
 
                 getIntentForAppState(currentState)?.let {
                     it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
-                    appContext.startActivity(it)
+                    runCatching { appContext.startActivity(it) }
+                        .onFailure { e -> Log.w(TAG, "No activity for onboarding settings intent", e) }
                 }
             }
 
@@ -264,7 +265,8 @@ class ConfigurationViewModel private constructor(
 
                 getIntentForAppState(currentState)?.let {
                     it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
-                    appContext.startActivity(it)
+                    runCatching { appContext.startActivity(it) }
+                        .onFailure { e -> Log.w(TAG, "No activity for onboarding settings intent", e) }
                 }
                 adbManager.startAdbPairingService()
             }
@@ -274,7 +276,8 @@ class ConfigurationViewModel private constructor(
                 // Once wireless debugging is re-enabled the state will be updated and autoconnect will be attempted
                 getIntentForAppState(currentState)?.let {
                     it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
-                    appContext.startActivity(it)
+                    runCatching { appContext.startActivity(it) }
+                        .onFailure { e -> Log.w(TAG, "No activity for onboarding settings intent", e) }
                 }
             }
             AppState.AdbConnectedFinishOnboarding -> {
