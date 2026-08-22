@@ -119,147 +119,155 @@ class AcquisitionRunner(
         }
         Log.i(TAG, "Starting acquisition in ${acquisitionDir.absolutePath}")
 
-        val shell = AdbShell(manager)
-        val cpu = shell.execFirstLine("getprop ro.product.cpu.abi")
-        var tmpDir = "/data/local/tmp/"
-        var sdCard = "/sdcard/"
-        shell.execForEachLine("env") { line ->
-            val trimmed = line.trim()
-            when {
-                trimmed.startsWith("TMPDIR=") -> tmpDir = trimmed.removePrefix("TMPDIR=")
-                trimmed.startsWith("EXTERNAL_STORAGE=") -> sdCard = trimmed.removePrefix("EXTERNAL_STORAGE=")
-            }
-        }
-        if (!tmpDir.endsWith('/')) tmpDir += '/'
-        if (!sdCard.endsWith('/')) sdCard += '/'
-
-        val total = modules.size
-        var completedCount = 0
-        val failedModules = mutableListOf<String>()
-        val skippedModules = mutableListOf<String>()
-
-        val adbHostKey = runCatching { manager.hostPublicKey() }
-            .onFailure { Log.w(TAG, "Could not encode host adb public key", it) }
-            .getOrNull()
-
-        var index = AcquisitionIndex(
-            uuid = acquisitionDir.name,
-            status = AcquisitionIndex.STATUS_RUNNING,
-            created = started.toString(),
-            completed = null,
-            bugbaneVersion = BuildConfig.VERSION_NAME,
-            storagePath = acquisitionDir.absolutePath,
-            tmpDir = tmpDir,
-            sdcard = sdCard,
-            cpu = cpu,
-            analysisDir = AcquisitionIndex.ANALYSIS_DIR,
-            adbHostPublicKey = adbHostKey,
-        )
-
-        // Encrypting needs only the public acquisition identity, so it never
-        // prompts. The fresh file key is cached so the first analysis doesn't
-        // prompt either (see SessionKeyCache).
-        val recipient = AcquisitionIdentityVault.recipient(context)
-        // On devices with no secure lock the acquisition is encrypted to an
-        // in-memory ephemeral key until the user sets a password; record it so an
-        // unsealed archive is swept if the process dies before that happens.
-        if (AcquisitionIdentityVault.hasPendingEphemeral()) {
-            AcquisitionIdentityVault.markUnsealed(context, acquisitionDir)
-        }
-        var fileKey: ByteArray? = null
-        val writer = EncryptedAcquisitionWriter(
-            acquisitionDir,
-            listOf(recipient),
-            onFileKey = { fileKey = it },
-        )
-
         var cancelled = false
+        // The dir once the index is written; null on setup failure so the UI never
+        // navigates into an unreadable acquisition.
+        var output: File? = null
         try {
-            adbHostKey?.let { key ->
-                runCatching {
-                    writer.useArtifact("adb_host_key.pub") { it.write((key + "\n").toByteArray()) }
-                }.onFailure { Log.w(TAG, "Failed to write adb_host_key.pub", it) }
+            val shell = AdbShell(manager)
+            val cpu = shell.execFirstLine("getprop ro.product.cpu.abi")
+            var tmpDir = "/data/local/tmp/"
+            var sdCard = "/sdcard/"
+            shell.execForEachLine("env") { line ->
+                val trimmed = line.trim()
+                when {
+                    trimmed.startsWith("TMPDIR=") -> tmpDir = trimmed.removePrefix("TMPDIR=")
+                    trimmed.startsWith("EXTERNAL_STORAGE=") -> sdCard = trimmed.removePrefix("EXTERNAL_STORAGE=")
+                }
+            }
+            if (!tmpDir.endsWith('/')) tmpDir += '/'
+            if (!sdCard.endsWith('/')) sdCard += '/'
+
+            val total = modules.size
+            var completedCount = 0
+            val failedModules = mutableListOf<String>()
+            val skippedModules = mutableListOf<String>()
+
+            val adbHostKey = runCatching { manager.hostPublicKey() }
+                .onFailure { Log.w(TAG, "Could not encode host adb public key", it) }
+                .getOrNull()
+
+            var index = AcquisitionIndex(
+                uuid = acquisitionDir.name,
+                status = AcquisitionIndex.STATUS_RUNNING,
+                created = started.toString(),
+                completed = null,
+                bugbaneVersion = BuildConfig.VERSION_NAME,
+                storagePath = acquisitionDir.absolutePath,
+                tmpDir = tmpDir,
+                sdcard = sdCard,
+                cpu = cpu,
+                analysisDir = AcquisitionIndex.ANALYSIS_DIR,
+                adbHostPublicKey = adbHostKey,
+            )
+
+            // Encrypting needs only the public acquisition identity, so it never
+            // prompts. The fresh file key is cached so the first analysis doesn't
+            // prompt either (see SessionKeyCache).
+            val recipient = AcquisitionIdentityVault.recipient(context)
+            // On devices with no secure lock the acquisition is encrypted to an
+            // in-memory ephemeral key until the user sets a password; record it so an
+            // unsealed archive is swept if the process dies before that happens.
+            if (AcquisitionIdentityVault.hasPendingEphemeral()) {
+                AcquisitionIdentityVault.markUnsealed(context, acquisitionDir)
+            }
+            var fileKey: ByteArray? = null
+            val writer = EncryptedAcquisitionWriter(
+                acquisitionDir,
+                listOf(recipient),
+                onFileKey = { fileKey = it },
+            )
+
+            try {
+                adbHostKey?.let { key ->
+                    runCatching {
+                        writer.useArtifact("adb_host_key.pub") { it.write((key + "\n").toByteArray()) }
+                    }.onFailure { Log.w(TAG, "Failed to write adb_host_key.pub", it) }
+                }
+
+                for (module in modules) {
+                    if (listener?.isCancelled() == true) {
+                        Log.i(TAG, "Acquisition cancelled before module ${module.name}")
+                        cancelled = true
+                        break
+                    }
+                    // Re-check free space at each boundary so a disk that was
+                    // already full at the start, or filled by another app between
+                    // modules, trips before we write anything.
+                    writer.refreshOutOfSpace()
+                    // Once out of space, skip this and every remaining module.
+                    if (writer.outOfSpace) {
+                        skippedModules += module.name
+                        listener?.onModuleSkipped(module.name)
+                        continue
+                    }
+
+                    var moduleBytes = 0L
+                    var lastReportBytes = 0L
+                    var lastReportNanos = 0L
+                    val progressCb: (Long) -> Unit = { delta ->
+                        moduleBytes += delta
+                        val now = System.nanoTime()
+                        if (moduleBytes - lastReportBytes >= PROGRESS_REPORT_BYTES ||
+                            now - lastReportNanos >= PROGRESS_REPORT_INTERVAL_NANOS
+                        ) {
+                            lastReportBytes = moduleBytes
+                            lastReportNanos = now
+                            listener?.onModuleProgress(module.name, moduleBytes)
+                        }
+                        Unit
+                    }
+                    Log.i(TAG, "Running module ${module.name}")
+                    listener?.onModuleStart(module.name, completedCount, total)
+                    var success = true
+                    try {
+                        module.run(context, manager, writer, progressCb)
+                        // Flush the throttled tail so the completed card shows the real total.
+                        if (moduleBytes > lastReportBytes) {
+                            listener?.onModuleProgress(module.name, moduleBytes)
+                        }
+                        Log.i(TAG, "Module ${module.name} finished")
+                    } catch (ise: InsufficientStorageException) {
+                        Log.w(TAG, "Module ${module.name} hit the storage reserve")
+                    } catch (t: Throwable) {
+                        success = false
+                        Log.e(TAG, "Module ${module.name} failed", t)
+                    }
+                    // The latched guard, not the throw, is authoritative (modules may swallow it).
+                    if (writer.outOfSpace) {
+                        Log.w(TAG, "Skipping ${module.name}: out of space")
+                        skippedModules += module.name
+                        listener?.onModuleSkipped(module.name)
+                        continue
+                    }
+                    if (!success) failedModules += module.name
+                    completedCount++
+                    listener?.onModuleComplete(module.name, completedCount, total, success)
+                }
+
+                val completed = Instant.now()
+                index = if (cancelled) index.markAsCancelled(completed)
+                    else index.markAsFinished(completed, failedModules, skippedModules)
+                writer.writeIndex(index)
+                output = acquisitionDir
+            } catch (io: IOException) {
+                // Finalizing hit the disk despite the reserve; keep what was collected.
+                Log.e(TAG, "Failed to finalize acquisition", io)
+            } finally {
+                runCatching { writer.close() }
+                    .onFailure { Log.e(TAG, "Failed to close acquisition archive", it) }
             }
 
-            for (module in modules) {
-                if (listener?.isCancelled() == true) {
-                    Log.i(TAG, "Acquisition cancelled before module ${module.name}")
-                    cancelled = true
-                    break
-                }
-                // Re-check free space at each boundary so a disk that was
-                // already full at the start, or filled by another app between
-                // modules, trips before we write anything.
-                writer.refreshOutOfSpace()
-                // Once out of space, skip this and every remaining module.
-                if (writer.outOfSpace) {
-                    skippedModules += module.name
-                    listener?.onModuleSkipped(module.name)
-                    continue
-                }
-
-                var moduleBytes = 0L
-                var lastReportBytes = 0L
-                var lastReportNanos = 0L
-                val progressCb: (Long) -> Unit = { delta ->
-                    moduleBytes += delta
-                    val now = System.nanoTime()
-                    if (moduleBytes - lastReportBytes >= PROGRESS_REPORT_BYTES ||
-                        now - lastReportNanos >= PROGRESS_REPORT_INTERVAL_NANOS
-                    ) {
-                        lastReportBytes = moduleBytes
-                        lastReportNanos = now
-                        listener?.onModuleProgress(module.name, moduleBytes)
-                    }
-                    Unit
-                }
-                Log.i(TAG, "Running module ${module.name}")
-                listener?.onModuleStart(module.name, completedCount, total)
-                var success = true
-                try {
-                    module.run(context, manager, writer, progressCb)
-                    // Flush the throttled tail so the completed card shows the real total.
-                    if (moduleBytes > lastReportBytes) {
-                        listener?.onModuleProgress(module.name, moduleBytes)
-                    }
-                    Log.i(TAG, "Module ${module.name} finished")
-                } catch (ise: InsufficientStorageException) {
-                    Log.w(TAG, "Module ${module.name} hit the storage reserve")
-                } catch (t: Throwable) {
-                    success = false
-                    Log.e(TAG, "Module ${module.name} failed", t)
-                }
-                // The latched guard, not the throw, is authoritative (modules may swallow it).
-                if (writer.outOfSpace) {
-                    Log.w(TAG, "Skipping ${module.name}: out of space")
-                    skippedModules += module.name
-                    listener?.onModuleSkipped(module.name)
-                    continue
-                }
-                if (!success) failedModules += module.name
-                completedCount++
-                listener?.onModuleComplete(module.name, completedCount, total, success)
-            }
-
-            val completed = Instant.now()
-            index = if (cancelled) index.markAsCancelled(completed)
-                else index.markAsFinished(completed, failedModules, skippedModules)
-            writer.writeIndex(index)
-        } catch (io: IOException) {
-            // Finalizing hit the disk despite the reserve; keep what was collected.
-            Log.e(TAG, "Failed to finalize acquisition", io)
+            // Cache only once the writer is closed: a screen-off during the (long)
+            // acquisition evicts the cache, so an early put would never survive
+            // until the automatic first analysis.
+            fileKey?.let { SessionKeyCache.put(context, acquisitionDir, it) }
         } finally {
-            runCatching { writer.close() }
-                .onFailure { Log.e(TAG, "Failed to close acquisition archive", it) }
+            // Report finished even when setup (env probe, recipient, writer) throws,
+            // so the UI never hangs in the scanning state.
+            Log.i(TAG, "Acquisition finished in ${acquisitionDir.absolutePath}")
+            listener?.onFinished(cancelled, output)
         }
-
-        // Cache only once the writer is closed: a screen-off during the (long)
-        // acquisition evicts the cache, so an early put would never survive
-        // until the automatic first analysis.
-        fileKey?.let { SessionKeyCache.put(context, acquisitionDir, it) }
-
-        Log.i(TAG, "Acquisition finished in ${acquisitionDir.absolutePath}")
-        listener?.onFinished(cancelled, acquisitionDir)
         return acquisitionDir
     }
 }
