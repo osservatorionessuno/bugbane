@@ -8,7 +8,7 @@ import org.osservatorionessuno.cadb.AdbSync
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.libmvt.android.parsers.APKParser
 import org.osservatorionessuno.libmvt.android.parsers.CertificateParser
-import org.osservatorionessuno.qf.ArtifactProtobuf
+import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
 import java.io.FileInputStream
@@ -215,7 +215,7 @@ class Packages : Module {
         val packages = mutableListOf<Package>()
         // execInternal retries re-stream the same lines into this callback, and the pm-list
         // fallbacks below can re-run after a partial first attempt: dedup by name so neither
-        // can produce duplicate records in packages.pb.
+        // can produce duplicate records in packages.json.
         val seen = HashSet<String>()
 
         fun addPackage(line: String) {
@@ -255,9 +255,8 @@ class Packages : Module {
                     restart()
                     shell.execForEachLine("pm list packages -U -u -i --user 0") { addPackage(it) }
                 } catch (e: Throwable) {
-                    // Could not obtain packages, write empty protobuf stream and return
-                    // TODO: understand if this is OK for MVT
-                    writer.useArtifact("packages.pb") { }
+                    // Could not obtain packages; write an empty JSON array and return.
+                    writer.useArtifact("packages.json") { output -> ArtifactJson.Array(output).close() }
                     return
                 }
             }
@@ -304,9 +303,11 @@ class Packages : Module {
             )
         }
 
-        writer.useArtifact("packages.pb") { protobufOutput ->
-            for (pkg in packages) {
-                ArtifactProtobuf.writeDelimitedPackageRecord(protobufOutput, pkg)
+        writer.useArtifact("packages.json") { output ->
+            ArtifactJson.Array(output).use { arr ->
+                for (pkg in packages) {
+                    arr.pkg(pkg)
+                }
             }
         }
     }

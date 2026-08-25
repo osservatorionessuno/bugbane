@@ -20,7 +20,8 @@ class Processes : Module {
         progress: ((Long) -> Unit)?
     ) {
         val shell = AdbShell(manager, progress = progress)
-        writer.useArtifact("processes.txt") { output ->
+        // ps.txt is the androidqf/MVT-standard name (libMVT reads both).
+        writer.useArtifact("ps.txt") { output ->
             shell.execToStream("ps -A", output)
         }
     }

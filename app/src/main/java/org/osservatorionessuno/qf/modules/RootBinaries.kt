@@ -5,12 +5,12 @@ import android.util.Log
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import org.osservatorionessuno.qf.ArtifactProtobuf
+import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /**
  * Checks for common rooting binaries/apps in PATH and saves the found paths.
- * Output: root_binaries.pb  (length-delimited protobuf string records)
+ * Output: root_binaries.json  (JSON array of path strings)
  */
 class RootBinaries : Module {
     override val name: String = "root_binaries"
@@ -66,9 +66,11 @@ class RootBinaries : Module {
 
         val unique = found.distinct()
         Log.i(TAG, "Found ${unique.size} root-related binaries")
-        writer.useArtifact("root_binaries.pb") { output ->
-            for (path in unique) {
-                ArtifactProtobuf.writeDelimitedStringRecord(output, path)
+        writer.useArtifact("root_binaries.json") { output ->
+            ArtifactJson.Array(output).use { arr ->
+                for (path in unique) {
+                    arr.string(path)
+                }
             }
         }
     }

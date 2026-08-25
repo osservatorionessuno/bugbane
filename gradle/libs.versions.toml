@@ -9,15 +9,13 @@ lifecycleRuntimeKtx   = "2.9.3"
 activityCompose       = "1.10.1"
 composeBom            = "2025.08.01"
 junitJupiter          = "5.13.4"
-protobuf              = "4.32.0"
-protobufPlugin        = "0.9.5"
 libadb                = "3.3.1"
 bouncycastle          = "1.84"
 work                  = "2.10.3"
 kage                  = "0.3.0"
 json                  = "20250517"
 accompanist-permissions = "0.37.3"
-libmvt                = "0.3.0"
+libmvt                = "0.4.1"
 libohttp              = "1.1.0"
 libohttpHpkeBc        = "1.0.1"
 libbhttp              = "1.1.0"
@@ -30,7 +28,6 @@ kotlin-android        = { id = "org.jetbrains.kotlin.android",       version.ref
 kotlin-jvm            = { id = "org.jetbrains.kotlin.jvm",           version.ref = "kotlin" }
 kotlin-compose        = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 junit5                = { id = "de.mannodermaus.android-junit5",     version = "1.13.1.0" }
-protobuf              = { id = "com.google.protobuf",                version.ref = "protobufPlugin" }
 
 [libraries]
 androidx-core-ktx                 = { group = "androidx.core",               name = "core-ktx",               version.ref = "coreKtx" }
@@ -51,8 +48,6 @@ compose-material-icons-extended   = { group = "androidx.compose.material",   nam
 google-accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
 libadb-android                    = { group = "com.github.osservatorionessuno", name = "libadb-android-bc", version.ref = "libadb" }
 bouncycastle-pkix                 = { group = "org.bouncycastle",             name = "bcpkix-jdk15to18",       version.ref = "bouncycastle" }
-protobuf-javalite                 = { group = "com.google.protobuf",          name = "protobuf-javalite",      version.ref = "protobuf" }
-protoc                            = { group = "com.google.protobuf",          name = "protoc",                 version.ref = "protobuf" }
 junit-jupiter-api                 = { group = "org.junit.jupiter",            name = "junit-jupiter-api",      version.ref = "junitJupiter" }
 junit-jupiter-engine              = { group = "org.junit.jupiter",            name = "junit-jupiter-engine",   version.ref = "junitJupiter" }
 lint-api                          = { group = "com.android.tools.lint",       name = "lint-api",               version.ref = "lint" }
