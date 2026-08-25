@@ -1,9 +1,11 @@
 package org.osservatorionessuno.qf.crypto
 
+import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.PowerManager
 import android.os.SystemClock
 import org.osservatorionessuno.qf.crypto.age.FileKeyIdentity
 import java.io.File
@@ -41,8 +43,17 @@ object SessionKeyCache {
 
     /** Register the file key of a freshly written archive. Takes ownership of [fileKey]. */
     fun put(context: Context, acquisitionDir: File, fileKey: ByteArray) {
-        installEvictionHook(context)
+        val keyguard = context.getSystemService(KeyguardManager::class.java)
+        val power = context.getSystemService(PowerManager::class.java)
         synchronized(lock) {
+            // Never cache into a locked device, but only when a secure lock exists:
+            // with no keyguard (the first-run ephemeral window) screen-off is not a
+            // protection boundary and this key is the first analysis's only handle.
+            if (keyguard.isKeyguardSecure && !power.isInteractive) {
+                fileKey.fill(0)
+                return
+            }
+            installEvictionHook(context)
             evictExpired()
             entries.put(acquisitionDir.absolutePath, Entry(Secret(fileKey), SystemClock.elapsedRealtime() + TTL_MS))
                 ?.secret?.close()
