@@ -187,17 +187,19 @@ jobs:
           pip install -r integration/requirements.txt
 
       - name: Install /e/OS system image
+        # Pinned build from the dev channel, which keeps history (the test
+        # channel only ever serves the latest build). To bump: browse
+        # https://ota.ecloud.global/dev/sdk_phone_x86_64/ and update both vars;
+        # a new Android base also needs the android-NN dir and the package.xml
+        # api-level below. The sha256 is pinned in-repo on purpose: don't
+        # replace it with the server's .sha256sum file.
+        env:
+          EOS_IMAGE: IMG-e-4.2-a16-20260815662914-community-sdk_phone_x86_64.zip
+          EOS_SHA256: 90340954d1b26bf5b1b089a89886257aa45c42e4f6b6bf4dcdd860be2e826826
         run: |
-          # The test channel keeps only the latest build (filenames rotate), so
-          # resolve it from the listing. Pinned to the a16 (Android 16 = API 36)
-          # base: a new base needs a new android-NN dir + package.xml api-level,
-          # so fail loudly instead of silently picking it up.
-          BASE=https://ota.ecloud.global/test/sdk_phone_x86_64
-          ZIP=$(curl -fsSL "$BASE/" | grep -oE 'IMG-e-[0-9.]+-a16-[0-9]+-test-sdk_phone_x86_64\.zip' | head -1)
-          if [ -z "$ZIP" ]; then echo "::error::no a16 /e/OS emulator build at $BASE — Android base moved on?"; exit 1; fi
-          echo "Using $ZIP"
-          curl -fL -o eos.zip "$BASE/$ZIP"
-          curl -fsSL "$BASE/$ZIP.sha256sum" | sed "s|$ZIP|eos.zip|" | sha256sum --check
+          echo "Using $EOS_IMAGE"
+          curl -fL -o eos.zip "https://ota.ecloud.global/dev/sdk_phone_x86_64/$EOS_IMAGE"
+          echo "$EOS_SHA256  eos.zip" | sha256sum --check
           IMGDIR="$ANDROID_HOME/system-images/android-36/lineage"
           mkdir -p "$IMGDIR"
           unzip -q eos.zip -d "$IMGDIR"
@@ -255,6 +257,10 @@ jobs:
           adb shell settings put global device_provisioned 1 || true
           adb shell settings put secure user_setup_complete 1 || true
           adb shell pm disable-user --user 0 org.lineageos.setupwizard 2>/dev/null || true
+          # record the booted build in the artifacts (run.sh owns RUN_INFO.txt)
+          mkdir -p integration/artifacts
+          adb shell getprop ro.build.fingerprint > integration/artifacts/EOS_BUILD.txt || true
+          adb shell getprop ro.lineage.version >> integration/artifacts/EOS_BUILD.txt || true
           ./integration/run.sh app-production-release.apk suspicious-apk-debug.apk
 
       - uses: actions/upload-artifact@v4
