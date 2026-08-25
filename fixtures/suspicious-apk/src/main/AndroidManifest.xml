@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Benign fixture: no code. The accessibility service + dangerous permissions make
+     libMVT's APKStaticAnalyzer return suspicious=true, so bugbane stages this APK. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <application android:label="suspicious-fixture">
+        <service
+            android:name=".AccessibilityCollector"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false" />
+    </application>
+</manifest>

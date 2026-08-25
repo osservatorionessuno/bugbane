@@ -39,13 +39,20 @@ jobs:
           unzip -q gradle-${GRADLE_VERSION}-bin.zip -d "$HOME/gradle"
           echo "$HOME/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
 
-      - name: Build release APK
-        run: gradle --no-daemon assembleProductionRelease
+      - name: Build release APK + suspicious fixture APK
+        run: gradle --no-daemon assembleProductionRelease :fixtures:suspicious-apk:assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:
           name: integration-apk
           path: app/build/outputs/apk/production/release/app-production-release.apk
+          compression-level: 0
+          retention-days: 3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: integration-fixture-apk
+          path: fixtures/suspicious-apk/build/outputs/apk/debug/suspicious-apk-debug.apk
           compression-level: 0
           retention-days: 3
 
@@ -85,6 +92,10 @@ jobs:
         with:
           name: integration-apk
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: integration-fixture-apk
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -114,7 +125,7 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 900
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot
-          script: ./integration/run.sh app-production-release.apk
+          script: ./integration/run.sh app-production-release.apk suspicious-apk-debug.apk
 
       - uses: actions/upload-artifact@v4
         if: always()
