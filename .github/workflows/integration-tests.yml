@@ -226,10 +226,15 @@ jobs:
           EOF
 
       - name: Create AVD
+        # pin ANDROID_AVD_HOME (exported for the launch step too): the runner's
+        # SDK env otherwise sends avdmanager elsewhere than ~/.android/avd
         run: |
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
           echo no | avdmanager create avd --name eos --package 'system-images;android-36;lineage;x86_64' --device pixel_5
           # sizing to match the matrix lanes (last duplicate key wins)
-          cat >> "$HOME/.android/avd/eos.avd/config.ini" <<CFG
+          cat >> "$ANDROID_AVD_HOME/eos.avd/config.ini" <<CFG
           hw.cpu.ncore=2
           hw.ramSize=4096
           disk.dataPartition.size=8192M
