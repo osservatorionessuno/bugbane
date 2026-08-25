@@ -34,7 +34,8 @@ internal class FileRandomAccess(file: File) : RandomAccessData {
  */
 class SeekableArchive(private val file: File, identities: List<AgeIdentity>) : Closeable {
     private val access = FileRandomAccess(file)
-    private val zip = ZipFile(AgePayloadChannel(AgePayload.open(access, identities)))
+    private val payload = AgePayload.open(access, identities)
+    private val zip = ZipFile(AgePayloadChannel(payload))
 
     fun names(): Set<String> {
         val out = LinkedHashSet<String>()
@@ -50,6 +51,7 @@ class SeekableArchive(private val file: File, identities: List<AgeIdentity>) : C
 
     override fun close() {
         zip.close()
+        payload.close()
         access.close()
     }
 }
