@@ -1,6 +1,7 @@
 package org.osservatorionessuno.qf.crypto.age
 
 import org.osservatorionessuno.qf.crypto.RandomAccessData
+import org.osservatorionessuno.qf.crypto.Secret
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 
@@ -13,14 +14,26 @@ import java.io.InputStream
  */
 class AgePayload private constructor(
     private val data: RandomAccessData,
-    private val streamKey: ByteArray,
+    streamKey: ByteArray,
     private val cipherStart: Long,
     private val numChunks: Long,
     private val lastCipherLen: Int,
     val length: Long,
-) {
+) : AutoCloseable {
+    // Off-heap; zeroed on close.
+    private val streamKey = Secret(streamKey)
     private var cachedIdx = -1L
     private var cached: ByteArray? = null
+    private var closed = false
+
+    /** Wipe the stream key and drop the cached chunk; idempotent. */
+    override fun close() {
+        if (closed) return
+        closed = true
+        cached = null
+        cachedIdx = -1L
+        streamKey.close()
+    }
 
     /** Read [len] decrypted bytes at plaintext offset [off]. */
     fun read(off: Long, len: Int): ByteArray {
@@ -54,6 +67,7 @@ class AgePayload private constructor(
     }
 
     private fun chunk(idx: Long): ByteArray {
+        check(!closed) { "age payload closed" }
         cached?.let { if (idx == cachedIdx) return it }
         val last = idx == numChunks - 1
         val clen = if (last) lastCipherLen else CIPHER_I
@@ -63,7 +77,7 @@ class AgePayload private constructor(
         // carries the last-flag, so a truncated payload fails to authenticate. Surface
         // any decrypt/auth failure as AgeFormatException, never a raw cipher exception.
         val pt = try {
-            AgePrimitives.chachaOpen(streamKey, streamNonce(idx, last), ct, 0, clen)
+            streamKey.withBytes { key -> AgePrimitives.chachaOpen(key, streamNonce(idx, last), ct, 0, clen) }
         } catch (e: Exception) {
             throw AgeFormatException("age payload chunk $idx failed to authenticate")
         }
