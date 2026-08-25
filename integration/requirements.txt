@@ -1,2 +1,4 @@
 # Host-side archive decrypt + verify. UI is driven by Maestro, so no OCR deps.
 pyrage>=1.1
+# Upstream MVT for the host-side detection cross-check (check-androidqf).
+mvt>=2026.7.29

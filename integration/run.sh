@@ -51,6 +51,10 @@ adb install -r -g "$APK"
 # must flag it and stage it into the archive, asserted host-side in verify_export.py.
 [ -n "$FIXTURE" ] && adb install -r -g "$FIXTURE"
 
+# Plant a known Predator file-path IOC (present in the bundled indicator set) so the
+# acquisition captures it; bugbane and MVT must both flag it (cross-check below).
+adb shell 'mkdir -p /data/local/tmp/wd && echo planted > /data/local/tmp/wd/pred.so' || true
+
 # Onboard + open the Settings pairing dialog (6-digit code left on screen).
 run_flow pair.yaml || exit 1
 
@@ -84,5 +88,11 @@ NAME="$(adb shell 'ls -t /sdcard/Download/' | tr -d '\r' | grep -m1 '\.zip\.age$
 if [ -z "$NAME" ]; then echo "NO EXPORT IN DOWNLOADS"; exit 1; fi
 adb pull "/sdcard/Download/$NAME" "$ART/$NAME"
 python3 "$DIR/verify_export.py" "$ART/$NAME" "$PASSPHRASE" ${FIXTURE:+"$SUSPICIOUS_APPID"} || exit 1
+
+# Cross-check: upstream MVT must independently flag the planted IOC in the decrypted
+# export, using bugbane's own bundled indicators (same IOC set on both sides).
+cp "$(dirname "$DIR")/app/src/main/assets/bundled-indicators/indicators.json" "$ART/indicators.stix2"
+python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" "$ART/indicators.stix2" "/data/local/tmp/wd/pred.so" || exit 1
+adb shell 'rm -rf /data/local/tmp/wd' || true
 
 echo "INTEGRATION E2E PASS"
