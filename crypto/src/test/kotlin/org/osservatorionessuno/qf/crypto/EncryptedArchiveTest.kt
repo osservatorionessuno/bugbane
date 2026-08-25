@@ -93,7 +93,7 @@ class EncryptedArchiveTest {
     }
 
     @Test
-    fun `already-compressed entries are stored and the level switch does not leak to the next entry`() {
+    fun `an incompressible entry next to a compressible one both round-trip and decompress`() {
         val id = X25519Identity.generate()
         val incompressible = ByteArray(2_000_000).also { java.util.Random(42).nextBytes(it) }
         val compressible = "I/ActivityManager: state=1 foo=bar\n".repeat(60_000).toByteArray()
@@ -103,14 +103,14 @@ class EncryptedArchiveTest {
             Entry("logcat.txt") { ByteArrayInputStream(compressible) },
         ))
 
-        // If the level switch applied one entry late, logcat.txt would be stored too
-        // and the total would be ~4 MB.
+        // The compressible entry still shrinks; the incompressible one must not balloon.
         assertTrue(
             atRest.size < incompressible.size + compressible.size / 5,
             "logcat.txt was not compressed: total ${atRest.size}",
         )
 
-        val out = readAll(atRest, id)
+        // Both entries decompress with a stock ZIP reader (the deflate stream is valid).
+        val out = unzip(readAgeFile(tempAgeFile(atRest), listOf(id)))
         assertArrayEquals(incompressible, out["bugreport.zip"])
         assertArrayEquals(compressible, out["logcat.txt"])
     }
