@@ -135,3 +135,126 @@ jobs:
           name: integration-artifacts-api${{ matrix.api-level }}-run${{ github.run_number }}
           path: integration/artifacts/
           retention-days: 7
+
+  # /e/OS (Murena) lane — the only open-source ROM shipping official prebuilt
+  # x86_64 emulator images (Android 16 / API 36, userdebug, test channel):
+  # https://ota.ecloud.global/test/sdk_phone_x86_64/
+  # https://doc.e.foundation/os/how-to/emulator
+  # The image isn't in Google's sdkmanager repo, and android-emulator-runner
+  # unconditionally sdkmanager-installs its system image, so this job seeds the
+  # image directory and drives avdmanager/emulator by hand instead.
+  test-eos:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: integration-apk
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: integration-fixture-apk
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK (emulator + tools, no system image)
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platforms;android-36 platform-tools emulator
+
+      - name: Install Maestro + host dependencies
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          pip install -r integration/requirements.txt
+
+      - name: Install /e/OS system image
+        run: |
+          # The test channel keeps only the latest build (filenames rotate), so
+          # resolve it from the listing. Pinned to the a16 (Android 16 = API 36)
+          # base: a new base needs a new android-NN dir + package.xml api-level,
+          # so fail loudly instead of silently picking it up.
+          BASE=https://ota.ecloud.global/test/sdk_phone_x86_64
+          ZIP=$(curl -fsSL "$BASE/" | grep -oE 'IMG-e-[0-9.]+-a16-[0-9]+-test-sdk_phone_x86_64\.zip' | head -1)
+          if [ -z "$ZIP" ]; then echo "::error::no a16 /e/OS emulator build at $BASE — Android base moved on?"; exit 1; fi
+          echo "Using $ZIP"
+          curl -fL -o eos.zip "$BASE/$ZIP"
+          curl -fsSL "$BASE/$ZIP.sha256sum" | sed "s|$ZIP|eos.zip|" | sha256sum --check
+          IMGDIR="$ANDROID_HOME/system-images/android-36/lineage"
+          mkdir -p "$IMGDIR"
+          unzip -q eos.zip -d "$IMGDIR"
+          rm eos.zip
+          # package.xml verbatim from https://doc.e.foundation/os/how-to/emulator
+          # so avdmanager accepts the package string.
+          cat > "$IMGDIR/x86_64/package.xml" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <ns2:repository xmlns:ns2="http://schemas.android.com/repository/android/common/02" xmlns:ns12="http://schemas.android.com/sdk/android/repo/sys-img2/03">
+            <localPackage path="system-images;android-36;lineage;x86_64" obsolete="false">
+              <type-details xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="ns12:sysImgDetailsType">
+                <api-level>36</api-level>
+                <base-extension>true</base-extension>
+                <tag>
+                  <id>lineage</id>
+                  <display>LineageOS</display>
+                </tag>
+                <abi>x86_64</abi>
+              </type-details>
+              <revision>
+                <major>1</major>
+              </revision>
+              <display-name>LineageOS x86_64 System Image</display-name>
+            </localPackage>
+          </ns2:repository>
+          EOF
+
+      - name: Create AVD
+        run: |
+          echo no | avdmanager create avd --name eos --package 'system-images;android-36;lineage;x86_64' --device pixel_5
+          # sizing to match the matrix lanes (last duplicate key wins)
+          cat >> "$HOME/.android/avd/eos.avd/config.ini" <<CFG
+          hw.cpu.ncore=2
+          hw.ramSize=4096
+          disk.dataPartition.size=8192M
+          CFG
+
+      - name: Run integration E2E (Maestro)
+        run: |
+          "$ANDROID_HOME/emulator/emulator" -avd eos -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot &
+          EMUPID=$!
+          trap 'adb emu kill 2>/dev/null || true; kill "$EMUPID" 2>/dev/null || true' EXIT
+          adb wait-for-device
+          timeout 900 sh -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 5; done'
+          # what android-emulator-runner's disable-animations does for the matrix lanes
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          # defensive: skip any first-boot setup wizard so it can't hold the UI
+          adb shell settings put global device_provisioned 1 || true
+          adb shell settings put secure user_setup_complete 1 || true
+          adb shell pm disable-user --user 0 org.lineageos.setupwizard 2>/dev/null || true
+          ./integration/run.sh app-production-release.apk suspicious-apk-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-artifacts-eos-a16-run${{ github.run_number }}
+          path: integration/artifacts/
+          retention-days: 7
