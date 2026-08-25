@@ -2,11 +2,10 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.os.Environment
-import android.util.JsonWriter
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
-import org.osservatorionessuno.qf.ArtifactProtobuf
+import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.storage.ArtifactSink
 
 class Files : Module {
@@ -14,6 +13,8 @@ class Files : Module {
 
     private companion object {
         private val WHITESPACE = Regex("\\s+")
+        // androidqf/MVT field order: atime ctime mtime symbolic-mode size selinux-context user group path.
+        private const val PRINTF = "%A@ %C@ %T@ %M %s %Z %u %g %p"
     }
 
     override fun run(
@@ -24,10 +25,11 @@ class Files : Module {
     ) {
         val sh = AdbShell(manager, progress = progress)
 
-        // Detect find -printf capability
+        // Detect find -printf capability with the exact format used below (so a device
+        // lacking any directive, e.g. %Z, falls back to path-only instead of misaligning).
         var supportsPrintf = false
         runCatching {
-            sh.execForEachLine("""find '/' -maxdepth 1 -printf '%T@ %m %s %u %g %p\n' 2>/dev/null""") {
+            sh.execForEachLine("""find '/' -maxdepth 1 -printf '$PRINTF\n' 2>/dev/null""") {
                 supportsPrintf = true
             }
         }
@@ -50,26 +52,24 @@ class Files : Module {
 
         val seen = HashSet<String>()
 
-        writer.useArtifact("files.pb") { output ->
+        writer.useArtifact("files.json") { output ->
             for (folder in folders) {
                 val cmd = if (supportsPrintf)
-                    """find ${shQuote(folder)} -type f -printf '%T@ %m %s %u %g %p\n' 2>/dev/null"""
+                    """find ${shQuote(folder)} -type f -printf '$PRINTF\n' 2>/dev/null"""
                 else
                     """find ${shQuote(folder)} -type f -print 2>/dev/null"""
 
                 if (supportsPrintf) {
-                    // "%T@ %m %s %u %g %p"
                     runCatching { sh.execForEachLine(cmd) { line ->
-                        val parts = line.trim().split(WHITESPACE, limit = 6)
-                        if (parts.size < 6) return@execForEachLine
-                        val mtime = parts[0].toDoubleOrNull()
-                        val mode  = parts[1]
-                        val size  = parts[2].toLongOrNull()
-                        val user  = parts[3]
-                        val group = parts[4]
-                        val path  = parts[5]
+                        val parts = line.trim().split(WHITESPACE, limit = 9)
+                        if (parts.size < 9) return@execForEachLine
+                        val path = parts[8]
                         if (seen.add(path)) {
-                            ArtifactProtobuf.writeDelimitedFileRecord(output, path, mtime, mode, size, user, group)
+                            ArtifactJson.file(
+                                output, path,
+                                parts[0].toDoubleOrNull(), parts[1].toDoubleOrNull(), parts[2].toDoubleOrNull(),
+                                parts[3], parts[4].toLongOrNull(), parts[5], parts[6], parts[7],
+                            )
                         }
                     } }
                 } else {
@@ -77,7 +77,7 @@ class Files : Module {
                         val path = line.trim()
                         if (path.isEmpty()) return@execForEachLine
                         if (seen.add(path)) {
-                            ArtifactProtobuf.writeDelimitedFileRecord(output, path, null, null, null, null, null)
+                            ArtifactJson.file(output, path, null, null, null, null, null, null, null, null)
                         }
                     } }
                 }
@@ -87,25 +87,6 @@ class Files : Module {
     }
 
     /* helpers */
-
-    private fun writeEntry(
-        jw: JsonWriter,
-        path: String,
-        mtime: Double?,
-        mode: String?,
-        size: Long?,
-        user: String?,
-        group: String?
-    ) {
-        jw.beginObject()
-        jw.name("path").value(path)
-        jw.name("mtime"); if (mtime == null) jw.nullValue() else jw.value(mtime)
-        jw.name("mode");  if (mode  == null) jw.nullValue() else jw.value(mode)
-        jw.name("size");  if (size  == null) jw.nullValue() else jw.value(size)
-        jw.name("user");  if (user  == null) jw.nullValue() else jw.value(user)
-        jw.name("group"); if (group == null) jw.nullValue() else jw.value(group)
-        jw.endObject()
-    }
 
     private fun addDir(list: MutableList<String>, dir: String) {
         if (dir.isBlank()) return

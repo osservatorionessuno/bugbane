@@ -11,7 +11,7 @@ import org.osservatorionessuno.libmvt.common.GroupedDetection
 import org.osservatorionessuno.libmvt.common.Indicators
 import org.osservatorionessuno.libmvt.common.ReopenableInput
 import org.osservatorionessuno.libmvt.common.StringResolver
-import org.osservatorionessuno.qf.ArtifactProtobuf
+import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.crypto.age.X25519Identity
 import org.osservatorionessuno.qf.modules.Packages
 import java.io.ByteArrayInputStream
@@ -86,48 +86,48 @@ class PlantedDetectionIntegrationTest {
     @Test
     fun `files - suspicious tmp path is detected`() {
         val artifact = bytes {
-            ArtifactProtobuf.writeDelimitedFileRecord(it, "/data/local/tmp/evil.sh", null, "755", 128L, null, null)
+            ArtifactJson.file(it, "/data/local/tmp/evil.sh", null, null, null, "-rwxr-xr-x", 128L, null, null, null)
         }
-        val blob = detectionBlob(analyze("files.pb", artifact))
+        val blob = detectionBlob(analyze("files.json", artifact))
         assertTrue(blob.contains("/data/local/tmp/evil.sh"), "expected suspicious-path detection; got:\n$blob")
     }
 
     @Test
     fun `mounts - system partition mounted read-write is detected`() {
         val artifact = bytes {
-            ArtifactProtobuf.writeDelimitedStringRecord(it, "/dev/block/dm-0 on /system type ext4 (rw,relatime)")
+            ArtifactJson.Array(it).use { arr -> arr.string("/dev/block/dm-0 on /system type ext4 (rw,relatime)") }
         }
-        val blob = detectionBlob(analyze("mounts.pb", artifact))
+        val blob = detectionBlob(analyze("mounts.json", artifact))
         assertTrue(blob.contains("/system"), "expected system-mount detection; got:\n$blob")
     }
 
     @Test
     fun `root_binaries - known su binary is detected`() {
-        val artifact = bytes { ArtifactProtobuf.writeDelimitedStringRecord(it, "/system/xbin/su") }
-        val blob = detectionBlob(analyze("root_binaries.pb", artifact))
+        val artifact = bytes { ArtifactJson.Array(it).use { arr -> arr.string("/system/xbin/su") } }
+        val blob = detectionBlob(analyze("root_binaries.json", artifact))
         assertTrue(blob.contains("/system/xbin/su"), "expected root-binary detection; got:\n$blob")
     }
 
     @Test
     fun `packages - app id IOC is detected`() {
-        val artifact = bytes { ArtifactProtobuf.writeDelimitedPackageRecord(it, pkg(name = "com.evil.spyware")) }
-        val blob = detectionBlob(analyze("packages.pb", artifact, indicatorsOf("app:id" to "com.evil.spyware")))
+        val artifact = bytes { ArtifactJson.Array(it).use { arr -> arr.pkg(pkg(name = "com.evil.spyware")) } }
+        val blob = detectionBlob(analyze("packages.json", artifact, indicatorsOf("app:id" to "com.evil.spyware")))
         assertTrue(blob.contains("com.evil.spyware"), "expected app:id IOC match; got:\n$blob")
     }
 
     @Test
     fun `packages - apk file hash IOC is detected`() {
-        val artifact = bytes { ArtifactProtobuf.writeDelimitedPackageRecord(it, pkg(file = packageFile(sha256 = hash))) }
-        val blob = detectionBlob(analyze("packages.pb", artifact, indicatorsOf("file:hashes.sha256" to hash)))
+        val artifact = bytes { ArtifactJson.Array(it).use { arr -> arr.pkg(pkg(file = packageFile(sha256 = hash))) } }
+        val blob = detectionBlob(analyze("packages.json", artifact, indicatorsOf("file:hashes.sha256" to hash)))
         assertTrue(blob.contains(hash), "expected apk file-hash IOC match; got:\n$blob")
     }
 
     @Test
     fun `packages - signing certificate hash IOC is detected`() {
         val artifact = bytes {
-            ArtifactProtobuf.writeDelimitedPackageRecord(it, pkg(file = packageFile(certs = listOf(cert(hash)))))
+            ArtifactJson.Array(it).use { arr -> arr.pkg(pkg(file = packageFile(certs = listOf(cert(hash))))) }
         }
-        val blob = detectionBlob(analyze("packages.pb", artifact, indicatorsOf("app:cert.sha256" to hash)))
+        val blob = detectionBlob(analyze("packages.json", artifact, indicatorsOf("app:cert.sha256" to hash)))
         assertTrue(blob.contains(hash), "expected signing-cert IOC match; got:\n$blob")
     }
 }

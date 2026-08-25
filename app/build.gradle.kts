@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.junit5)
-    alias(libs.plugins.protobuf)
 }
 
 android {
@@ -166,9 +165,6 @@ dependencies {
     implementation(project(":crypto"))
     lintChecks(project(":lint-rules"))
 
-    // Tombstone protobuf (lite)
-    implementation(libs.protobuf.javalite)
-
     // Crash reporting (ACRA: mail sender + status-bar notification)
     implementation(libs.acra.core)
     implementation(libs.acra.mail)
@@ -186,22 +182,6 @@ dependencies {
 
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-}
-
-protobuf {
-    protoc {
-        artifact = libs.protoc.get().toString()
-    }
-    // Generate lite Java classes for Android
-    generateProtoTasks {
-        all().forEach { task ->
-            task.builtins {
-                register("java") {
-                    option("lite")
-                }
-            }
-        }
-    }
 }
 
 tasks.withType<Test>().configureEach {
