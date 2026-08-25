@@ -7,7 +7,9 @@
 # so all evidence is captured before then via the EXIT trap). No `-e`: capture first.
 set -uo pipefail
 
-APK="${1:?usage: run.sh <apk>}"
+APK="${1:?usage: run.sh <apk> [suspicious-fixture-apk]}"
+FIXTURE="${2:-}"
+SUSPICIOUS_APPID=org.osservatorionessuno.fixture.suspicious
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FLOWS="$DIR/maestro"
 ART="${INTEGRATION_ARTIFACTS:-$DIR/artifacts}"
@@ -45,6 +47,9 @@ adb shell settings put global hide_error_dialogs 1 || true
 adb shell settings put system notification_cooldown_enabled 0 || true
 adb shell settings put system notification_cooldown_all 0 || true
 adb install -r -g "$APK"
+# A benign "suspicious" APK (accessibility service): the acquisition's Packages module
+# must flag it and stage it into the archive, asserted host-side in verify_export.py.
+[ -n "$FIXTURE" ] && adb install -r -g "$FIXTURE"
 
 # Onboard + open the Settings pairing dialog (6-digit code left on screen).
 run_flow pair.yaml || exit 1
@@ -78,6 +83,6 @@ run_flow set-password.yaml || exit 1
 NAME="$(adb shell 'ls -t /sdcard/Download/' | tr -d '\r' | grep -m1 '\.zip\.age$')"
 if [ -z "$NAME" ]; then echo "NO EXPORT IN DOWNLOADS"; exit 1; fi
 adb pull "/sdcard/Download/$NAME" "$ART/$NAME"
-python3 "$DIR/verify_export.py" "$ART/$NAME" "$PASSPHRASE" || exit 1
+python3 "$DIR/verify_export.py" "$ART/$NAME" "$PASSPHRASE" ${FIXTURE:+"$SUSPICIOUS_APPID"} || exit 1
 
 echo "INTEGRATION E2E PASS"

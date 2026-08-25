@@ -15,7 +15,7 @@ REQUIRED_ENTRIES = ["acquisition.json", "dumpsys.txt", "getprop.txt", "packages.
 MIN_BUGREPORT_BYTES = 100_000
 
 
-def verify(path, passphrase):
+def verify(path, passphrase, suspicious_appid=None):
     with open(path, "rb") as f:
         ciphertext = f.read()
     plaintext = pyrage.passphrase.decrypt(ciphertext, passphrase)
@@ -24,6 +24,13 @@ def verify(path, passphrase):
     missing = [e for e in REQUIRED_ENTRIES if e not in names]
     if missing:
         raise AssertionError("missing entries: %s (have: %s)" % (missing, names))
+    # The suspicious APK heuristic staged the fixture's APK into the archive.
+    if suspicious_appid:
+        staged = [n for n in names if n.startswith("apks/") and suspicious_appid in n]
+        if not staged:
+            apks = [n for n in names if n.startswith("apks/")]
+            raise AssertionError("suspicious APK %s not staged; apks/: %s" % (suspicious_appid, apks))
+        print("suspicious APK staged: %s" % staged, flush=True)
     index = json.loads(z.read("acquisition.json"))
     if not index.get("uuid"):
         raise AssertionError("acquisition.json has no uuid")
@@ -41,4 +48,4 @@ def verify(path, passphrase):
 
 
 if __name__ == "__main__":
-    verify(sys.argv[1], sys.argv[2])
+    verify(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
