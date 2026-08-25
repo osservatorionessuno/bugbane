@@ -11,7 +11,7 @@ import zipfile
 
 import pyrage
 
-REQUIRED_ENTRIES = ["acquisition.json", "dumpsys.txt", "getprop.txt", "packages.pb", "bugreport.zip"]
+REQUIRED_ENTRIES = ["acquisition.json", "dumpsys.txt", "getprop.txt", "packages.json", "bugreport.zip"]
 MIN_BUGREPORT_BYTES = 100_000
 
 

@@ -49,10 +49,11 @@ appId: org.osservatorionessuno.bugbane
     visible: "Export"
     timeout: 1200000
 # Auto-analysis runs after acquisition and disables Export until it finishes (slow on
-# CI). Waiting for a severity level to appear is both the gate and a detection smoke.
+# CI). CRITICAL is bugbane's own detection of the planted pred.so IOC (cross-checked
+# against MVT host-side) and doubles as the analysis-done gate.
 - extendedWaitUntil:
     visible:
-      text: ".*(CRITICAL|HIGH|MEDIUM|LOW|INFO).*"
+      text: ".*CRITICAL.*"
     timeout: 300000
 # Tapping Export right after can race the SAF picker, so retry until SAVE shows.
 - repeat:
