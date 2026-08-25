@@ -136,17 +136,26 @@ jobs:
           path: integration/artifacts/
           retention-days: 7
 
-  # /e/OS (Murena) lane — the only open-source ROM shipping official prebuilt
-  # x86_64 emulator images (Android 16 / API 36, userdebug, test channel):
-  # https://ota.ecloud.global/test/sdk_phone_x86_64/
+  # /e/OS (Murena) lanes — the only open-source ROM shipping official prebuilt
+  # x86_64 emulator images (userdebug, sdk_phone_x86_64 target):
   # https://doc.e.foundation/os/how-to/emulator
   # The image isn't in Google's sdkmanager repo, and android-emulator-runner
   # unconditionally sdkmanager-installs its system image, so this job seeds the
   # image directory and drives avdmanager/emulator by hand instead.
+  #
+  # Two flavors: `pinned` is a fixed dev-channel build (sha256 in-repo) and
+  # gates the PR; `latest` floats on the test channel's newest build as an
+  # early-warning canary for upstream /e/OS changes (including new Android
+  # bases) and never blocks the PR.
   test-eos:
     needs: build-apk
     runs-on: ubuntu-latest
     timeout-minutes: 110
+    continue-on-error: ${{ matrix.flavor == 'latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [pinned, latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -187,31 +196,44 @@ jobs:
           pip install -r integration/requirements.txt
 
       - name: Install /e/OS system image
-        # Pinned build from the dev channel, which keeps history (the test
-        # channel only ever serves the latest build). To bump: browse
-        # https://ota.ecloud.global/dev/sdk_phone_x86_64/ and update both vars;
-        # a new Android base also needs the android-NN dir and the package.xml
-        # api-level below. The sha256 is pinned in-repo on purpose: don't
+        # pinned: fixed build from the dev channel, which keeps history. To
+        # bump: browse https://ota.ecloud.global/dev/sdk_phone_x86_64/ and
+        # update both vars. The sha256 is pinned in-repo on purpose: don't
         # replace it with the server's .sha256sum file.
+        # latest: newest build on the test channel (only ever serves one),
+        # integrity-checked in transit against the server's .sha256sum.
+        # Either way the API level is derived from the aNN in the filename
+        # (Android NN = API NN+20, valid since Android 15).
         env:
           EOS_IMAGE: IMG-e-4.2-a16-20260815662914-community-sdk_phone_x86_64.zip
           EOS_SHA256: 90340954d1b26bf5b1b089a89886257aa45c42e4f6b6bf4dcdd860be2e826826
         run: |
-          echo "Using $EOS_IMAGE"
-          curl -fL -o eos.zip "https://ota.ecloud.global/dev/sdk_phone_x86_64/$EOS_IMAGE"
-          echo "$EOS_SHA256  eos.zip" | sha256sum --check
-          IMGDIR="$ANDROID_HOME/system-images/android-36/lineage"
+          if [ "${{ matrix.flavor }}" = pinned ]; then
+            ZIP="$EOS_IMAGE"
+            curl -fL -o eos.zip "https://ota.ecloud.global/dev/sdk_phone_x86_64/$ZIP"
+            echo "$EOS_SHA256  eos.zip" | sha256sum --check
+          else
+            BASE=https://ota.ecloud.global/test/sdk_phone_x86_64
+            ZIP=$(curl -fsSL "$BASE/" | grep -oE 'IMG-e-[0-9.]+-a[0-9]+-[0-9]+-test-sdk_phone_x86_64\.zip' | head -1)
+            if [ -z "$ZIP" ]; then echo "::error::no build resolved from $BASE — naming scheme changed?"; exit 1; fi
+            curl -fL -o eos.zip "$BASE/$ZIP"
+            curl -fsSL "$BASE/$ZIP.sha256sum" | sed "s|$ZIP|eos.zip|" | sha256sum --check
+          fi
+          echo "Using $ZIP"
+          API=$(( $(echo "$ZIP" | sed -E 's/^IMG-e-[0-9.]+-a([0-9]+)-.*/\1/') + 20 ))
+          echo "EOS_API=$API" >> "$GITHUB_ENV"
+          IMGDIR="$ANDROID_HOME/system-images/android-$API/lineage"
           mkdir -p "$IMGDIR"
           unzip -q eos.zip -d "$IMGDIR"
           rm eos.zip
-          # package.xml verbatim from https://doc.e.foundation/os/how-to/emulator
+          # package.xml from https://doc.e.foundation/os/how-to/emulator
           # so avdmanager accepts the package string.
-          cat > "$IMGDIR/x86_64/package.xml" <<'EOF'
+          cat > "$IMGDIR/x86_64/package.xml" <<EOF
           <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
           <ns2:repository xmlns:ns2="http://schemas.android.com/repository/android/common/02" xmlns:ns12="http://schemas.android.com/sdk/android/repo/sys-img2/03">
-            <localPackage path="system-images;android-36;lineage;x86_64" obsolete="false">
+            <localPackage path="system-images;android-$API;lineage;x86_64" obsolete="false">
               <type-details xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="ns12:sysImgDetailsType">
-                <api-level>36</api-level>
+                <api-level>$API</api-level>
                 <base-extension>true</base-extension>
                 <tag>
                   <id>lineage</id>
@@ -234,7 +256,7 @@ jobs:
           export ANDROID_AVD_HOME="$HOME/.android/avd"
           mkdir -p "$ANDROID_AVD_HOME"
           echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
-          echo no | avdmanager create avd --name eos --package 'system-images;android-36;lineage;x86_64' --device pixel_5
+          echo no | avdmanager create avd --name eos --package "system-images;android-$EOS_API;lineage;x86_64" --device pixel_5
           # sizing to match the matrix lanes (last duplicate key wins)
           cat >> "$ANDROID_AVD_HOME/eos.avd/config.ini" <<CFG
           hw.cpu.ncore=2
@@ -266,6 +288,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: integration-artifacts-eos-a16-run${{ github.run_number }}
+          name: integration-artifacts-eos-${{ matrix.flavor }}-run${{ github.run_number }}
           path: integration/artifacts/
           retention-days: 7
