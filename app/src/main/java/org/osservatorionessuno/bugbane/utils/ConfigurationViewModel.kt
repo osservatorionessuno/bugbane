@@ -170,12 +170,17 @@ class ConfigurationViewModel private constructor(
         // (USB Debugging). Those are independent settings; wireless ADB does not depend on
         // USB Debugging being on, including on Android 15+. An earlier check on ADB_ENABLED
         // for API 35+ was removed for that reason.
-        if (wirelessDebuggingEnabled) {
-            if (adbState == AdbState.ConnectedIdle && !appProgress.hasCompletedOnboarding) return AppState.AdbConnectedFinishOnboarding
-            if (adbState == AdbState.ConnectedIdle) return AppState.AdbConnected
-            if (adbState == AdbState.ConnectedAcquiring) return AppState.AdbScanning
-            if (adbState == AdbState.Connecting) return AppState.AdbConnecting
+        //
+        // An active connection (local or remote third-party) is enough to acquire — do not
+        // require Wireless Debugging to be enabled on *this* device when already connected.
+        if (adbState == AdbState.ConnectedIdle && !appProgress.hasCompletedOnboarding) {
+            return AppState.AdbConnectedFinishOnboarding
+        }
+        if (adbState == AdbState.ConnectedIdle) return AppState.AdbConnected
+        if (adbState == AdbState.ConnectedAcquiring) return AppState.AdbScanning
+        if (adbState == AdbState.Connecting) return AppState.AdbConnecting
 
+        if (wirelessDebuggingEnabled) {
             if (appProgress.hasCompletedOnboarding && autoConnectAttempts.load() < _MAX_AUTOCONNECT_ATTEMPTS) return AppState.TryAutoConnect
             // Wireless debugging is on, but our preconditions weren't met.
             // Maybe we failed autoconnect, or maybe we're connecting for the first time and need to pair first.

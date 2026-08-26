@@ -6,6 +6,7 @@
     <string name="main_nav_scan">Acquire</string>
     <string name="main_nav_acquisitions">Acquisitions</string>
     <string name="main_nav_settings">Settings</string>
+    <string name="main_nav_wireless">Wireless ADB</string>
 
     <!-- Slideshow strings -->
     <string name="slideshow_welcome_title">Welcome to Bugbane</string>
@@ -64,6 +65,11 @@
     <string name="home_scan_button">Start Acquisition</string>
     <string name="home_scanning_button">Acquiring…</string>
     <string name="home_permissions_button">Enable Permissions</string>
+    <string name="scan_device_selector_label">Acquisition device</string>
+    <string name="scan_device_none">Not connected</string>
+    <string name="scan_device_this_device">This device</string>
+    <string name="scan_device_this_device_hint">Local Wireless Debugging</string>
+    <string name="scan_device_pair_new">Pair another device…</string>
     <string name="scan_disable_dialog_title">After each acquisition, it\'s recommended to disable Developer Options until the next session.</string>
     <string name="scan_disable_dialog_button">Disable</string>
     <string name="scan_disable_dialog_close_button">Close</string>
@@ -135,6 +141,29 @@
     <string name="notification_adb_pairing_stop_searching">Stop searching</string>
     <string name="notification_adb_pairing_service_found_title">ADB pairing service found on port %d</string>
     <string name="notification_adb_pairing_working_title">Pairing with ADB service</string>
+
+    <!-- Wireless LAN ADB pairing (third-party devices) -->
+    <string name="wireless_pairing_title">Wireless Pairing</string>
+    <string name="wireless_pairing_rescan">Rescan</string>
+    <string name="wireless_pairing_empty">Looking for devices on this Wi‑Fi…\nEnable Wireless debugging on the target phone.</string>
+    <string name="wireless_pairing_enter_code_title">Pairing code</string>
+    <string name="wireless_pairing_dialog_hint">On the target phone, open Wireless debugging → Pair device with pairing code, then enter the 6-digit code shown there.</string>
+    <string name="wireless_pairing_code_label">6-digit code</string>
+    <string name="wireless_pairing_waiting_port">Waiting for pairing service…</string>
+    <string name="wireless_pairing_pair_button">Pair</string>
+    <string name="wireless_pairing_cancel">Cancel</string>
+    <string name="wireless_pairing_action_connect">Connect</string>
+    <string name="wireless_pairing_action_pair">Requires pairing</string>
+    <string name="wireless_pairing_action_checking">Checking…</string>
+    <string name="wireless_pairing_action_unreachable">Unavailable</string>
+    <string name="wireless_pairing_open_pair_ui">Connection refused.Pairing required.</string>
+    <string name="wireless_pairing_failed">Could not connect</string>
+    <string name="wireless_pairing_qr_button">Pair with QR code</string>
+    <string name="wireless_pairing_qr_title">Scan with target phone</string>
+    <string name="wireless_pairing_qr_hint">On the target phone, open Wireless debugging → Pair device with QR code, then scan this code.</string>
+    <string name="wireless_pairing_qr_waiting">Waiting for scan…</string>
+    <string name="wireless_pairing_qr_close">Close</string>
+    <string name="wireless_pairing_qr_timeout">Timed out waiting for QR scan</string>
 
     <!-- Acquisition details strings -->
     <string name="acquisition_details_title">Acquisition Details</string>

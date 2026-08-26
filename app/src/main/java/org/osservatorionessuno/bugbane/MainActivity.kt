@@ -146,6 +146,10 @@ fun MainContent() {
                             pagerState.animateScrollToPage(tabIndex)
                         }
                     },
+                    onWirelessClick = {
+                        val intent = Intent(context, WirelessPairingActivity::class.java)
+                        context.startActivity(intent)
+                    },
                     onSettingsClick = {
                         val intent = Intent(context, SettingsActivity::class.java)
                         context.startActivity(intent)
@@ -155,6 +159,10 @@ fun MainContent() {
                 // Portrait mode: separate top bar and navigation tabs
                 Column {
                     AppTopBar(
+                        onWirelessClick = {
+                            val intent = Intent(context, WirelessPairingActivity::class.java)
+                            context.startActivity(intent)
+                        },
                         onSettingsClick = {
                             val intent = Intent(context, SettingsActivity::class.java)
                             context.startActivity(intent)

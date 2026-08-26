@@ -60,6 +60,11 @@ class AdbConnectionManager private constructor(context: Context) : AbsAdbConnect
 
     override fun getDeviceName(): String = "Bugbane"
 
+    /** Exposed for short-lived probe connections that must not replace the active session. */
+    fun adbPrivateKey(): PrivateKey = privateKey
+
+    fun adbCertificate(): Certificate = certificate
+
     /**
      * The adb_keys line the device records for this host on authorization. Stored with
      * acquisitions (androidqf parity) so analysis can exclude it from unknown-key checks.

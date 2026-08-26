@@ -3,6 +3,7 @@ package org.osservatorionessuno.bugbane.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,11 +24,18 @@ import org.osservatorionessuno.bugbane.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBar(
-    onSettingsClick: () -> Unit = {}
+    onWirelessClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
 ) {
     TopAppBar(
         title = { TopBarTitle() },
         actions = {
+            IconButton(onClick = onWirelessClick) {
+                Icon(
+                    imageVector = Icons.Default.Wifi,
+                    contentDescription = stringResource(R.string.main_nav_wireless)
+                )
+            }
             IconButton(onClick = onSettingsClick) {
                 Icon(
                     imageVector = Icons.Default.Settings,
@@ -49,6 +57,7 @@ fun AppTopBar(
 fun MergedTopBar(
     selectedTabIndex: Int,
     onTabSelected: (Int) -> Unit,
+    onWirelessClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
 ) {
     TopAppBar(
@@ -64,6 +73,12 @@ fun MergedTopBar(
                     onTabSelected = onTabSelected,
                     isLandscape = true
                 )
+                IconButton(onClick = onWirelessClick) {
+                    Icon(
+                        imageVector = Icons.Default.Wifi,
+                        contentDescription = stringResource(R.string.main_nav_wireless)
+                    )
+                }
                 IconButton(onClick = onSettingsClick) {
                     Icon(
                         imageVector = Icons.Default.Settings,

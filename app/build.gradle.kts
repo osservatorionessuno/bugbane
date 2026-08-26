@@ -174,6 +174,9 @@ dependencies {
     implementation(libs.acra.mail)
     implementation(libs.acra.notification)
 
+    // QR code generation for ADB wireless pairing
+    implementation(libs.zxing.core)
+
     // --- Unit test (JUnit 5) ---
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)

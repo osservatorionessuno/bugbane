@@ -30,6 +30,7 @@ import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
 import org.osservatorionessuno.bugbane.AcquisitionActivity
+import org.osservatorionessuno.bugbane.components.AcquisitionDeviceSelector
 import org.osservatorionessuno.bugbane.components.LayeredProgressIndicator
 import org.osservatorionessuno.bugbane.components.AcquisitionIdentityLostDialog
 import org.osservatorionessuno.bugbane.utils.AcquisitionRecovery
@@ -348,56 +349,145 @@ fun ScanScreen() {
                         )
                     }
                 } else {
-                    Button(
-                        onClick = {
-                            if (adbState.value != AdbState.Cancelling) {
-                                adbManager.cancelQuickForensics()
-                            }
-                        },
-                        enabled = adbState.value != AdbState.Cancelling,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error
-                        ),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        AcquisitionDeviceSelector(
+                            adbManager = adbManager,
+                            enabled = false,
+                            modifier = Modifier.padding(bottom = 6.dp),
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (adbState.value == AdbState.Cancelling) {
-                                stringResource(R.string.scan_cancelling_button)
-                            } else {
-                                stringResource(R.string.scan_cancel_button)
+                        Button(
+                            onClick = {
+                                if (adbState.value != AdbState.Cancelling) {
+                                    adbManager.cancelQuickForensics()
+                                }
                             },
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                        )
+                            enabled = adbState.value != AdbState.Cancelling,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error
+                            ),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (adbState.value == AdbState.Cancelling) {
+                                    stringResource(R.string.scan_cancelling_button)
+                                } else {
+                                    stringResource(R.string.scan_cancel_button)
+                                },
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                            )
+                        }
                     }
                 }
             }
         } else {
-            Box(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Welcome content in the center
-                if (isLandscape) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.Center),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_bugbane_zoom),
-                            contentDescription = stringResource(R.string.app_name),
-                            modifier = Modifier.size(160.dp),
-                            alpha = 0.4f
-                        )
-                        Spacer(modifier = Modifier.width(24.dp))
-                        Column(modifier = Modifier.fillMaxWidth(0.5f)) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // Disable Development Tools Dialog
+                    if (showDisableDialog.value) {
+                        Card(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.scan_disable_dialog_title),
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            ConfigurationManager.openDeveloperOptions(context)
+                                            AcquisitionProgressTracker.dismissDisableReminder()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.error
+                                        )
+                                    ) {
+                                        Text(stringResource(R.string.scan_disable_dialog_button))
+                                    }
+
+                                    IconButton(
+                                        onClick = { AcquisitionProgressTracker.dismissDisableReminder() }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = stringResource(R.string.scan_disable_dialog_close_button),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (isLandscape) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_bugbane_zoom),
+                                contentDescription = stringResource(R.string.app_name),
+                                modifier = Modifier.size(160.dp),
+                                alpha = 0.4f
+                            )
+                            Spacer(modifier = Modifier.width(24.dp))
+                            Column(modifier = Modifier.fillMaxWidth(0.5f)) {
+                                Text(
+                                    text = stringResource(R.string.scan_welcome_title),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.scan_welcome_description),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_bugbane_zoom),
+                                contentDescription = stringResource(R.string.app_name),
+                                modifier = Modifier.size(160.dp),
+                                alpha = 0.4f
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
                             Text(
                                 text = stringResource(R.string.scan_welcome_title),
                                 style = MaterialTheme.typography.headlineMedium,
@@ -414,140 +504,63 @@ fun ScanScreen() {
                             )
                         }
                     }
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.Center),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_bugbane_zoom),
-                            contentDescription = stringResource(R.string.app_name),
-                            modifier = Modifier.size(160.dp),
-                            alpha = 0.4f
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Text(
-                            text = stringResource(R.string.scan_welcome_title),
-                            style = MaterialTheme.typography.headlineMedium,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(R.string.scan_welcome_description),
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                    }
                 }
 
-                // Disable Development Tools Dialog
-                if (showDisableDialog.value) {
-                    Card(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.scan_disable_dialog_title),
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        ConfigurationManager.openDeveloperOptions(context)
-                                        AcquisitionProgressTracker.dismissDisableReminder()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.error
-                                    )
-                                ) {
-                                    Text(stringResource(R.string.scan_disable_dialog_button))
+                // Device selector + scan button fixed at the bottom
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    AcquisitionDeviceSelector(
+                        adbManager = adbManager,
+                        enabled = true,
+                        modifier = Modifier.padding(bottom = 6.dp),
+                    )
+                    Button(
+                        onClick = {
+                            when (appState.value) {
+                                AppState.AdbConnected -> {
+                                    startAcquisition()
                                 }
-
-                                IconButton(
-                                    onClick = { AcquisitionProgressTracker.dismissDisableReminder() }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = stringResource(R.string.scan_disable_dialog_close_button),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                AppState.AdbConnecting, AppState.TryAutoConnect -> {
+                                    // No-op and button is disabled below
+                                }
+                                else -> {
+                                    // Restart the slideshow, but leave the option to return to this activity
+                                    val intent = Intent(context, SlideshowActivity::class.java)
+                                    intent.putExtra(INTENT_EXIT_BACKPRESS, false)
+                                    context.startActivity(intent)
+                                    return@Button
                                 }
                             }
-                        }
-                    }
-                }
-                
-                // Scan Button fixed at the bottom
-                Button(
-                    onClick = {
-                        when (appState.value) {
-                            AppState.AdbConnected -> {
-                                startAcquisition()
-                            }
-                            AppState.AdbConnecting, AppState.TryAutoConnect -> {
-                                // No-op and button is disabled below
-                            }
-                            else -> {
-                                // Restart the slideshow, but leave the option to return to this activity
-                                val intent = Intent(context, SlideshowActivity::class.java)
-                                intent.putExtra(INTENT_EXIT_BACKPRESS, false)
-                                context.startActivity(intent)
-                                return@Button
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth(),
-                    enabled = (appState.value !in arrayOf(AppState.AdbScanning, AppState.TryAutoConnect, AppState.AdbConnecting)),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = when (appState.value) {
-                            AppState.AdbScanning, AppState.AdbConnecting, AppState.TryAutoConnect -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                            AppState.AdbConnected -> MaterialTheme.colorScheme.secondary
-                            else ->
-                                MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
-                        }
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = when (appState.value) {
-                            AppState.AdbScanning -> stringResource(R.string.home_scanning_button)
-                            AppState.AdbConnected -> stringResource(R.string.home_scan_button)
-                            AppState.TryAutoConnect, AppState.AdbConnecting -> stringResource(R.string.button_working_adb_pairing)
-                            else
-                                -> stringResource(R.string.home_permissions_button)
                         },
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Medium
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = (appState.value !in arrayOf(AppState.AdbScanning, AppState.TryAutoConnect, AppState.AdbConnecting)),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = when (appState.value) {
+                                AppState.AdbScanning, AppState.AdbConnecting, AppState.TryAutoConnect -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                AppState.AdbConnected -> MaterialTheme.colorScheme.secondary
+                                else ->
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
+                            }
                         )
-                    )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = when (appState.value) {
+                                AppState.AdbScanning -> stringResource(R.string.home_scanning_button)
+                                AppState.AdbConnected -> stringResource(R.string.home_scan_button)
+                                AppState.TryAutoConnect, AppState.AdbConnecting -> stringResource(R.string.button_working_adb_pairing)
+                                else
+                                    -> stringResource(R.string.home_permissions_button)
+                            },
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                    }
                 }
             }
         }

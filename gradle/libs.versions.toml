@@ -21,6 +21,7 @@ libmvt                = "0.3.0"
 libohttp              = "1.1.0"
 libohttpHpkeBc        = "1.0.1"
 libbhttp              = "1.1.0"
+zxing                 = "3.5.3"
 acra                  = "5.13.1"
 
 [plugins]
@@ -67,3 +68,4 @@ libbhttp                          = { group = "com.github.osservatorionessuno", 
 acra-core                         = { group = "ch.acra", name = "acra-core", version.ref = "acra" }
 acra-mail                         = { group = "ch.acra", name = "acra-mail", version.ref = "acra" }
 acra-notification                 = { group = "ch.acra", name = "acra-notification", version.ref = "acra" }
+zxing-core                        = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
