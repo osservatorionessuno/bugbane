@@ -1,0 +1,36 @@
+<p><i>This is the <b>beta channel</b> of Bugbane, released ahead of the stable app for early testing. Expect rough edges; it installs alongside the stable app.</i></p>
+
+<b>Bugbane</b> is an open-source Android application designed to help users perform basic forensic self-triage on their own devices. It uses Wireless ADB to collect the same type of data that tools like <a href="https://github.com/mvt-project/androidqf">AndroidQF</a> or <a href="https://github.com/mvt-project/mvt">MVT</a> would extract, but without requiring external computers, cables, or command-line expertise.
+
+<b>Requirements</b>
+<ul>
+  <li>Wireless ADB must be available on your device (Android 11+).</li>
+  <li>A Wi-Fi connection to pair the device locally.</li>
+  <li>Basic understanding that this tool is for self-triage and <i>cannot</i> guarantee detection.</li>
+</ul>
+
+<b>Features</b>
+<ul>
+  <li>A step-by-step wizard to guide you through enabling developer options, pairing ADB, and preparing for acquisition.</li>
+  <li>One-click forensic acquisition of relevant device logs and configurations.</li>
+  <li>Encrypted export options through system dialogs, Signal, or email.</li>
+  <li>Ability to delete or rename existing acquisitions locally.</li>
+  <li>Indicators of compromise are periodically updated from <a href="https://github.com/mvt-project/mvt-indicators/blob/main/indicators.yaml">mvt-indicators</a>.</li>
+  <li>Ability to keep acquisitions on device, and scan them multiple times using new indicators, to detect past compromises.</li>
+</ul>
+
+<b>Security and Privacy</b>
+<p>Bugbane does not transmit your data automatically. All exports remain on-device until you decide to share them with trusted organizations or analysts.</p>
+
+<b>Planned Improvements</b>
+<ul>
+  <li>Streamlined workflows for collaborating organizations.</li>
+  <li>Localization and accessibility enhancements.</li>
+  <li>Automated rescan of past acquisitions after each indicators update.</li>
+</ul>
+
+<b>Translations</b>
+<p>Help us improve translations and documentation by contributing via our <a href="https://github.com/osservatorionessuno/bugbane">GitHub repository</a>.</p>
+
+<b>Important Notice</b>
+<p>Bugbane is intended for individuals who suspect their device may be compromised by stalkerware, spyware, or non-consensual forensics, however no app can confirm if your phone is clean. If you have strong reasons to believe your device is compromised, consider using a separate trusted device and consult with professionals.</p>

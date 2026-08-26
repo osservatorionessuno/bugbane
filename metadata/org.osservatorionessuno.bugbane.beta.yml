@@ -8,17 +8,7 @@ SourceCode: https://github.com/osservatorionessuno/bugbane
 IssueTracker: https://github.com/osservatorionessuno/bugbane/issues
 Changelog: https://github.com/osservatorionessuno/bugbane/releases
 
-Name: Bugbane Beta
 AutoName: Bugbane
-Summary: On-device Android forensics toolkit (beta channel)
-Description: |-
-  Beta channel of Bugbane, released ahead of the stable app for early testing.
-  Expect rough edges; installs alongside the stable app.
-
-  Bugbane is an open-source Android app that helps potential spyware and
-  stalkerware victims self-triage their devices and export evidence for
-  analysis when needed. It performs an on-device guided scan and uses ADB
-  Wireless Debugging to execute commands directly on the device.
 
 RepoType: git
 Repo: https://github.com/osservatorionessuno/bugbane.git
