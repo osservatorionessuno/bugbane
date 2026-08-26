@@ -21,19 +21,19 @@ Repo: https://github.com/osservatorionessuno/bugbane.git
 Binaries: https://github.com/osservatorionessuno/bugbane/releases/download/%v/bugbane-%v.apk
 
 Builds:
-  - versionName: 0.2.0
-    versionCode: 6
-    commit: 0.2.0
+  - versionName: 0.2.1
+    versionCode: 7
+    commit: 0.2.1
     subdir: .
     gradle:
       - production
     output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
 
 # Pin to the release signing certificate (Yubikey). Compute from the signed release APK:
-#   apksigner verify --print-certs bugbane-0.2.0.apk | grep 'SHA-256'
+#   apksigner verify --print-certs bugbane-0.2.1.apk | grep 'SHA-256'
 # AllowedAPKSigningKeys: <sha256-of-signing-cert>
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 0.2.0
-CurrentVersionCode: 6
+CurrentVersion: 0.2.1
+CurrentVersionCode: 7
