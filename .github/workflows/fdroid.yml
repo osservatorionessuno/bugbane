@@ -113,16 +113,16 @@ jobs:
           git clone --depth 1 https://gitlab.com/fdroid/fdroiddata.git "$TMP_META_DIR"
 
           test -f "metadata/${APPID}.yml" || { echo "::error::metadata/${APPID}.yml not found"; exit 1; }
-          cp "metadata/${APPID}.yml" "$TMP_META_DIR/metadata/${APPID}.yml"
+          cp metadata/${APPID}*.yml "$TMP_META_DIR/metadata/"
 
           # fdroidserver parses every app's metadata (publish validates all of
           # it), so other apps' files can break this lane — e.g. the pinned
           # 2.4.5 rejects Taproot bitcoin addresses newer metadata uses. Keep
-          # only our app: metadata/ holds <appid>.yml files plus <appid>/
-          # localization dirs, and fdroidserver requires them to correspond,
-          # so both must go.
-          find "$TMP_META_DIR/metadata" -maxdepth 1 -name '*.yml' ! -name "${APPID}.yml" -delete
-          find "$TMP_META_DIR/metadata" -mindepth 1 -maxdepth 1 -type d ! -name "${APPID}" -exec rm -rf {} +
+          # only our apps (stable + beta): metadata/ holds <appid>.yml files
+          # plus <appid>/ localization dirs, and fdroidserver requires them to
+          # correspond, so both must go.
+          find "$TMP_META_DIR/metadata" -maxdepth 1 -name '*.yml' ! -name "${APPID}*.yml" -delete
+          find "$TMP_META_DIR/metadata" -mindepth 1 -maxdepth 1 -type d ! -name "${APPID}*" -exec rm -rf {} +
 
           cd "$TMP_META_DIR"
           cat > config.yml <<'YAML'
@@ -170,8 +170,16 @@ jobs:
         run: |
           set -euo pipefail
           cd "$TMP_META_DIR"
-          fdroid rewritemeta "$APPID"
-          fdroid lint "$APPID"
+          fdroid rewritemeta "$APPID" "$APPID.beta"
+          fdroid lint "$APPID" "$APPID.beta"
+
+      - name: Validate metadata against the fdroiddata schema
+        run: |
+          set -euo pipefail
+          pip install check-jsonschema
+          # The pristine repo files, against the schema fdroiddata's own MR
+          # pipeline enforces (the pinned fdroidserver can lag its rules).
+          check-jsonschema --schemafile "$TMP_META_DIR/schemas/metadata.json" metadata/${APPID}*.yml
 
       - name: Build
         env:
@@ -220,6 +228,24 @@ jobs:
           set -euo pipefail
           cd "$TMP_META_DIR"
           fdroid publish --verbose --error-on-failed "$APPID"
+
+      # Last: this replaces the scratch clone's rewritten metadata with the
+      # pristine repo files, so the pinned build/publish steps must be done.
+      - name: fdroidserver master canary (rewritemeta drift + lint)
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/fdsm
+          /tmp/fdsm/bin/pip -q install "fdroidserver @ https://gitlab.com/fdroid/fdroidserver/-/archive/master/fdroidserver-master.tar.gz"
+          # fdroiddata's MR pipeline requires master rewritemeta to be a
+          # no-op on the submitted files; warn early when upstream drifts.
+          cp metadata/${APPID}*.yml "$TMP_META_DIR/metadata/"
+          cd "$TMP_META_DIR"
+          git add -A && git -c user.email=ci@example.invalid -c user.name=CI commit -qm "canary baseline"
+          /tmp/fdsm/bin/fdroid rewritemeta "$APPID" "$APPID.beta"
+          /tmp/fdsm/bin/fdroid lint "$APPID" "$APPID.beta"
+          git diff --exit-code -- metadata/ || {
+            echo "::warning::fdroidserver master rewritemeta would reformat the metadata (upstream drift)"; exit 1; }
 
       - name: Collect artifacts
         run: |
