@@ -3,16 +3,18 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-BASE_DIR=./app/build/outputs/bundle
+BASE_DIR=./app/build/outputs
 case "${1:-}" in
   beta)
-    GRADLE_TASK=bundleBetaRelease
-    AAB=betaRelease/app-beta-release.aab
+    GRADLE_TASKS="bundleBetaRelease assembleBetaRelease"
+    AAB=$BASE_DIR/bundle/betaRelease/app-beta-release.aab
+    APK=$BASE_DIR/apk/beta/release/app-beta-release.apk
     TAG_SUFFIX="-beta"
     ;;
   production)
-    GRADLE_TASK=bundleProductionRelease
-    AAB=productionRelease/app-production-release.aab
+    GRADLE_TASKS="bundleProductionRelease assembleProductionRelease"
+    AAB=$BASE_DIR/bundle/productionRelease/app-production-release.aab
+    APK=$BASE_DIR/apk/production/release/app-production-release.apk
     TAG_SUFFIX=""
     ;;
   *)
@@ -47,10 +49,13 @@ echo "==> signed tag $TAG"
 git tag -s "$TAG" -m "Release $TAG"
 git push origin "refs/tags/$TAG"
 
-echo "==> ./gradlew $GRADLE_TASK"
-./gradlew "$GRADLE_TASK"
+echo "==> ./gradlew $GRADLE_TASKS"
+./gradlew "$GRADLE_TASKS"
 
 echo "==> ./apksigner-pkcs11.sh $AAB"
 ./apksigner-pkcs11.sh "$AAB"
-
 echo "Done: $AAB"
+
+echo "==> ./apksigner-pkcs11.sh $APK"
+./apksigner-pkcs11.sh "$APK"
+echo "Done: $APK"
