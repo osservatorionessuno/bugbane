@@ -142,7 +142,22 @@ jobs:
 
           # CI builds arbitrary SHAs with no published release binary to verify
           # against, so drop the reproducible-signature pins for this run.
-          sed -i -E '/^(Binaries|AllowedAPKSigningKeys):/d' "$APPFILE"
+          # These keys can be wrapped onto indented continuation lines
+          # (rewritemeta formatting), so drop those too.
+          python3 - "$APPFILE" <<'PYEOF'
+          import re, sys
+          path = sys.argv[1]
+          out, skipping = [], False
+          for line in open(path):
+              if re.match(r'^(Binaries|AllowedAPKSigningKeys):', line):
+                  skipping = True
+                  continue
+              if skipping and line.startswith('  '):
+                  continue
+              skipping = False
+              out.append(line)
+          open(path, 'w').writelines(out)
+          PYEOF
 
           echo '== After rewrite =='
           grep -nE '^[[:space:]]*(Repo|commit):' "$APPFILE" || sed -n '1,120p' "$APPFILE"
