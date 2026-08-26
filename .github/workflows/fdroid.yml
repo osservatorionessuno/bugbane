@@ -118,8 +118,11 @@ jobs:
           # fdroidserver parses every app's metadata (publish validates all of
           # it), so other apps' files can break this lane — e.g. the pinned
           # 2.4.5 rejects Taproot bitcoin addresses newer metadata uses. Keep
-          # only our app.
-          find "$TMP_META_DIR/metadata" -name '*.yml' ! -name "${APPID}.yml" -delete
+          # only our app: metadata/ holds <appid>.yml files plus <appid>/
+          # localization dirs, and fdroidserver requires them to correspond,
+          # so both must go.
+          find "$TMP_META_DIR/metadata" -maxdepth 1 -name '*.yml' ! -name "${APPID}.yml" -delete
+          find "$TMP_META_DIR/metadata" -mindepth 1 -maxdepth 1 -type d ! -name "${APPID}" -exec rm -rf {} +
 
           cd "$TMP_META_DIR"
           cat > config.yml <<'YAML'
