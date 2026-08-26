@@ -24,9 +24,11 @@ capture() {
   # Maestro drops screenshots/logs per run under ~/.maestro/tests; keep the latest.
   latest="$(ls -dt "$HOME"/.maestro/tests/* 2>/dev/null | head -1)"
   [ -n "$latest" ] && cp -r "$latest" "$ART/maestro-debug" 2>/dev/null || true
-  # takeScreenshot saves into each flow's own test dir, not the cwd; harvest
-  # them all (one dir per flow) into the artifacts.
-  cp "$HOME"/.maestro/tests/*/takeScreenshot/screenshots/*.png "$ART/screenshots/" 2>/dev/null || true
+  # takeScreenshot saves into each flow's own test dir
+  # (~/.maestro/tests/<ts>/<flow>/takeScreenshot/screenshots/); harvest them
+  # all into the artifacts, depth-agnostically.
+  find "$HOME/.maestro/tests" -path '*/takeScreenshot/screenshots/*.png' \
+    -exec cp {} "$ART/screenshots/" \; 2>/dev/null || true
 }
 trap capture EXIT
 
