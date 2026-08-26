@@ -26,11 +26,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository (exact PR head or push)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           repository: ${{ inputs.repo_full_name }}
           ref: ${{ inputs.ref_sha }}
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
       - name: Stable env
         run: |
@@ -49,14 +52,14 @@ jobs:
             jq unzip diffutils rsync
 
       - name: Set up JDK
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
           packages: |
             platforms;android-36 build-tools;36.0.0
@@ -71,8 +74,13 @@ jobs:
           gradle --version
 
       - name: Add fdroidserver to PATH/ENV
+        env:
+          FDROIDSERVER_TAG: "2.4.5"
+          FDROIDSERVER_COMMIT: "92229a9152a31d005503bac64d773551f0655494"
         run: |
-          git clone --depth 1 https://gitlab.com/fdroid/fdroidserver.git fdroidserver
+          git clone --depth 1 --branch "$FDROIDSERVER_TAG" https://gitlab.com/fdroid/fdroidserver.git fdroidserver
+          test "$(git -C fdroidserver rev-parse HEAD)" = "$FDROIDSERVER_COMMIT" || {
+            echo "::error::fdroidserver tag $FDROIDSERVER_TAG no longer points at $FDROIDSERVER_COMMIT"; exit 1; }
           cd fdroidserver
           pip install --upgrade pip setuptools wheel
           pip install .
@@ -207,7 +215,7 @@ jobs:
           ls -R fdroid-out || true
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: fdroids
           path: fdroid-out/**
