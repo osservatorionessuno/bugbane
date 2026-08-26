@@ -25,9 +25,9 @@ Repo: https://github.com/osservatorionessuno/bugbane.git
 Binaries: https://github.com/osservatorionessuno/bugbane/releases/download/%v-beta/bugbane-%v-beta.apk
 
 Builds:
-  - versionName: 0.2.1
-    versionCode: 7
-    commit: 0.2.1-beta
+  - versionName: 0.2.2
+    versionCode: 8
+    commit: 0.2.2-beta
     subdir: .
     gradle:
       - beta
@@ -38,5 +38,5 @@ AllowedAPKSigningKeys: 8d301b7e49106b30011fe36d869ffd313ce8115a44f4c4abdfd48f850
 
 AutoUpdateMode: Version %v-beta
 UpdateCheckMode: Tags ^\d+(\.\d+)*-beta$
-CurrentVersion: 0.2.1
-CurrentVersionCode: 7
+CurrentVersion: 0.2.2
+CurrentVersionCode: 8
