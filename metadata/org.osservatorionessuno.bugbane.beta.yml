@@ -8,9 +8,13 @@ SourceCode: https://github.com/osservatorionessuno/bugbane
 IssueTracker: https://github.com/osservatorionessuno/bugbane/issues
 Changelog: https://github.com/osservatorionessuno/bugbane/releases
 
+Name: Bugbane Beta
 AutoName: Bugbane
-Summary: On-device Android forensics toolkit
+Summary: On-device Android forensics toolkit (beta channel)
 Description: |-
+  Beta channel of Bugbane, released ahead of the stable app for early testing.
+  Expect rough edges; installs alongside the stable app.
+
   Bugbane is an open-source Android app that helps potential spyware and
   stalkerware victims self-triage their devices and export evidence for
   analysis when needed. It performs an on-device guided scan and uses ADB
@@ -18,22 +22,21 @@ Description: |-
 
 RepoType: git
 Repo: https://github.com/osservatorionessuno/bugbane.git
-Binaries: https://github.com/osservatorionessuno/bugbane/releases/download/%v/bugbane-%v.apk
+Binaries: https://github.com/osservatorionessuno/bugbane/releases/download/%v-beta/bugbane-%v-beta.apk
 
 Builds:
   - versionName: 0.2.1
     versionCode: 7
-    commit: 0.2.1
+    commit: 0.2.1-beta
     subdir: .
     gradle:
-      - production
-    output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
+      - beta
+    output: app/build/outputs/apk/beta/release/app-beta-release-unsigned.apk
 
-# Release signing certificate (Yubikey, CN=Osservatorio Nessuno OdV). Recompute
-# from a signed release APK with: apksigner verify --print-certs <apk> | grep SHA-256
+# Same Yubikey certificate as the stable app (CN=Osservatorio Nessuno OdV).
 AllowedAPKSigningKeys: 8d301b7e49106b30011fe36d869ffd313ce8115a44f4c4abdfd48f8507b42c50
 
-AutoUpdateMode: Version
-UpdateCheckMode: Tags ^\d+(\.\d+)*$
+AutoUpdateMode: Version %v-beta
+UpdateCheckMode: Tags ^\d+(\.\d+)*-beta$
 CurrentVersion: 0.2.1
 CurrentVersionCode: 7
