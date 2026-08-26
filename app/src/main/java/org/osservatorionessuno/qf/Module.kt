@@ -21,7 +21,8 @@ interface Module {
      * @param context Application context.
      * @param manager Active ADB connection manager.
      * @param writer Writer to write artifacts to.
-     * @param progress Optional callback to report bytes processed.
+     * @param progress Optional callback to report bytes processed. It may throw to
+     *   abort the module (user cancel); a zero delta only gives it a chance to do so.
      */
     fun run(
         context: Context,

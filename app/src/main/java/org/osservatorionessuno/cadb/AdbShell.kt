@@ -5,6 +5,7 @@ import java.io.*
 import java.nio.charset.StandardCharsets
 import java.util.*
 import java.util.concurrent.*
+import org.osservatorionessuno.qf.AcquisitionCancelledException
 
 class ShellTimeoutException(message: String) : IOException(message)
 
@@ -84,6 +85,9 @@ class AdbShell(
                 throw IOException("All attempts failed", t)
             } catch (t: ShellInactivityException) {
                 throw IOException("All attempts failed", t)
+            } catch (c: AcquisitionCancelledException) {
+                // Thrown by the progress callback on user cancel: never retry.
+                throw c
             } catch (t: Throwable) {
                 Log.w(tag, "[exec] Attempt $attempt failed: ${t.message}")
                 lastErr = t
