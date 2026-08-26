@@ -25,10 +25,6 @@ Builds:
     versionCode: 6
     commit: 0.2.0
     subdir: .
-    prebuild: |
-      gradle --version
-      gradle wrapper --gradle-version 8.13
-      chmod +x gradlew
     gradle:
       - production
     output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
