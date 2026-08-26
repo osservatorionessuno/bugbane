@@ -16,40 +16,44 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: |
             platforms;android-36 build-tools;36.0.0
 
-      - name: Install Gradle (official distribution)
-        env:
-          GRADLE_VERSION: "8.13"
-        run: |
-          curl -L -o gradle-${GRADLE_VERSION}-bin.zip https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip
-          unzip -q gradle-${GRADLE_VERSION}-bin.zip -d "$HOME/gradle"
-          echo "$HOME/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
-
       - name: Build release APK + suspicious fixture APK
-        run: gradle --no-daemon assembleProductionRelease :fixtures:suspicious-apk:assembleDebug
+        run: ./gradlew --no-daemon assembleProductionRelease :fixtures:suspicious-apk:assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - name: Sign release APK with a throwaway CI key (unsigned APKs cannot be installed)
+        run: |
+          keytool -genkeypair -keystore ci.jks -alias ci -keyalg RSA -keysize 2048 \
+            -validity 1 -storepass ci-integration -keypass ci-integration -dname "CN=CI"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
+            --ks ci.jks --ks-pass pass:ci-integration \
+            --out app-production-release.apk \
+            app/build/outputs/apk/production/release/app-production-release-unsigned.apk
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: integration-apk
-          path: app/build/outputs/apk/production/release/app-production-release.apk
+          path: app-production-release.apk
           compression-level: 0
           retention-days: 3
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: integration-fixture-apk
           path: fixtures/suspicious-apk/build/outputs/apk/debug/suspicious-apk-debug.apk
@@ -80,7 +84,7 @@ jobs:
           - { api-level: 35, target: google_apis_playstore }
           - { api-level: 36, target: google_apis_playstore }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Enable KVM
         run: |
@@ -88,20 +92,20 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: integration-apk
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: integration-fixture-apk
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
@@ -113,7 +117,7 @@ jobs:
           pip install -r integration/requirements.txt
 
       - name: Run integration E2E (Maestro)
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ matrix.api-level }}
           target: ${{ matrix.target }}
@@ -127,7 +131,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot
           script: ./integration/run.sh app-production-release.apk suspicious-apk-debug.apk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           # run number in the name so downloaded artifacts are unambiguous across
