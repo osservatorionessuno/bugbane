@@ -46,7 +46,7 @@ if [[ -f "$AAB" ]]; then
   echo "==> ./apksigner-pkcs11.sh $AAB"
   ./apksigner-pkcs11.sh "$AAB"
   mv "$AAB" ./build/bugbane-${VERSION}.aab
-  mv "$AAB.idsig" ./build/bugbane-${VERSION}.idsig
+  mv "$AAB.idsig" ./build/bugbane-${VERSION}.aab.idsig
   echo "Done: ./build/bugbane-${VERSION}.aab"
 else
   echo "Error: $AAB not found."
@@ -57,7 +57,7 @@ if [[ -f "$APK" ]]; then
   echo "==> ./apksigner-pkcs11.sh $APK"
   ./apksigner-pkcs11.sh "$APK"
   mv "$APK" ./build/bugbane-${VERSION}.apk
-  mv "$APK.idsig" ./build/bugbane-${VERSION}.idsig
+  mv "$APK.idsig" ./build/bugbane-${VERSION}.apk.idsig
   echo "Done: ./build/bugbane-${VERSION}.apk"
 else
   echo "Error: $APK not found."
