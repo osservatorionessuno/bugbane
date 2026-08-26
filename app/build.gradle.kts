@@ -138,14 +138,6 @@ configurations.all {
     exclude(group = "com.google.auto.service", module = "auto-service")
 }
 
-// Library baseline profiles merge in environment-dependent order, making
-// assets/dexopt/baseline.prof non-reproducible; drop it from the APK.
-tasks.configureEach {
-    if (name.contains("ArtProfile")) {
-        enabled = false
-    }
-}
-
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
