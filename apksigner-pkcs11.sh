@@ -76,6 +76,15 @@ EOF
 # We dont check the APK path here, apksigner will do it for us
 APK_PATH="${1:-}"
 
+# APKs must stay byte-identical to the unsigned build apart from the appended
+# signing block, or F-Droid's reproducible verification (apksigcopier) fails:
+# v1 (JAR) signing appends META-INF entries into the zip, and minSdk 30 never
+# reads v1 anyway. AABs keep v1 — the JAR signature is what Play validates.
+V1_FLAGS=""
+if [[ "$APK_PATH" != *.aab ]]; then
+  V1_FLAGS="--v1-signing-enabled false"
+fi
+
 java \
   $FLAGS \
   -jar "$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/lib/apksigner.jar" \
@@ -87,6 +96,7 @@ java \
   --provider-class sun.security.pkcs11.SunPKCS11 \
   --provider-arg "$TEMP_CFG_FILE" \
   $EXTRA_FLAGS \
+  $V1_FLAGS \
   "$APK_PATH"
 if [[ $? -ne 0 ]]; then
   echo "Error: Failed to sign APK"
