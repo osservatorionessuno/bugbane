@@ -24,7 +24,6 @@ Builds:
   - versionName: 0.2.2
     versionCode: 8
     commit: 0.2.2
-    subdir: .
     gradle:
       - production
     output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
