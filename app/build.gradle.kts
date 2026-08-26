@@ -14,8 +14,8 @@ android {
         applicationId = "org.osservatorionessuno.bugbane"
         minSdk = 30
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.2.2"
+        versionCode = 9
+        versionName = "0.2.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "CRASH_REPORT_EMAIL", "\"bugbane@osservatorionessuno.org\"")
     }
@@ -136,6 +136,14 @@ tasks.named("preBuild") { dependsOn(checkBundledIndicators) }
 // runtime classpath; their service files are pre-generated, so drop it.
 configurations.all {
     exclude(group = "com.google.auto.service", module = "auto-service")
+}
+
+// Library baseline profiles merge in environment-dependent order, making
+// assets/dexopt/baseline.prof non-reproducible; drop it from the APK.
+tasks.configureEach {
+    if (name.contains("ArtProfile")) {
+        enabled = false
+    }
 }
 
 dependencies {
