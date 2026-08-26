@@ -24,13 +24,15 @@ capture() {
   # Maestro drops screenshots/logs per run under ~/.maestro/tests; keep the latest.
   latest="$(ls -dt "$HOME"/.maestro/tests/* 2>/dev/null | head -1)"
   [ -n "$latest" ] && cp -r "$latest" "$ART/maestro-debug" 2>/dev/null || true
+  # takeScreenshot saves into each flow's own test dir, not the cwd; harvest
+  # them all (one dir per flow) into the artifacts.
+  cp "$HOME"/.maestro/tests/*/takeScreenshot/screenshots/*.png "$ART/screenshots/" 2>/dev/null || true
 }
 trap capture EXIT
 
 run_flow() {  # <flow-file>
   echo "::group::maestro $1"
-  # Run from $ART so the flows' takeScreenshot steps land in $ART/screenshots.
-  ( cd "$ART" && maestro test "$FLOWS/$1" )
+  maestro test "$FLOWS/$1"
   local rc=$?
   echo "::endgroup::"
   [ "$rc" -eq 0 ] || echo "FLOW FAILED: $1 (rc=$rc)"
@@ -73,7 +75,7 @@ done
 # Enter the code + acquire + export in one flow (no relaunch gap after pairing, where
 # the wireless connection drops and the app reverts to the pair page).
 echo "::group::maestro connect-acquire.yaml"
-( cd "$ART" && maestro test -e CODE="$CODE" "$FLOWS/connect-acquire.yaml" ); rc=$?
+maestro test -e CODE="$CODE" "$FLOWS/connect-acquire.yaml"; rc=$?
 echo "::endgroup::"
 if [ "$rc" -ne 0 ]; then echo "FLOW FAILED: connect-acquire.yaml (rc=$rc)"; exit 1; fi
 
