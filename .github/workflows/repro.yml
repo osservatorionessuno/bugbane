@@ -65,52 +65,54 @@ jobs:
       - name: Compare 22.04 vs 24.04
         run: |
           set -euo pipefail
-          A=./artifacts/ubuntu-22.04/app-production-release.apk
-          B=./artifacts/ubuntu-24.04/app-production-release.apk
+          A=./artifacts/ubuntu-22.04/app-production-release-unsigned.apk
+          B=./artifacts/ubuntu-24.04/app-production-release-unsigned.apk
           test -f "$A" && test -f "$B"
-          # apksigcopier compares APK contents ignoring signatures
-          apksigcopier compare "$A" "$B"
+          # Both unsigned: must be byte-identical
+          sha256sum "$A" "$B"
+          cmp "$A" "$B"
 
       - name: Compare vs F-Droid repo APK
         run: |
           set -euo pipefail
-          A=./artifacts/ubuntu-22.04/app-production-release.apk
-          B=./artifacts/ubuntu-24.04/app-production-release.apk
+          A=./artifacts/ubuntu-22.04/app-production-release-unsigned.apk
+          B=./artifacts/ubuntu-24.04/app-production-release-unsigned.apk
           # F-Droid puts signed APKs in repo/, pick the newest one
           F=$(ls -t ./artifacts/fdroid/repo/*.apk | head -n1)
           echo "Comparing against F-Droid APK: $F"
-          apksigcopier compare "$A" "$F"
-          apksigcopier compare "$B" "$F"
+          # Transplant the signature from the signed APK onto ours and compare
+          apksigcopier compare "$F" --unsigned "$A"
+          apksigcopier compare "$F" --unsigned "$B"
 
       - name: diffoscope (22.04 vs 24.04)
-        if: always()
+        if: failure()
         continue-on-error: true
         run: |
           set -euo pipefail
-          A=artifacts/ubuntu-22.04/app-production-release.apk
-          B=artifacts/ubuntu-24.04/app-production-release.apk
+          A=artifacts/ubuntu-22.04/app-production-release-unsigned.apk
+          B=artifacts/ubuntu-24.04/app-production-release-unsigned.apk
           diffoscope "$A" "$B" > diffoscope-22-vs-24.txt || true
 
       - name: diffoscope (22.04 vs F-Droid)
-        if: always()
+        if: failure()
         continue-on-error: true
         run: |
           set -euo pipefail
-          A=artifacts/ubuntu-22.04/app-production-release.apk
+          A=artifacts/ubuntu-22.04/app-production-release-unsigned.apk
           F=$(ls -t artifacts/fdroid/repo/*.apk | head -n1)
           diffoscope "$A" "$F" > diffoscope-22-vs-fdroid.txt || true
 
       - name: diffoscope (24.04 vs F-Droid)
-        if: always()
+        if: failure()
         continue-on-error: true
         run: |
           set -euo pipefail
-          B=artifacts/ubuntu-24.04/app-production-release.apk
+          B=artifacts/ubuntu-24.04/app-production-release-unsigned.apk
           F=$(ls -t artifacts/fdroid/repo/*.apk | head -n1)
           diffoscope "$B" "$F" > diffoscope-24-vs-fdroid.txt || true
 
       - name: Upload reports
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: reproducibility-reports
@@ -118,4 +120,5 @@ jobs:
             diffoscope-22-vs-24.txt
             diffoscope-22-vs-fdroid.txt
             diffoscope-24-vs-fdroid.txt
+          if-no-files-found: ignore
           retention-days: 7
