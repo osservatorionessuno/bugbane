@@ -1,0 +1,6 @@
+Prima release pubblica.
+
+• Procedura guidata per attivare l'ADB Wireless e associare il dispositivo
+• Acquisizione forense di log e configurazioni con un tocco
+• Scansione sul dispositivo con indicatori di compromissione aggiornati periodicamente
+• Esportazione cifrata tramite condivisione di sistema, Signal o email

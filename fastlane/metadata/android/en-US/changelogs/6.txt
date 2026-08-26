@@ -1,0 +1,6 @@
+First public release.
+
+• Guided wizard to enable Wireless ADB and pair with the device
+• One-tap forensic acquisition of device logs and configuration
+• On-device scan against periodically updated indicators of compromise
+• Encrypted export via system share, Signal, or email
