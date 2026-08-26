@@ -2,9 +2,6 @@
 .idea
 .vscode
 build
-gradle/wrapper/
-gradlew
-gradlew.bat
 local.properties
 *.class
 .DS_Store
