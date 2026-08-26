@@ -156,7 +156,15 @@ jobs:
         run: |
           set -euo pipefail
           cd "$TMP_META_DIR"
-          fdroid checkupdates --auto -v "$APPID"
+          # A versionCode bumped ahead of its release tag is the normal state
+          # on pre-release PRs; tolerate exactly that, fail on anything else.
+          if out=$(fdroid checkupdates --auto -v "$APPID" 2>&1); then
+            echo "$out"
+          else
+            echo "$out"
+            echo "$out" | grep -q "current version is newer" || exit 1
+            echo "::notice::checkupdates: version is ahead of the newest tag (pre-release state)"
+          fi
 
       - name: F-Droid rewritemeta + lint
         run: |
