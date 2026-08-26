@@ -144,7 +144,9 @@ jobs:
           echo '== After rewrite =='
           grep -nE '^[[:space:]]*(Repo|commit):' "$APPFILE" || sed -n '1,120p' "$APPFILE"
 
-          git -C "$TMP_META_DIR" add "metadata/${APPID}.yml" "config.yml"
+          # add -A also stages the pruned metadata deletions; fdroidserver
+          # refuses to run on a dirty metadata repo.
+          git -C "$TMP_META_DIR" add -A
           git -C "$TMP_META_DIR" -c user.email=ci@example.invalid -c user.name=CI commit -m "Use custom metadata for ${APPID}" >/dev/null
 
       - name: F-Droid checkupdates
