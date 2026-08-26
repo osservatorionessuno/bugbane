@@ -131,7 +131,6 @@ object AcquisitionProgressTracker {
             }
 
             override fun onModuleComplete(name: String, completed: Int, total: Int, success: Boolean) {
-                _completedModules.value = completed
                 val status = if (success) ModuleScanStatus.Completed else ModuleScanStatus.Error
                 _modules.update { list ->
                     if (list.any { it.name == name }) {
@@ -140,12 +139,14 @@ object AcquisitionProgressTracker {
                         list + ModuleProgress(name, 0L, status)
                     }
                 }
+                syncCompletedCount()
             }
 
             override fun onModuleSkipped(name: String) {
                 _modules.update { list ->
                     list.map { if (it.name == name) it.copy(status = ModuleScanStatus.Skipped) else it }
                 }
+                syncCompletedCount()
             }
 
             override fun isCancelled(): Boolean = adbManager.isQuickForensicsCancelled
@@ -159,14 +160,24 @@ object AcquisitionProgressTracker {
                     .filter { it.status == ModuleScanStatus.Skipped }
                     .map { it.name }
                 when {
-                    skipped.isNotEmpty() -> _skippedForSpace.value = skipped
                     failed.isNotEmpty() -> _failedModules.value = failed
+                    skipped.isNotEmpty() -> _skippedForSpace.value = skipped
                     else -> _pendingAcquisition.value = output
                 }
                 _showDisableReminder.value = true
                 autoAnalyze(appContext, output, failed, skipped)
             }
         })
+    }
+
+    // Count every module that reached a terminal state, including those skipped
+    // for low storage, so the progress ring fills to 100% when the run ends.
+    private fun syncCompletedCount() {
+        _completedModules.value = _modules.value.count {
+            it.status == ModuleScanStatus.Completed ||
+                it.status == ModuleScanStatus.Error ||
+                it.status == ModuleScanStatus.Skipped
+        }
     }
 
     /**
