@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.qf.Module
+import org.osservatorionessuno.qf.rethrowIfCancelled
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbSync
 import java.io.IOException
@@ -23,11 +24,12 @@ class Bugreport : Module {
         writer: ArtifactSink,
         progress: ((Long) -> Unit)?
     ) {
-        // Shell progress is NOT file progress; leave it null.
+        // Shell output is not file progress, so report zero bytes; the callback
+        // must still run so a cancel can abort bugreportz mid-generation.
         val shell = AdbShell(
             manager = manager,
             tag = "ShellQF",
-            progress = null,
+            progress = progress?.let { report -> { _: Long -> report(0L) } },
             timeoutMs = 15 * 60_000L, // 15 min hard cap
             inactivityMs = 60_000L    // bugreportz can be quiet for a while
         )
@@ -78,7 +80,7 @@ class Bugreport : Module {
             runBugreportz(shell, "bugreportz")?.let { return it }
 
             findNewestShellBugreport(shell, startedEpochSec)?.let { return it }
-        }.onFailure {
+        }.rethrowIfCancelled().onFailure {
             Log.w(TAG, "bugreportz invocation failed: ${it.message}")
         }
 
@@ -90,7 +92,7 @@ class Bugreport : Module {
                 Log.d(TAG, "bugreport -f: $line")
             }
             if (remoteFileExists(shell, zipFallback)) return zipFallback
-        }.onFailure {
+        }.rethrowIfCancelled().onFailure {
             Log.w(TAG, "bugreport -f failed: ${it.message}")
         }
 

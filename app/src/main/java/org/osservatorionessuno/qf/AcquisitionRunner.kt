@@ -34,6 +34,18 @@ import org.osservatorionessuno.qf.crypto.SessionKeyCache
 private const val TAG = "AcquisitionRunner"
 
 /**
+ * Thrown from the progress callback to abort a module the moment the user cancels.
+ * Transports must let it propagate rather than retry (see AdbShell).
+ */
+class AcquisitionCancelledException : RuntimeException()
+
+/** Re-throw a cancel swallowed by runCatching so a module's fallbacks don't run. */
+fun <T> Result<T>.rethrowIfCancelled(): Result<T> {
+    exceptionOrNull()?.let { if (it is AcquisitionCancelledException) throw it }
+    return this
+}
+
+/**
  * Entry point used by the UI layer to trigger an AndroidQF-compatible dump.
  *
  * The class wires the ADB connection with a collection of [Module] instances
@@ -208,16 +220,20 @@ class AcquisitionRunner(
                     var lastReportBytes = 0L
                     var lastReportNanos = 0L
                     val progressCb: (Long) -> Unit = { delta ->
-                        moduleBytes += delta
-                        val now = System.nanoTime()
-                        if (moduleBytes - lastReportBytes >= PROGRESS_REPORT_BYTES ||
-                            now - lastReportNanos >= PROGRESS_REPORT_INTERVAL_NANOS
-                        ) {
-                            lastReportBytes = moduleBytes
-                            lastReportNanos = now
-                            listener?.onModuleProgress(module.name, moduleBytes)
+                        // Honor cancellation mid-transfer, not just between modules.
+                        if (listener?.isCancelled() == true) throw AcquisitionCancelledException()
+                        // A zero delta is only a cancel probe; keep the throttle untouched.
+                        if (delta > 0) {
+                            moduleBytes += delta
+                            val now = System.nanoTime()
+                            if (moduleBytes - lastReportBytes >= PROGRESS_REPORT_BYTES ||
+                                now - lastReportNanos >= PROGRESS_REPORT_INTERVAL_NANOS
+                            ) {
+                                lastReportBytes = moduleBytes
+                                lastReportNanos = now
+                                listener?.onModuleProgress(module.name, moduleBytes)
+                            }
                         }
-                        Unit
                     }
                     Log.i(TAG, "Running module ${module.name}")
                     listener?.onModuleStart(module.name, completedCount, total)
@@ -231,9 +247,17 @@ class AcquisitionRunner(
                         Log.i(TAG, "Module ${module.name} finished")
                     } catch (ise: InsufficientStorageException) {
                         Log.w(TAG, "Module ${module.name} hit the storage reserve")
+                    } catch (c: AcquisitionCancelledException) {
+                        // Handled by the flag check below.
                     } catch (t: Throwable) {
                         success = false
                         Log.e(TAG, "Module ${module.name} failed", t)
+                    }
+                    // The flag, not the throw, is authoritative (modules may swallow it in runCatching).
+                    if (listener?.isCancelled() == true) {
+                        Log.i(TAG, "Acquisition cancelled during module ${module.name}")
+                        cancelled = true
+                        break
                     }
                     // The latched guard, not the throw, is authoritative (modules may swallow it).
                     if (writer.outOfSpace) {
