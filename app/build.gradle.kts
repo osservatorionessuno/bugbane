@@ -31,14 +31,12 @@ android {
         }
     }
 
-    signingConfigs {
-        // Auto generated when "debug"
-    }
-
     buildTypes {
         debug {
             buildConfigField("boolean", "CRASH_REPORTING_ENABLED", "false")
         }
+        // Release stays unsigned: F-Droid builds it as-is, and releases are
+        // signed out-of-band with apksigner-pkcs11.sh.
         release {
             buildConfigField("boolean", "CRASH_REPORTING_ENABLED", "true")
             isMinifyEnabled = true
@@ -46,8 +44,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    dependenciesInfo {
+        // Google's dependency-info block is an opaque blob in the signing block;
+        // drop it so signature transplants verify cleanly.
+        includeInApk = false
+        includeInBundle = false
     }
 
     compileOptions {
