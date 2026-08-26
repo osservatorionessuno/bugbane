@@ -41,15 +41,28 @@ if [[ "$VERSION" != "$FDROID_VERSION" ]]; then
 fi
 TAG="${VERSION}${TAG_SUFFIX}"
 
+# Reproducibility guard: the JetBrains Runtime (Android Studio's bundled JDK)
+# orders merged baseline profiles differently than standard OpenJDK builds, so
+# F-Droid's rebuild of assets/dexopt/baseline.prof would not match a
+# JBR-built release. Require a standard JDK (e.g. Temurin 17).
+JAVA_BIN="${JAVA_HOME:+$JAVA_HOME/bin/}java"
+JVM_VENDOR="$("$JAVA_BIN" -XshowSettings:properties -version 2>&1 | sed -n 's/.*java\.vendor = //p')"
+if grep -qi "jetbrains" <<<"$JVM_VENDOR"; then
+  echo "Error: release builds must not use the JetBrains Runtime (java.vendor = $JVM_VENDOR)."
+  echo "Point JAVA_HOME at a standard OpenJDK (e.g. Temurin 17)."
+  exit 1
+fi
+echo "==> JDK vendor: $JVM_VENDOR"
+
 echo "==> ./gradlew $GRADLE_TASKS"
 ./gradlew $GRADLE_TASKS
 
 if [[ -f "$AAB" ]]; then
   echo "==> ./apksigner-pkcs11.sh $AAB"
   ./apksigner-pkcs11.sh "$AAB"
-  mv "$AAB" ./build/bugbane-${VERSION}.aab
-  mv "$AAB.idsig" ./build/bugbane-${VERSION}.aab.idsig
-  echo "Done: ./build/bugbane-${VERSION}.aab"
+  mv "$AAB" ./build/bugbane-${VERSION}${TAG_SUFFIX}.aab
+  mv "$AAB.idsig" ./build/bugbane-${VERSION}${TAG_SUFFIX}.aab.idsig
+  echo "Done: ./build/bugbane-${VERSION}${TAG_SUFFIX}.aab"
 else
   echo "Error: $AAB not found."
   exit 1
@@ -58,9 +71,9 @@ fi
 if [[ -f "$APK" ]]; then
   echo "==> ./apksigner-pkcs11.sh $APK"
   ./apksigner-pkcs11.sh "$APK"
-  mv "$APK" ./build/bugbane-${VERSION}.apk
-  mv "$APK.idsig" ./build/bugbane-${VERSION}.apk.idsig
-  echo "Done: ./build/bugbane-${VERSION}.apk"
+  mv "$APK" ./build/bugbane-${VERSION}${TAG_SUFFIX}.apk
+  mv "$APK.idsig" ./build/bugbane-${VERSION}${TAG_SUFFIX}.apk.idsig
+  echo "Done: ./build/bugbane-${VERSION}${TAG_SUFFIX}.apk"
 else
   echo "Error: $APK not found."
   exit 1
