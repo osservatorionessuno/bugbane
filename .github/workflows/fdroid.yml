@@ -115,6 +115,12 @@ jobs:
           test -f "metadata/${APPID}.yml" || { echo "::error::metadata/${APPID}.yml not found"; exit 1; }
           cp "metadata/${APPID}.yml" "$TMP_META_DIR/metadata/${APPID}.yml"
 
+          # fdroidserver parses every app's metadata (publish validates all of
+          # it), so other apps' files can break this lane — e.g. the pinned
+          # 2.4.5 rejects Taproot bitcoin addresses newer metadata uses. Keep
+          # only our app.
+          find "$TMP_META_DIR/metadata" -name '*.yml' ! -name "${APPID}.yml" -delete
+
           cd "$TMP_META_DIR"
           cat > config.yml <<'YAML'
           repo_url: https://example.invalid/repo
