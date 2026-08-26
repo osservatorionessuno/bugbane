@@ -1,5 +1,6 @@
-Bugbane is licensed under GPL 3.0 terms, except as otherwise noted below
-and/or in individual files.
+Bugbane is licensed under the GNU General Public License, version 3
+(SPDX: GPL-3.0-only), except as otherwise noted below and/or in
+individual files.
 
 Bugbane includes packages and snippets written by third parties.
 The following third party packages/snippets are included, and carry their own
@@ -23,7 +24,7 @@ copyright notices and license terms:
 	<https://github.com/RikkaApps/Shizuku/blob/master/LICENSE>
 
 Bugbane translations are possible thanks to volountaries contributions.
-Translations are licensed under GPL 3.0 terms.
+Translations are licensed under the same GPL-3.0-only terms.
 
 The complete list of translators is available at the following URL:
 <https://hosted.weblate.org/credits/bugbane/>
