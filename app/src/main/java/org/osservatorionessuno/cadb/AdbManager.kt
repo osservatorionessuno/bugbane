@@ -299,7 +299,8 @@ class AdbManager(applicationContext: Context) {
                 // Set the flag otherwise we will be stuck
                 qfCancelled.set(true);
             }
-            catch (e: java.lang.Exception) {
+            // Catch Error too (e.g. OOM) so the acquiring state always resets.
+            catch (e: Throwable) {
                 e.printStackTrace()
                 commandOutput.postValue("Error running QuickForensics: " + e.message)
                 _adbState.value = AdbState.ErrorAcquisition
