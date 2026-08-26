@@ -8,6 +8,7 @@ appId: org.osservatorionessuno.bugbane
 - extendedWaitUntil:
     visible: "Welcome to Bugbane"
     timeout: 60000
+- takeScreenshot: screenshots/01-welcome
 - tapOn:
     text: "^I understand$"
 # CVE vulnerability page: API 34-36 only.
@@ -36,6 +37,7 @@ appId: org.osservatorionessuno.bugbane
 - extendedWaitUntil:
     visible: "Enable Wireless Debugging and Pair"
     timeout: 25000
+- takeScreenshot: screenshots/02-pair-wizard
 - tapOn: "Pair"
 # The app redirects to Settings developer options; scroll to the row and enter it.
 - scrollUntilVisible:

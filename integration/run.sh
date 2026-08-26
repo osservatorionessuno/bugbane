@@ -13,7 +13,7 @@ SUSPICIOUS_APPID=org.osservatorionessuno.fixture.suspicious
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FLOWS="$DIR/maestro"
 ART="${INTEGRATION_ARTIFACTS:-$DIR/artifacts}"
-mkdir -p "$ART"
+mkdir -p "$ART" "$ART/screenshots"
 PKG=org.osservatorionessuno.bugbane
 
 echo "sha=${GITHUB_SHA:-unknown} run=${GITHUB_RUN_NUMBER:-?} ref=${GITHUB_REF_NAME:-?}" > "$ART/RUN_INFO.txt"
@@ -29,7 +29,8 @@ trap capture EXIT
 
 run_flow() {  # <flow-file>
   echo "::group::maestro $1"
-  maestro test "$FLOWS/$1"
+  # Run from $ART so the flows' takeScreenshot steps land in $ART/screenshots.
+  ( cd "$ART" && maestro test "$FLOWS/$1" )
   local rc=$?
   echo "::endgroup::"
   [ "$rc" -eq 0 ] || echo "FLOW FAILED: $1 (rc=$rc)"
@@ -72,7 +73,7 @@ done
 # Enter the code + acquire + export in one flow (no relaunch gap after pairing, where
 # the wireless connection drops and the app reverts to the pair page).
 echo "::group::maestro connect-acquire.yaml"
-maestro test -e CODE="$CODE" "$FLOWS/connect-acquire.yaml"; rc=$?
+( cd "$ART" && maestro test -e CODE="$CODE" "$FLOWS/connect-acquire.yaml" ); rc=$?
 echo "::endgroup::"
 if [ "$rc" -ne 0 ]; then echo "FLOW FAILED: connect-acquire.yaml (rc=$rc)"; exit 1; fi
 

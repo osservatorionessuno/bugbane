@@ -35,6 +35,7 @@ appId: org.osservatorionessuno.bugbane
     visible:
       text: ".*(Ready to Start|Get Started|Acquire Data).*"
     timeout: 90000
+- takeScreenshot: screenshots/03-home-paired
 # --- acquisition + export (same flow, no relaunch gap after pairing) ---
 - runFlow:
     when:
@@ -44,10 +45,12 @@ appId: org.osservatorionessuno.bugbane
 - extendedWaitUntil:
     visible: "Start Acquisition"
     timeout: 20000
+- takeScreenshot: screenshots/04-ready-to-acquire
 - tapOn: "Start Acquisition"
 - extendedWaitUntil:
     visible: "Export"
     timeout: 1200000
+- takeScreenshot: screenshots/05-acquisition-complete
 # Auto-analysis runs after acquisition and disables Export until it finishes (slow on
 # CI). CRITICAL is bugbane's own detection of the planted pred.so IOC (cross-checked
 # against MVT host-side) and doubles as the analysis-done gate.
@@ -55,6 +58,7 @@ appId: org.osservatorionessuno.bugbane
     visible:
       text: ".*CRITICAL.*"
     timeout: 300000
+- takeScreenshot: screenshots/06-scan-results
 # Tapping Export right after can race the SAF picker, so retry until SAVE shows.
 - repeat:
     times: 3
@@ -73,3 +77,4 @@ appId: org.osservatorionessuno.bugbane
 - extendedWaitUntil:
     visible: "Copy to clipboard"
     timeout: 120000
+- takeScreenshot: screenshots/07-export-passphrase
