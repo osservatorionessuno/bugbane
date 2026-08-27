@@ -25,9 +25,9 @@ Builds:
   - versionName: 0.2.3
     versionCode: 9
     commit: 0.2.3
+    subdir: app
     gradle:
       - production
-    output: app/build/outputs/apk/production/release/app-production-release-unsigned.apk
 
 AllowedAPKSigningKeys: 8d301b7e49106b30011fe36d869ffd313ce8115a44f4c4abdfd48f8507b42c50
 
