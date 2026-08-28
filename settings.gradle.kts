@@ -1,3 +1,5 @@
+import org.gradle.api.artifacts.verification.DependencyVerificationMode
+
 pluginManagement {
     repositories {
         google {
@@ -33,14 +35,18 @@ val useLocalLibmvt = providers.gradleProperty("libmvtLocal")
     .toBoolean()
 
 if (useLocalLibmvt) {
-    // Instead of downloading libmvt from GitHub
-    // Fall back on the local libmvt.
+    // Included libmvt resolves its own plugin classpath (Plugin Portal POMs),
+    // which is not the same set of checksums as the JitPack libmvt jar.
+    gradle.startParameter.dependencyVerificationMode = DependencyVerificationMode.OFF
     includeBuild("../libmvt") {
         dependencySubstitution {
             substitute(module("com.github.osservatorionessuno:libmvt"))
                 .using(project(":"))
         }
     }
-    println("using local LibMVT")
+    println("using local LibMVT, dependency verification is off")
+    if (gradle.startParameter.taskNames.any { "Production" in it }) {
+        throw GradleException("Cannot build the production flavor with libmvtLocal=true. Unset libmvtLocal for a production build.")
+    }
 }
 

@@ -3,6 +3,15 @@
    <configuration>
       <verify-metadata>true</verify-metadata>
       <verify-signatures>false</verify-signatures>
+      <!-- IDE Gradle sync downloads sources/javadoc and the Gradle distribution src zip
+           for navigation. They are not used at compile or runtime. Trust them so
+           verification still covers the artifacts that actually ship in the app. -->
+      <trusted-artifacts>
+         <trust file=".*-javadoc[.]jar" regex="true"/>
+         <trust file=".*-sources[.]jar" regex="true"/>
+         <trust group="gradle" name="gradle" file="gradle-.*-src[.]zip" regex="true"/>
+         <trust group="gradle" name="gradle" file="gradle-.*-docs[.]zip" regex="true"/>
+      </trusted-artifacts>
    </configuration>
    <components>
       <component group="androidx.activity" name="activity" version="1.10.1">
