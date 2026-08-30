@@ -53,7 +53,12 @@ def main(path, passphrase, stix2, expected):
     hit = [m for m in matches if expected in m or m in expected]
     if not hit:
         raise AssertionError("MVT did not flag %r; matched: %s" % (expected, matches))
-    print("MVT cross-check OK: %r matched %s" % (expected, hit), flush=True)
+    # Specificity: the planted IOC must be the only match — anything else is a
+    # false positive in the indicators or the collection.
+    stray = [m for m in matches if m not in hit]
+    if stray:
+        raise AssertionError("MVT matched indicators beyond the planted %r: %s" % (expected, stray))
+    print("MVT cross-check OK: %r matched %s, no stray matches" % (expected, hit), flush=True)
 
 
 if __name__ == "__main__":
