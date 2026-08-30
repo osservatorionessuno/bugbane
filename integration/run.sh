@@ -92,10 +92,11 @@ run_flow set-password.yaml || exit 1
 NAME="$(adb shell 'ls -t /sdcard/Download/' | tr -d '\r' | grep -m1 '\.zip\.age$')"
 if [ -z "$NAME" ]; then echo "NO EXPORT IN DOWNLOADS"; exit 1; fi
 adb pull "/sdcard/Download/$NAME" "$ART/$NAME"
-# --sideloaded: the harness adb-installs exactly bugbane (+ the fixture); any other
-# package the acquisition marks as sideloaded is a false positive and fails here.
+# --sideloaded: the harness adb-installs exactly bugbane, Maestro's on-device driver
+# apps (+ the fixture); any other package the acquisition marks as sideloaded is a
+# false positive and fails here.
 python3 "$DIR/verify_export.py" "$ART/$NAME" "$PASSPHRASE" ${FIXTURE:+"$SUSPICIOUS_APPID"} \
-  --sideloaded "$PKG${FIXTURE:+,$SUSPICIOUS_APPID}" || exit 1
+  --sideloaded "$PKG,dev.mobile.maestro,dev.mobile.maestro.test${FIXTURE:+,$SUSPICIOUS_APPID}" || exit 1
 
 # Cross-check: upstream MVT must independently flag the planted IOC in the decrypted
 # export, using bugbane's own bundled indicators (same IOC set on both sides).
