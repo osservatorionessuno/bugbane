@@ -141,3 +141,159 @@ jobs:
           name: integration-artifacts-api${{ matrix.api-level }}-run${{ github.run_number }}
           path: integration/artifacts/
           retention-days: 7
+
+  # /e/OS (Murena) lanes — the only open-source ROM shipping official prebuilt
+  # x86_64 emulator images (userdebug, sdk_phone_x86_64 target):
+  # https://doc.e.foundation/os/how-to/emulator
+  # The image isn't in Google's sdkmanager repo, and android-emulator-runner
+  # unconditionally sdkmanager-installs its system image, so this job seeds the
+  # image directory and drives avdmanager/emulator by hand instead.
+  #
+  # Two flavors: `pinned` is a fixed dev-channel build (sha256 in-repo) and
+  # gates the PR; `latest` floats on the test channel's newest build as an
+  # early-warning canary for upstream /e/OS changes (including new Android
+  # bases) and never blocks the PR.
+  test-eos:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    continue-on-error: ${{ matrix.flavor == 'latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [pinned, latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: integration-apk
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: integration-fixture-apk
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK (emulator + tools, no system image)
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platforms;android-36 platform-tools emulator
+
+      - name: Install Maestro + host dependencies
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          pip install -r integration/requirements.txt
+
+      - name: Install /e/OS system image
+        # pinned: fixed build from the dev channel, which keeps history. To
+        # bump: browse https://ota.ecloud.global/dev/sdk_phone_x86_64/ and
+        # update both vars. The sha256 is pinned in-repo on purpose: don't
+        # replace it with the server's .sha256sum file.
+        # latest: newest build on the test channel (only ever serves one),
+        # integrity-checked in transit against the server's .sha256sum.
+        # Either way the API level is derived from the aNN in the filename
+        # (Android NN = API NN+20, valid since Android 15).
+        env:
+          EOS_IMAGE: IMG-e-4.2-a16-20260815662914-community-sdk_phone_x86_64.zip
+          EOS_SHA256: 90340954d1b26bf5b1b089a89886257aa45c42e4f6b6bf4dcdd860be2e826826
+        run: |
+          if [ "${{ matrix.flavor }}" = pinned ]; then
+            ZIP="$EOS_IMAGE"
+            curl -fL -o eos.zip "https://ota.ecloud.global/dev/sdk_phone_x86_64/$ZIP"
+            echo "$EOS_SHA256  eos.zip" | sha256sum --check
+          else
+            BASE=https://ota.ecloud.global/test/sdk_phone_x86_64
+            ZIP=$(curl -fsSL "$BASE/" | grep -oE 'IMG-e-[0-9.]+-a[0-9]+-[0-9]+-test-sdk_phone_x86_64\.zip' | head -1)
+            if [ -z "$ZIP" ]; then echo "::error::no build resolved from $BASE — naming scheme changed?"; exit 1; fi
+            curl -fL -o eos.zip "$BASE/$ZIP"
+            curl -fsSL "$BASE/$ZIP.sha256sum" | sed "s|$ZIP|eos.zip|" | sha256sum --check
+          fi
+          echo "Using $ZIP"
+          API=$(( $(echo "$ZIP" | sed -E 's/^IMG-e-[0-9.]+-a([0-9]+)-.*/\1/') + 20 ))
+          echo "EOS_API=$API" >> "$GITHUB_ENV"
+          IMGDIR="$ANDROID_HOME/system-images/android-$API/lineage"
+          mkdir -p "$IMGDIR"
+          unzip -q eos.zip -d "$IMGDIR"
+          rm eos.zip
+          # package.xml from https://doc.e.foundation/os/how-to/emulator
+          # so avdmanager accepts the package string.
+          cat > "$IMGDIR/x86_64/package.xml" <<EOF
+          <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <ns2:repository xmlns:ns2="http://schemas.android.com/repository/android/common/02" xmlns:ns12="http://schemas.android.com/sdk/android/repo/sys-img2/03">
+            <localPackage path="system-images;android-$API;lineage;x86_64" obsolete="false">
+              <type-details xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="ns12:sysImgDetailsType">
+                <api-level>$API</api-level>
+                <base-extension>true</base-extension>
+                <tag>
+                  <id>lineage</id>
+                  <display>LineageOS</display>
+                </tag>
+                <abi>x86_64</abi>
+              </type-details>
+              <revision>
+                <major>1</major>
+              </revision>
+              <display-name>LineageOS x86_64 System Image</display-name>
+            </localPackage>
+          </ns2:repository>
+          EOF
+
+      - name: Create AVD
+        # pin ANDROID_AVD_HOME (exported for the launch step too): the runner's
+        # SDK env otherwise sends avdmanager elsewhere than ~/.android/avd
+        run: |
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          echo no | avdmanager create avd --name eos --package "system-images;android-$EOS_API;lineage;x86_64" --device pixel_5
+          # sizing to match the matrix lanes (last duplicate key wins)
+          cat >> "$ANDROID_AVD_HOME/eos.avd/config.ini" <<CFG
+          hw.cpu.ncore=2
+          hw.ramSize=4096
+          disk.dataPartition.size=8192M
+          CFG
+
+      - name: Run integration E2E (Maestro)
+        run: |
+          "$ANDROID_HOME/emulator/emulator" -avd eos -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot &
+          EMUPID=$!
+          trap 'adb emu kill 2>/dev/null || true; kill "$EMUPID" 2>/dev/null || true' EXIT
+          adb wait-for-device
+          timeout 900 sh -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = "1" ]; do sleep 5; done'
+          # what android-emulator-runner's disable-animations does for the matrix lanes
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          # defensive: skip any first-boot setup wizard so it can't hold the UI
+          adb shell settings put global device_provisioned 1 || true
+          adb shell settings put secure user_setup_complete 1 || true
+          adb shell pm disable-user --user 0 org.lineageos.setupwizard 2>/dev/null || true
+          # record the booted build in the artifacts (run.sh owns RUN_INFO.txt)
+          mkdir -p integration/artifacts
+          adb shell getprop ro.build.fingerprint > integration/artifacts/EOS_BUILD.txt || true
+          adb shell getprop ro.lineage.version >> integration/artifacts/EOS_BUILD.txt || true
+          ./integration/run.sh app-production-release.apk suspicious-apk-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-artifacts-eos-${{ matrix.flavor }}-run${{ github.run_number }}
+          path: integration/artifacts/
+          retention-days: 7

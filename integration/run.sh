@@ -51,6 +51,14 @@ adb shell settings put global hide_error_dialogs 1 || true
 # bugbane's pairing notification; disable it device-wide.
 adb shell settings put system notification_cooldown_enabled 0 || true
 adb shell settings put system notification_cooldown_all 0 || true
+# /e/OS ships an enabled password manager whose "Save credentials" sheet covers
+# the app after password entry; disable autofill/credman device-wide (no-op on
+# stock images). "null" is unparseable as a component, i.e. no service.
+adb shell settings put secure autofill_service null || true
+adb shell settings put secure credential_service null || true
+adb shell settings put secure credential_service_primary null || true
+# The default 2M logcat buffer wraps before the run ends, losing early evidence.
+adb logcat -G 16M || true
 adb install -r -g "$APK"
 # A benign "suspicious" APK (accessibility service): the acquisition's Packages module
 # must flag it and stage it into the archive, asserted host-side in verify_export.py.
@@ -69,11 +77,16 @@ run_flow pair.yaml || exit 1
 CODE="$(maestro hierarchy 2>/dev/null | python3 "$DIR/scrape.py" code)"
 if [ -z "$CODE" ]; then echo "PAIRING CODE SCRAPE FAILED"; exit 1; fi
 echo "pairing code = $CODE"
-for _ in $(seq 1 30); do
+NOTIF_SEEN=
+for _ in $(seq 1 60); do
   adb shell cmd statusbar expand-notifications || true
-  if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then break; fi
+  if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then NOTIF_SEEN=1; break; fi
   sleep 3
 done
+if [ -z "$NOTIF_SEEN" ]; then
+  echo "PAIRING NOTIFICATION NOT SEEN AFTER 3min (continuing; the flow waits once more)"
+  maestro hierarchy > "$ART/pairing-wait-hierarchy.json" 2>/dev/null || true
+fi
 # Enter the code + acquire + export in one flow (no relaunch gap after pairing, where
 # the wireless connection drops and the app reverts to the pair page).
 echo "::group::maestro connect-acquire.yaml"
