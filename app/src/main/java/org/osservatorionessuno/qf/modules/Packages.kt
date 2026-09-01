@@ -277,16 +277,26 @@ class Packages : Module {
         val byName = packages.associateBy { it.name }
         for ((fieldName, arg) in filters) {
             val setFlag = fieldMap[fieldName]
-            try {
-                shell.execForEachLine("pm list packages $arg") { line ->
-                    val packageName = line.trim().removePrefix("package:")
-                    if (packageName.isBlank()) return@execForEachLine
+            val markLine = { line: String ->
+                val packageName = line.trim().removePrefix("package:")
+                if (packageName.isNotBlank()) {
                     byName[packageName]?.let { p ->
                         setFlag?.invoke(p)
                     }
                 }
+            }
+            // "-u" keeps each flag pass on the same package set as the enumeration above;
+            // without it, a system package not installed for user 0 (e.g. the Android 16
+            // private-space app) is never marked system and reads as sideloaded.
+            try {
+                shell.execForEachLine("pm list packages $arg -u", markLine)
             } catch (_: Throwable) {
-                continue
+                // Same Samsung quirk as the enumeration fallback: retry scoped to user 0.
+                try {
+                    shell.execForEachLine("pm list packages $arg -u --user 0", markLine)
+                } catch (_: Throwable) {
+                    continue
+                }
             }
         }
 
