@@ -1,0 +1,37 @@
+name: Report a bug
+description: Things that were working earlier but don't anymore
+labels: ["bug", "triage"]
+body:
+    - type: markdown
+      attributes:
+          value: |
+              **Preliminary check**
+              Open a issue only after you've searched for existing ones [on Bugbane](https://github.com/search?q=repo%3Aosservatorionessuno%2Fbugbane+&type=issues) and on [libmvt](https://github.com/search?q=repo%3Aosservatorionessuno%2Flibmvt+&type=issues)
+    - type: textarea
+      attributes:
+          label: Description
+    - type: input
+      attributes:
+          label: Version
+          description: The version can be seen at the top of the Settings screen.
+          placeholder: e.g. v1.2.3
+    - type: input
+      attributes:
+          label: Device
+          description: The target device that you are performing the acquisition from
+          placeholder: e.g. Google Pixel 10, Fairphone 6, Nothing Phone 4a Pro, etc
+    - type: input
+      attributes:
+          label: Android Version
+          description: The Android Version that the device is running
+          placeholder: e.g. Android 16
+    - type: upload
+      id: screenshots
+      attributes:
+        label: Upload screenshots
+        description: If applicable, add screenshots to help explain your problem.
+      validations:
+        required: false
+    - type: markdown
+      attributes:
+          value: Thank you for reporting this and helping Bugbane! ❤️
