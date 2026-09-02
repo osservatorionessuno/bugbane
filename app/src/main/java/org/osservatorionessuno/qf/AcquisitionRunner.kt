@@ -33,6 +33,9 @@ import org.osservatorionessuno.qf.crypto.SessionKeyCache
 
 private const val TAG = "AcquisitionRunner"
 
+/** Thrown from the progress callback to abort a module the moment the user cancels. */
+private class AcquisitionCancelledException : RuntimeException()
+
 /**
  * Entry point used by the UI layer to trigger an AndroidQF-compatible dump.
  *
@@ -208,6 +211,8 @@ class AcquisitionRunner(
                     var lastReportBytes = 0L
                     var lastReportNanos = 0L
                     val progressCb: (Long) -> Unit = { delta ->
+                        // Honor cancellation mid-transfer, not just between modules.
+                        if (listener?.isCancelled() == true) throw AcquisitionCancelledException()
                         moduleBytes += delta
                         val now = System.nanoTime()
                         if (moduleBytes - lastReportBytes >= PROGRESS_REPORT_BYTES ||
@@ -231,6 +236,10 @@ class AcquisitionRunner(
                         Log.i(TAG, "Module ${module.name} finished")
                     } catch (ise: InsufficientStorageException) {
                         Log.w(TAG, "Module ${module.name} hit the storage reserve")
+                    } catch (c: AcquisitionCancelledException) {
+                        Log.i(TAG, "Acquisition cancelled during module ${module.name}")
+                        cancelled = true
+                        break
                     } catch (t: Throwable) {
                         success = false
                         Log.e(TAG, "Module ${module.name} failed", t)
