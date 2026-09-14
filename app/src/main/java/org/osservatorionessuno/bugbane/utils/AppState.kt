@@ -14,6 +14,7 @@ enum class AppState(val step: Int) {
     NeedAdbVulnerabilityWarning(1),
     NeedNotificationPermission(1),
     DeviceUnsupported(1), // Alternative to step 1: device isn't compatible
+    DebuggingRestricted(1), // Alternative to step 1: an admin (MDM) blocks debugging features
     // Lock the acquisition encryption key to the device (one fingerprint). Only
     // shown on devices with a hardware keystore and a secure lock; otherwise the
     // password is asked after the first acquisition instead.
@@ -38,7 +39,7 @@ enum class AppState(val step: Int) {
     companion object {
         // Error states have different UI implications
         fun isErrorState(state: AppState): Boolean {
-            return (state in arrayOf(DeviceUnsupported, AdbConnectionError))
+            return (state in arrayOf(DeviceUnsupported, DebuggingRestricted, AdbConnectionError))
         }
         fun distinctSteps(): Int {
             return entries

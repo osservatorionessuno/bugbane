@@ -15,6 +15,11 @@
     \n</string>
     <string name="slideshow_unsupported_version">Sorry, Bugbane is not supported on Android versions lower than 11 (API level 30). Please use AndroidQF or MVT from a trusted computer.</string>
     <string name="slideshow_button_exit">Exit</string>
+    <string name="slideshow_restricted_title">This device is managed</string>
+    <string name="slideshow_restricted_description">Bugbane cannot run on this device. A device administrator (for example a work or school MDM policy) has disabled debugging features, so ADB Wireless Debugging cannot be enabled.
+    \n\n
+    If this is a work device, use AndroidQF or MVT from a trusted computer instead. If you did not expect this device to be managed, that is itself worth investigating.</string>
+    <string name="slideshow_restricted_button">Show who manages this device</string>
     <string name="slideshow_welcome_button">I understand</string>
 
     <string name="slideshow_wifi_title">Connect to a Trusted Wi-Fi Network</string>

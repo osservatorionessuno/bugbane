@@ -2,12 +2,14 @@ package org.osservatorionessuno.bugbane.utils
 
 import android.app.Activity
 import android.app.Application
+import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.content.Intent
 import android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
 import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
 import android.os.Build
 import android.os.Bundle
+import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -83,7 +85,8 @@ class ConfigurationViewModel private constructor(
         val notificationsEnabled: Boolean,
         val developerOptionsEnabled: Boolean,
         val wirelessDebuggingEnabled: Boolean,
-        val wifiConnected: Boolean
+        val wifiConnected: Boolean,
+        val debuggingRestricted: Boolean,
     )
 
     /**
@@ -97,8 +100,9 @@ class ConfigurationViewModel private constructor(
                 configurationManager.developerOptionsEnabled,
                 configurationManager.wirelessDebuggingEnabled,
                 wifiConnectivityMonitor.wifiState,
-            ) { notifications, devOpts, wirelessDebug, wifiConnected ->
-                SettingsState(notifications, devOpts, wirelessDebug, wifiConnected) }
+                configurationManager.debuggingRestricted,
+            ) { notifications, devOpts, wirelessDebug, wifiConnected, restricted ->
+                SettingsState(notifications, devOpts, wirelessDebug, wifiConnected, restricted) }
 
             combine(settingsFlow, adbManager.adbState, appManager.appProgress) { settings, adbState, appProgress ->
                 if (adbState == AdbState.RequisitesMissing) {
@@ -121,6 +125,7 @@ class ConfigurationViewModel private constructor(
                     settings.developerOptionsEnabled,
                     settings.wirelessDebuggingEnabled,
                     settings.wifiConnected,
+                    settings.debuggingRestricted,
                     adbState,
                     appProgress)
             }.distinctUntilChanged()
@@ -146,11 +151,14 @@ class ConfigurationViewModel private constructor(
         developerOptionsEnabled: Boolean,
         wirelessDebuggingEnabled: Boolean,
         isConnectedToWifi: Boolean,
+        debuggingRestricted: Boolean,
         adbState: AdbState,
         appProgress: SlideshowManager.AppProgress,
     ): AppState {
         // TODO: This can be defined in the manifest if it's just about API level
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return AppState.DeviceUnsupported
+        // The restriction can leave DEVELOPMENT_SETTINGS_ENABLED at 1, so check it first.
+        if (debuggingRestricted) return AppState.DebuggingRestricted
         if (!appProgress.hasSeenWelcomeScreen) return AppState.NeedWelcomeScreen
         // The order of these checks defines the onboarding order.
         // Beta builds gate onboarding on a "use at your own risk" warning, once.
@@ -230,6 +238,17 @@ class ConfigurationViewModel private constructor(
         when (currentState) {
             AppState.DeviceUnsupported -> {
                 (appContext as? Activity)?.finishAffinity()
+            }
+
+            AppState.DebuggingRestricted -> {
+                // System dialog naming the admin that set the restriction.
+                appContext.getSystemService(DevicePolicyManager::class.java)
+                    ?.createAdminSupportIntent(UserManager.DISALLOW_DEBUGGING_FEATURES)
+                    ?.let {
+                        it.addFlags(FLAG_ACTIVITY_NEW_TASK)
+                        runCatching { appContext.startActivity(it) }
+                            .onFailure { e -> Log.w(TAG, "No activity for admin support intent", e) }
+                    }
             }
 
             AppState.NeedWelcomeScreen -> {
