@@ -5,6 +5,7 @@ import android.content.Intent
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
+import android.os.UserManager
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
@@ -39,6 +40,8 @@ object ConfigurationManager {
     val wirelessDebuggingEnabled: StateFlow<Boolean> = _wirelessDebuggingEnabled.asStateFlow()
     private val _notificationsEnabled = MutableStateFlow(false)
     val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled.asStateFlow()
+    private val _debuggingRestricted = MutableStateFlow(false)
+    val debuggingRestricted: StateFlow<Boolean> = _debuggingRestricted.asStateFlow()
 
     fun initialize(context: Context) {
         if (!::appContext.isInitialized) {
@@ -80,9 +83,16 @@ object ConfigurationManager {
 
     // Run all checks
     fun checkAll() {
+        debuggingRestrictedCheck()
         developerOptionsCheck()
         wirelessDebugCheck()
         notificationsCheck()
+    }
+
+    // MDMs block Developer Options and adb through this restriction. No change broadcast exists, so re-read on every checkAll().
+    private fun debuggingRestrictedCheck() {
+        val um = appContext.getSystemService(UserManager::class.java)
+        _debuggingRestricted.value = um?.hasUserRestriction(UserManager.DISALLOW_DEBUGGING_FEATURES) == true
     }
 
     private fun developerOptionsCheck() {

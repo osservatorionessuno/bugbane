@@ -38,6 +38,12 @@ fun getSlideshowScreenContent(state: AppState): SlideshowPageData {
             icon = ImageVector.Companion.vectorResource(R.drawable.ic_bugbane_zoom),
             buttonText = stringResource(R.string.slideshow_button_exit),
         )
+        AppState.DebuggingRestricted -> return SlideshowPageData(
+            title = stringResource(R.string.slideshow_restricted_title),
+            description = stringResource(R.string.slideshow_restricted_description),
+            icon = ImageVector.Companion.vectorResource(R.drawable.ic_bugbane_zoom),
+            buttonText = stringResource(R.string.slideshow_restricted_button),
+        )
         AppState.NeedWelcomeScreen -> return SlideshowPageData(
             title = stringResource(R.string.slideshow_welcome_title),
             description = stringResource(R.string.slideshow_welcome_description),
