@@ -14,6 +14,8 @@ class ShellInactivityException(message: String, cause: Throwable? = null) : IOEx
 class AdbShell(
     private val manager: AdbConnectionManager,
     private val tag: String = "AdbShell",
+    // Called with the bytes of each output chunk, and with 0 while the command is
+    // silent; it may throw to abort the command (user cancel).
     private val progress: ((Long) -> Unit)? = null,
     // Generous defaults: full dumpsys/logcat dumps run for minutes and can stay quiet ~10s.
     private val timeoutMs: Long = 5 * 60_000L,
@@ -22,6 +24,8 @@ class AdbShell(
     companion object {
         private const val RETRIES = 1
         private const val READ_BUFFER_SIZE = 1 shl 20
+        // How long a silent read waits before probing the progress callback for a cancel.
+        private val PROBE_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(1)
     }
 
     @Deprecated("This method buffers and could use a lot of memory. Use execToStream or execForEachLine whenever possible")
@@ -203,8 +207,18 @@ class AdbShell(
         timeoutMs: Long
     ): Int {
         val f = executor.submit<Int> { input.read(buf, off, len) }
-        return try {
-            f.get(timeoutMs, TimeUnit.MILLISECONDS)
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
+        try {
+            while (true) {
+                val remaining = deadline - System.nanoTime()
+                if (remaining <= 0) throw TimeoutException()
+                try {
+                    return f.get(minOf(remaining, PROBE_INTERVAL_NANOS), TimeUnit.NANOSECONDS)
+                } catch (e: TimeoutException) {
+                    // Quiet command: give the callback a chance to abort on user cancel.
+                    progress?.invoke(0L)
+                }
+            }
         } catch (e: TimeoutException) {
             f.cancel(true)
             throw e
