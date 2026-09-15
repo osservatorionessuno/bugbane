@@ -64,6 +64,15 @@ adb install -r -g "$APK"
 # Plant a known Predator file-path IOC (present in the bundled indicator set) so the
 # acquisition captures it; bugbane and MVT must both flag it (cross-check below).
 adb shell 'mkdir -p /data/local/tmp/wd && echo planted > /data/local/tmp/wd/pred.so' || true
+# A user-imported IOC set on top of the feed: plant its file-path marker and push the
+# fixture to Downloads, where import-iocs.yaml picks it via the system file picker.
+CUSTOM_IOCS="$DIR/fixtures/e2e-iocs.stix2"
+CUSTOM_MARKER=/data/local/tmp/bugbane-e2e/custom-marker.so
+adb shell "mkdir -p $(dirname "$CUSTOM_MARKER") && echo planted > $CUSTOM_MARKER" || true
+adb push "$CUSTOM_IOCS" /sdcard/Download/e2e-iocs.stix2
+adb shell content call --uri content://media/external/file --method scan_file \
+  --arg /storage/emulated/0/Download/e2e-iocs.stix2 >/dev/null 2>&1 || true
+CUSTOM_SHA="$(shasum -a 256 "$CUSTOM_IOCS" | cut -d' ' -f1)"
 
 # Onboard + open the Settings pairing dialog (6-digit code left on screen).
 # Restartable (clears app state): one retry absorbs a transient dialog or a slow start.
@@ -80,10 +89,11 @@ for _ in $(seq 1 30); do
   if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then break; fi
   sleep 3
 done
-# Enter the code + acquire + export in one flow (no relaunch gap after pairing, where
-# the wireless connection drops and the app reverts to the pair page).
+# Enter the code + import the custom IOCs + acquire + export in one flow (no relaunch
+# gap after pairing, where the wireless connection drops and the app reverts to the
+# pair page).
 echo "::group::maestro connect-acquire.yaml"
-maestro test -e CODE="$CODE" "$FLOWS/connect-acquire.yaml"; rc=$?
+maestro test -e CODE="$CODE" -e IOCS_SHA256="$CUSTOM_SHA" "$FLOWS/connect-acquire.yaml"; rc=$?
 echo "::endgroup::"
 if [ "$rc" -ne 0 ]; then echo "FLOW FAILED: connect-acquire.yaml (rc=$rc)"; exit 1; fi
 
@@ -108,10 +118,12 @@ adb pull "/sdcard/Download/$NAME" "$ART/$NAME"
 python3 "$DIR/verify_export.py" "$ART/$NAME" "$PASSPHRASE" ${FIXTURE:+"$SUSPICIOUS_APPID"} \
   --sideloaded "$PKG,dev.mobile.maestro,dev.mobile.maestro.test${FIXTURE:+,$SUSPICIOUS_APPID}" || exit 1
 
-# Cross-check: upstream MVT must independently flag the planted IOC in the decrypted
-# export, using bugbane's own bundled indicators (same IOC set on both sides).
+# Cross-check: upstream MVT must independently flag both planted IOCs in the decrypted
+# export, fed the same two sets bugbane used (bundled feed + the imported custom file).
 cp "$(dirname "$DIR")/app/src/main/assets/bundled-indicators/indicators.json" "$ART/indicators.stix2"
-python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" "$ART/indicators.stix2" "/data/local/tmp/wd/pred.so" || exit 1
-adb shell 'rm -rf /data/local/tmp/wd' || true
+python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" \
+  -i "$ART/indicators.stix2" -i "$CUSTOM_IOCS" \
+  -e "/data/local/tmp/wd/pred.so" -e "$CUSTOM_MARKER" || exit 1
+adb shell "rm -rf /data/local/tmp/wd $(dirname "$CUSTOM_MARKER")" || true
 
 echo "INTEGRATION E2E PASS"
