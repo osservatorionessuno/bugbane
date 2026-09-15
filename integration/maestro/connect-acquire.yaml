@@ -36,6 +36,9 @@ appId: org.osservatorionessuno.bugbane
       text: ".*(Ready to Start|Get Started|Acquire Data).*"
     timeout: 90000
 - takeScreenshot: screenshots/03-home-paired
+# Import the custom IOC set now (same process, so the wireless connection stays up),
+# so the auto-analysis below runs against feed + custom indicators.
+- runFlow: import-iocs.yaml
 # --- acquisition + export (same flow, no relaunch gap after pairing) ---
 - runFlow:
     when:
@@ -59,6 +62,8 @@ appId: org.osservatorionessuno.bugbane
       text: ".*CRITICAL.*"
     timeout: 300000
 - takeScreenshot: screenshots/06-scan-results
+# The custom set must have matched too (its planted marker, see run.sh).
+- runFlow: check-custom-ioc.yaml
 # Tapping Export right after can race the SAF picker, so retry until SAVE shows.
 - repeat:
     times: 3

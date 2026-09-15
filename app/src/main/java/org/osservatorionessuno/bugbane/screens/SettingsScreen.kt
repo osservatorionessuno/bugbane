@@ -5,15 +5,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -21,7 +24,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.res.pluralStringResource
 import org.osservatorionessuno.bugbane.BuildConfig
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.components.MIN_ACQUISITION_PASSWORD_LENGTH
@@ -29,6 +37,8 @@ import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.osservatorionessuno.bugbane.update.CustomIndicatorStore
+import org.osservatorionessuno.bugbane.update.IndicatorFileInspector
 import org.osservatorionessuno.bugbane.update.IndicatorStore
 import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
 import org.osservatorionessuno.qf.crypto.AndroidKeystoreKeyVault
@@ -110,6 +120,9 @@ fun SettingsScreen() {
             }
         }
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        CustomIndicatorsCard(formatEpoch = ::formatEpoch)
         Spacer(modifier = Modifier.height(16.dp))
 
         // Only the passphrase tiers have a password to change.
@@ -214,6 +227,186 @@ fun SettingsScreen() {
             }
         }
     }
+}
+
+/**
+ * User-imported indicator sets ([CustomIndicatorStore]): pick a file, validate + copy it into
+ * the app, list what is imported (name, count, SHA-256) and remove entries.
+ */
+@Composable
+private fun CustomIndicatorsCard(formatEpoch: (Long?) -> String) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val store = remember { CustomIndicatorStore(context) }
+    var entries by remember { mutableStateOf<List<CustomIndicatorStore.Entry>>(emptyList()) }
+    var working by remember { mutableStateOf(false) }
+    var toRemove by remember { mutableStateOf<CustomIndicatorStore.Entry?>(null) }
+
+    LaunchedEffect(Unit) {
+        entries = withContext(Dispatchers.IO) { store.list() }
+    }
+
+    fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+
+    fun import(uri: Uri) {
+        working = true
+        scope.launch {
+            val message = try {
+                withContext(Dispatchers.IO) {
+                    val name = displayName(context, uri)
+                    val result = context.contentResolver.openInputStream(uri)?.use { store.import(name, it) }
+                        ?: return@withContext context.getString(R.string.settings_custom_indicators_read_error)
+                    entries = store.list()
+                    when (result) {
+                        is CustomIndicatorStore.ImportResult.Imported ->
+                            context.getString(R.string.settings_custom_indicators_success, result.entry.name)
+                        is CustomIndicatorStore.ImportResult.Duplicate ->
+                            context.getString(R.string.settings_custom_indicators_duplicate)
+                        is CustomIndicatorStore.ImportResult.Rejected -> when (result.problem) {
+                            IndicatorFileInspector.Problem.MALFORMED_JSON -> context.getString(R.string.settings_custom_indicators_malformed)
+                            IndicatorFileInspector.Problem.UNSUPPORTED_FORMAT -> context.getString(R.string.settings_custom_indicators_unsupported)
+                            IndicatorFileInspector.Problem.NO_INDICATORS -> context.getString(R.string.settings_custom_indicators_none_found)
+                            IndicatorFileInspector.Problem.TOO_LARGE ->
+                                context.getString(R.string.settings_custom_indicators_too_large, CustomIndicatorStore.MAX_BYTES / (1024 * 1024))
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                context.getString(R.string.settings_custom_indicators_read_error)
+            } finally {
+                working = false
+            }
+            toast(message)
+        }
+    }
+
+    // .stix2 has no registered MIME type, so accept anything and validate the content instead.
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) import(uri)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = stringResource(R.string.settings_custom_indicators_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_custom_indicators_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (entries.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.settings_custom_indicators_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                )
+            }
+            entries.forEachIndexed { i, entry ->
+                if (i > 0) HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                CustomIndicatorRow(entry, formatEpoch, enabled = !working) { toRemove = entry }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { picker.launch(arrayOf("*/*")) },
+                enabled = !working,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (working) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(20.dp))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.settings_custom_indicators_import),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                )
+            }
+        }
+    }
+
+    val target = toRemove ?: return
+    AlertDialog(
+        onDismissRequest = { toRemove = null },
+        title = { Text(stringResource(R.string.settings_custom_indicators_remove_title)) },
+        text = { Text(stringResource(R.string.settings_custom_indicators_remove_message, target.name)) },
+        confirmButton = {
+            TextButton(onClick = {
+                toRemove = null
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        store.remove(target)
+                        entries = store.list()
+                    }
+                    Toast.makeText(context, R.string.settings_custom_indicators_removed, Toast.LENGTH_SHORT).show()
+                }
+            }) { Text(stringResource(R.string.settings_custom_indicators_remove_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = { toRemove = null }) { Text(stringResource(android.R.string.cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun CustomIndicatorRow(
+    entry: CustomIndicatorStore.Entry,
+    formatEpoch: (Long?) -> String,
+    enabled: Boolean,
+    onRemove: () -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.name,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+            )
+            Text(
+                text = pluralStringResource(R.plurals.settings_custom_indicators_count, entry.indicators, entry.indicators) +
+                    " · " + stringResource(R.string.settings_custom_indicators_imported_on, formatEpoch(entry.importedEpoch)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+            if (entry.families.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.settings_custom_indicators_families, entry.families.joinToString(", ")),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                )
+            }
+            Text(
+                text = stringResource(R.string.settings_custom_indicators_sha256) + " " + entry.sha256,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+        }
+        IconButton(onClick = onRemove, enabled = enabled) {
+            Icon(
+                Icons.Default.Delete,
+                contentDescription = stringResource(R.string.settings_custom_indicators_remove, entry.name),
+            )
+        }
+    }
+}
+
+/** The picked document's display name, falling back to the last URI segment. */
+private fun displayName(context: android.content.Context, uri: Uri): String {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) {
+            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0) c.getString(idx)?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+    }
+    return uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "indicators"
 }
 
 /**
