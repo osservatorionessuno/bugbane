@@ -15,6 +15,9 @@
 > [!CAUTION]
 > This project is under active development and is not recommended for non-technical users at this stage.
 > The installation and usage of Bugbane can be detected by spyware and stalkerware. Do not use it when there is a direct risk of physical harm.
+> Read the [risks and warnings](https://bugbane.org/docs/risks/) before installing.
+
+Documentation lives on the official website, [bugbane.org](https://bugbane.org/). In particular, see the [security architecture](https://bugbane.org/docs/security/) and the [risks and warnings](https://bugbane.org/docs/risks/).
 
 Bugbane is currently in **beta**. The store listings below are the beta channel; a stable release will follow.
 
@@ -24,10 +27,9 @@ Bugbane is currently in **beta**. The store listings below are the beta channel;
 <img src="https://f-droid.org/badge/get-it-on.png"
 alt="Get the beta on F-Droid" align="center" height="80" /></a>
 
-<a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/osservatorionessuno/bugbane">
-<img src="https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png"
-alt="Get it on Obtainium" align="center" height="80" />
-</a>
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/osservatorionessuno/bugbane">
+<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png"
+alt="Get it on Obtainium" align="center" height="80" /></a>
 
 <a href="https://play.google.com/store/apps/details?id=org.osservatorionessuno.bugbane.beta">
 <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
@@ -49,14 +51,6 @@ This project is still evolving. Current releases are betas: expect rough edges a
 
 ## License
 Portions of the code in Shizuku are distributed under the Apache 2.0 License, whereas Bugbane is released under the GNU General Public License, version 3 only (GPL-3.0-only).
-
-## Technical details
-Bugbane uses the pairing logic from [Shizuku](https://github.com/RikkaApps/Shizuku), forked and included in our code, and [libadb-android](https://github.com/MuntashirAkon/libadb-android) as a dependency. This allows it to interact with the device's debugging service exactly as a computer connected via USB would.
- - Commands are executed with shell privileges.
- - Output is saved to the application’s private storage and encrypted.
- - The generated ADB RSA certificate is authorized for debugging and stored encrypted at rest, using StrongBox-backed credentials when available.
-
-Export and sharing logic are currently in progress. Documentation will be expanded as development continues.
 
 ## Project Structure
 
