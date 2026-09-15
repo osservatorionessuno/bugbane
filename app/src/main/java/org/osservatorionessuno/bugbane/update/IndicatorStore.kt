@@ -116,10 +116,14 @@ class IndicatorStore(private val filesDir: File) {
         return Staged(tmp, sha256, objectCount(newlines))
     }
 
-    /** Atomically replace the stored bundle with [staged], clearing any stale indicator files. */
+    /**
+     * Atomically replace the stored bundle with [staged], clearing any stale indicator files.
+     * User-imported sets ([CustomIndicatorStore]) live in the same directory and are kept.
+     */
     fun adoptStaged(staged: Staged) {
         indicatorsDir.listFiles()?.forEach { f ->
-            if (f != bundleFile && (f.name.endsWith(".json") || f.name.endsWith(".stix2"))) f.delete()
+            if (f == bundleFile || isCustomFile(f)) return@forEach
+            if (f.name.endsWith(".json") || f.name.endsWith(".stix2")) f.delete()
         }
         rename(staged.file, bundleFile)
     }
@@ -146,5 +150,10 @@ class IndicatorStore(private val filesDir: File) {
         private const val INDICATORS_DIR = "bugbane-indicators"
         private const val BUNDLE_FILE = "indicators.json"
         private val NL = '\n'.code.toByte()
+
+        /** Name prefix of user-imported indicator files, see [CustomIndicatorStore]. */
+        const val CUSTOM_PREFIX = "custom-"
+
+        fun isCustomFile(f: File): Boolean = f.name.startsWith(CUSTOM_PREFIX)
     }
 }
