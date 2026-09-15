@@ -16,20 +16,22 @@
 > This project is under active development and is not recommended for non-technical users at this stage.
 > The installation and usage of Bugbane can be detected by spyware and stalkerware. Do not use it when there is a direct risk of physical harm.
 
+Bugbane is currently in **beta**. The store listings below are the beta channel; a stable release will follow.
+
 <div align="center">
 
-<a href="https://f-droid.org/packages/org.osservatorionessuno.bugbane">
+<a href="https://f-droid.org/packages/org.osservatorionessuno.bugbane.beta">
 <img src="https://f-droid.org/badge/get-it-on.png"
-alt="Get it on F-Droid" align="center" height="80" /></a>
+alt="Get the beta on F-Droid" align="center" height="80" /></a>
 
 <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/osservatorionessuno/bugbane">
 <img src="https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png"
 alt="Get it on Obtainium" align="center" height="80" />
 </a>
 
-<a href="https://play.google.com/store/apps/details?id=org.osservatorionessuno.bugbane">
+<a href="https://play.google.com/store/apps/details?id=org.osservatorionessuno.bugbane.beta">
 <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
-alt="Get it on Google Play" align="center" height="80" /></a>
+alt="Get the beta on Google Play" align="center" height="80" /></a>
   
 </div>
 
@@ -43,7 +45,7 @@ Unlike existing tools such as [MVT](https://mvt.re), Bugbane does not require a 
 
 Exports are intended to be [AndroidQF](https://github.com/mvt-project/androidqf)-compliant, making them portable and analyzable off-device using existing tools, and can be easily shared via Signal or other communication tools. Each export is automatically encrypted with a random password using [age](https://github.com/FiloSottile/age). Since exported data can contain sensitive personal information, the initial scan is performed on-device using a re-implementation of MVT that reuses the same IOCs as the original.
 
-This project is still evolving. A beta release will be announced when ready, and testing will be opened at that stage.
+This project is still evolving. Current releases are betas: expect rough edges and please report what you find.
 
 ## License
 Portions of the code in Shizuku are distributed under the Apache 2.0 License, whereas Bugbane is released under the GNU General Public License, Version 3 (GPLv3).
