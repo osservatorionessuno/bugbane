@@ -18,6 +18,7 @@ json                  = "20250517"
 accompanist-permissions = "0.37.3"
 libmvt                = "0.4.1"
 zxing                 = "3.5.3"
+gson                  = "2.11.0" # same as libmvt's transitive gson
 libohttp              = "1.1.0"
 libohttpHpkeBc        = "1.0.1"
 libbhttp              = "1.1.0"
@@ -59,6 +60,7 @@ kage                              = { group = "com.github.android-password-store
 org-json                          = { group = "org.json",                     name = "json",                   version.ref = "json" }
 libmvt                            = { group = "com.github.osservatorionessuno", name = "libmvt", version.ref = "libmvt" }
 zxing-core                        = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+gson                              = { group = "com.google.code.gson",           name = "gson",                   version.ref = "gson" }
 libohttp                          = { group = "com.github.osservatorionessuno", name = "libohttp",         version.ref = "libohttp" }
 libohttp-hpke-bc                  = { group = "com.github.osservatorionessuno", name = "libohttp-hpke-bc", version.ref = "libohttpHpkeBc" }
 libbhttp                          = { group = "com.github.osservatorionessuno", name = "libbhttp",         version.ref = "libbhttp" }

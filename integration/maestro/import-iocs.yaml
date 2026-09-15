@@ -1,0 +1,49 @@
+# Import the custom IOC fixture (run.sh pushed it to /sdcard/Download/e2e-iocs.stix2)
+# through Settings → Custom indicators → system file picker, then return home. Runs
+# inside connect-acquire.yaml so the set is in place before the auto-analysis.
+# IOCS_SHA256 (from run.sh) is the fixture's hash, asserted against the Settings row.
+appId: org.osservatorionessuno.bugbane
+---
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible: "Custom indicators"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Import indicators file"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Import indicators file"
+# DocumentsUI: the pushed file normally shows under Recent; otherwise browse the
+# Downloads root from the drawer.
+- extendedWaitUntil:
+    visible:
+      text: ".*(Recent|Downloads|e2e-iocs).*"
+    timeout: 20000
+- runFlow:
+    when:
+      notVisible:
+        text: "e2e-iocs.*"
+    commands:
+      - tapOn: "Show roots"
+      - tapOn: "Downloads"
+      - extendedWaitUntil:
+          visible:
+            text: "e2e-iocs.*"
+          timeout: 10000
+- tapOn:
+    text: "e2e-iocs.*"
+# Back in Settings the imported row shows name, indicator count and SHA-256.
+- extendedWaitUntil:
+    visible:
+      text: "2 indicators.*"
+    timeout: 30000
+- assertVisible: "e2e-iocs.stix2"
+- assertVisible:
+    text: ".*${IOCS_SHA256}.*"
+- takeScreenshot: screenshots/03b-custom-iocs-imported
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: ".*(Ready to Start|Get Started|Acquire Data).*"
+    timeout: 15000

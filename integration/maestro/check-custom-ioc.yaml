@@ -1,0 +1,27 @@
+# Bugbane's own detection of the custom set: open the analysis from the acquisition
+# detail (row marked CRITICAL), expand result cards until the planted marker from
+# e2e-iocs.stix2 shows, then return to the acquisition detail for the export.
+appId: org.osservatorionessuno.bugbane
+---
+- tapOn:
+    containsChild: "CRITICAL"
+- extendedWaitUntil:
+    visible:
+      text: "Analysis date.*"
+    timeout: 30000
+# Cards are collapsed; "Expand" flips to "Collapse" once tapped, so tapping the first
+# "Expand" each round walks down the list (CRITICAL cards sort first).
+- repeat:
+    times: 6
+    while:
+      notVisible:
+        text: ".*custom-marker.*"
+    commands:
+      - tapOn: "Expand"
+- assertVisible:
+    text: ".*/data/local/tmp/bugbane-e2e/custom-marker.*"
+- takeScreenshot: screenshots/06b-custom-ioc-detected
+- pressKey: Back
+- extendedWaitUntil:
+    visible: "Export"
+    timeout: 20000

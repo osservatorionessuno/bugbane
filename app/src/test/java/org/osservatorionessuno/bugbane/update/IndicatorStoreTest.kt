@@ -35,6 +35,8 @@ class IndicatorStoreTest {
         // Pre-existing stale indicator files that a previous mechanism might have left behind.
         File(dir, "old-a.json").writeText("{}")
         File(dir, "old-b.stix2").writeText("{}")
+        // A user-imported set must survive feed adoption.
+        File(dir, "custom-abc.stix2").writeText("{}")
 
         val store = IndicatorStore(tmp)
         // Builder framing: head line, one object per line, tail line, trailing newline.
@@ -50,6 +52,7 @@ class IndicatorStoreTest {
         val names = dir.listFiles()!!.map { it.name }.toSet()
         assertFalse("old-a.json" in names)
         assertFalse("old-b.stix2" in names)
+        assertTrue("custom-abc.stix2" in names)
         assertTrue("indicators.json" in names)
         assertArrayEquals(bundle, store.openBundle()!!.use { it.readBytes() })
         assertEquals(0, store.stage { it.write("not json".toByteArray()) }.also { it.discard() }.objectCount)
