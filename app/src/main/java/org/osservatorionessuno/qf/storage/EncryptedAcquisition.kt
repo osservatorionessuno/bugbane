@@ -76,8 +76,7 @@ class EncryptedAcquisitionWriter(
         val json = Utils.toJsonString(index.toJsonObject()).toByteArray(Charsets.UTF_8)
         writer.putEntry(METADATA_FILE).use { it.write(json) }
         indexWritten = true
-        // Keep a copy in plaintext so acquisitions can be listed without unlocking the Keystore.
-        File(acquisitionDir, METADATA_FILE).writeText(Utils.toJsonString(index.toJsonObject()), Charsets.UTF_8)
+        index.writeSidecar(acquisitionDir)
     }
 
     private fun archiveHashManifestIfNeeded() {

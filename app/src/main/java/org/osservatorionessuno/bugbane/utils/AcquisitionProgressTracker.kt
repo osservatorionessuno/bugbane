@@ -152,6 +152,7 @@ object AcquisitionProgressTracker {
             override fun isCancelled(): Boolean = adbManager.isQuickForensicsCancelled
 
             override fun onFinished(cancelled: Boolean, output: File?) {
+                HotspotManager.stop()
                 if (cancelled || output == null) return
                 val failed = _modules.value
                     .filter { it.status == ModuleScanStatus.Error }

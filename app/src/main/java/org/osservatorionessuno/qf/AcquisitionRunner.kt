@@ -26,6 +26,7 @@ import org.osservatorionessuno.qf.modules.RootBinaries
 import org.osservatorionessuno.qf.modules.Temp
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.qf.storage.AcquisitionIndex
+import org.osservatorionessuno.qf.storage.AcquisitionTransport
 import org.osservatorionessuno.qf.storage.EncryptedAcquisitionWriter
 import org.osservatorionessuno.qf.storage.InsufficientStorageException
 import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
@@ -119,7 +120,8 @@ class AcquisitionRunner(
         context: Context,
         manager: AdbConnectionManager,
         baseOutputDir: File,
-        listener: ProgressListener? = null
+        listener: ProgressListener? = null,
+        transport: AcquisitionTransport? = null,
     ): File {
         if (!baseOutputDir.exists() && !baseOutputDir.mkdirs()) {
             throw IOException("Unable to create base output directory: $baseOutputDir")
@@ -151,6 +153,7 @@ class AcquisitionRunner(
             }
             if (!tmpDir.endsWith('/')) tmpDir += '/'
             if (!sdCard.endsWith('/')) sdCard += '/'
+            val device = DeviceInfo.collect(shell)
 
             val total = modules.size
             var completedCount = 0
@@ -173,6 +176,8 @@ class AcquisitionRunner(
                 cpu = cpu,
                 analysisDir = AcquisitionIndex.ANALYSIS_DIR,
                 adbHostPublicKey = adbHostKey,
+                device = device,
+                transport = transport,
             )
 
             // Encrypting needs only the public acquisition identity, so it never

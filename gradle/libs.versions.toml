@@ -9,13 +9,15 @@ lifecycleRuntimeKtx   = "2.9.3"
 activityCompose       = "1.10.1"
 composeBom            = "2025.08.01"
 junitJupiter          = "5.13.4"
-libadb                = "3.3.1"
+# usb-transport head; bump to the next tag once released
+libadb                = "75a978c2ac"
 bouncycastle          = "1.84"
 work                  = "2.10.3"
 kage                  = "0.3.0"
 json                  = "20250517"
 accompanist-permissions = "0.37.3"
 libmvt                = "0.4.1"
+zxing                 = "3.5.3"
 libohttp              = "1.1.0"
 libohttpHpkeBc        = "1.0.1"
 libbhttp              = "1.1.0"
@@ -56,6 +58,7 @@ androidx-work-runtime-ktx         = { group = "androidx.work",              name
 kage                              = { group = "com.github.android-password-store", name = "kage", version.ref = "kage" }
 org-json                          = { group = "org.json",                     name = "json",                   version.ref = "json" }
 libmvt                            = { group = "com.github.osservatorionessuno", name = "libmvt", version.ref = "libmvt" }
+zxing-core                        = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 libohttp                          = { group = "com.github.osservatorionessuno", name = "libohttp",         version.ref = "libohttp" }
 libohttp-hpke-bc                  = { group = "com.github.osservatorionessuno", name = "libohttp-hpke-bc", version.ref = "libohttpHpkeBc" }
 libbhttp                          = { group = "com.github.osservatorionessuno", name = "libbhttp",         version.ref = "libbhttp" }

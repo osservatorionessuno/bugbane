@@ -8,6 +8,8 @@ enum class AppState(val step: Int) {
     NeedWelcomeScreen(0),
     // Ghost states share the next real step's dot, so conditional pages that most
     // users never see add no extra progress dot.
+    // Once per install: check this device (user) or other devices (analyst).
+    NeedRole(1),
     // Beta builds only, right after the welcome screen.
     NeedBetaWarning(1),
     // Only on devices still exposed to the wireless-ADB bypass (CVE-2026-0073).
@@ -32,6 +34,8 @@ enum class AppState(val step: Int) {
     AdbConnected(6),
     TryAutoConnect(6),
     AdbConnectionError(6),
+    // Analyst installs never connect to this device's adbd; onboarding ends here.
+    AnalystReady(6),
 
     // Not part of our slideshow
     AdbScanning(EXCLUDED_STEP);

@@ -27,9 +27,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.ui.theme.logoRes
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
 import org.osservatorionessuno.bugbane.SlideshowActivity
 import org.osservatorionessuno.bugbane.AcquisitionActivity
+import org.osservatorionessuno.bugbane.RemoteScanActivity
 import org.osservatorionessuno.bugbane.components.LayeredProgressIndicator
 import org.osservatorionessuno.bugbane.components.AcquisitionIdentityLostDialog
 import org.osservatorionessuno.bugbane.utils.AcquisitionRecovery
@@ -159,6 +161,7 @@ fun ScanScreen() {
     val viewModel = remember { ViewModelFactory.get(application) }
 
     val appState = viewModel.configurationState.collectAsStateWithLifecycle()
+    val isAnalyst = viewModel.appManager.appProgress.collectAsStateWithLifecycle().value.isAnalyst
     val adbManager = viewModel.adbManager
     val adbState = adbManager.adbState.collectAsStateWithLifecycle()
 
@@ -188,7 +191,11 @@ fun ScanScreen() {
             identityLost = true
             return
         }
-        AcquisitionProgressTracker.start(context, adbManager, File(context.filesDir, "acquisitions"))
+        if (isAnalyst) {
+            context.startActivity(Intent(context, RemoteScanActivity::class.java))
+        } else {
+            AcquisitionProgressTracker.start(context, adbManager, File(context.filesDir, "acquisitions"))
+        }
     }
 
     if (identityLost) {
@@ -391,7 +398,7 @@ fun ScanScreen() {
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.ic_bugbane_zoom),
+                            painter = painterResource(id = logoRes()),
                             contentDescription = stringResource(R.string.app_name),
                             modifier = Modifier.size(160.dp),
                             alpha = 0.4f
@@ -399,14 +406,14 @@ fun ScanScreen() {
                         Spacer(modifier = Modifier.width(24.dp))
                         Column(modifier = Modifier.fillMaxWidth(0.5f)) {
                             Text(
-                                text = stringResource(R.string.scan_welcome_title),
+                                text = stringResource(if (isAnalyst) R.string.scan_analyst_welcome_title else R.string.scan_welcome_title),
                                 style = MaterialTheme.typography.headlineMedium,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = stringResource(R.string.scan_welcome_description),
+                                text = stringResource(if (isAnalyst) R.string.scan_analyst_welcome_description else R.string.scan_welcome_description),
                                 style = MaterialTheme.typography.bodyLarge,
                                 textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -422,21 +429,21 @@ fun ScanScreen() {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.ic_bugbane_zoom),
+                            painter = painterResource(id = logoRes()),
                             contentDescription = stringResource(R.string.app_name),
                             modifier = Modifier.size(160.dp),
                             alpha = 0.4f
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         Text(
-                            text = stringResource(R.string.scan_welcome_title),
+                            text = stringResource(if (isAnalyst) R.string.scan_analyst_welcome_title else R.string.scan_welcome_title),
                             style = MaterialTheme.typography.headlineMedium,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = stringResource(R.string.scan_welcome_description),
+                            text = stringResource(if (isAnalyst) R.string.scan_analyst_welcome_description else R.string.scan_welcome_description),
                             style = MaterialTheme.typography.bodyLarge,
                             textAlign = TextAlign.Center,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -445,8 +452,8 @@ fun ScanScreen() {
                     }
                 }
 
-                // Disable Development Tools Dialog
-                if (showDisableDialog.value) {
+                // Disable Development Tools Dialog (this device's)
+                if (showDisableDialog.value && !isAnalyst) {
                     Card(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -502,7 +509,7 @@ fun ScanScreen() {
                 Button(
                     onClick = {
                         when (appState.value) {
-                            AppState.AdbConnected -> {
+                            AppState.AdbConnected, AppState.AnalystReady -> {
                                 startAcquisition()
                             }
                             AppState.AdbConnecting, AppState.TryAutoConnect -> {
@@ -524,7 +531,7 @@ fun ScanScreen() {
                     colors = ButtonDefaults.buttonColors(
                         containerColor = when (appState.value) {
                             AppState.AdbScanning, AppState.AdbConnecting, AppState.TryAutoConnect -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                            AppState.AdbConnected -> MaterialTheme.colorScheme.secondary
+                            AppState.AdbConnected, AppState.AnalystReady -> MaterialTheme.colorScheme.secondary
                             else ->
                                 MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
                         }
@@ -540,6 +547,7 @@ fun ScanScreen() {
                         text = when (appState.value) {
                             AppState.AdbScanning -> stringResource(R.string.home_scanning_button)
                             AppState.AdbConnected -> stringResource(R.string.home_scan_button)
+                            AppState.AnalystReady -> stringResource(R.string.home_scan_device_button)
                             AppState.TryAutoConnect, AppState.AdbConnecting -> stringResource(R.string.button_working_adb_pairing)
                             else
                                 -> stringResource(R.string.home_permissions_button)

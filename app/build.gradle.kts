@@ -160,8 +160,10 @@ dependencies {
     implementation(libs.libbhttp)
     implementation(libs.libohttp.hpke.bc)
 
-    // libadb-android (BouncyCastle fork)
+    // libadb-android (BouncyCastle fork, with the USB transport)
     implementation(libs.libadb.android)
+    // QR codes shown to the device being scanned (hotspot + ADB pairing)
+    implementation(libs.zxing.core)
     // X.509 certificate generation for ADB pairing (BouncyCastle)
     implementation(libs.bouncycastle.pkix)
 

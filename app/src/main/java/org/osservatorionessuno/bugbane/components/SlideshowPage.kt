@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.ui.theme.logoRes
 import org.osservatorionessuno.bugbane.utils.AppState
 import androidx.compose.material3.MaterialTheme
 
@@ -35,19 +36,19 @@ fun getSlideshowScreenContent(state: AppState): SlideshowPageData {
         AppState.DeviceUnsupported -> return SlideshowPageData(
             title = stringResource(R.string.slideshow_welcome_title),
             description = stringResource(R.string.slideshow_unsupported_version),
-            icon = ImageVector.Companion.vectorResource(R.drawable.ic_bugbane_zoom),
+            icon = ImageVector.Companion.vectorResource(logoRes()),
             buttonText = stringResource(R.string.slideshow_button_exit),
         )
         AppState.DebuggingRestricted -> return SlideshowPageData(
             title = stringResource(R.string.slideshow_restricted_title),
             description = stringResource(R.string.slideshow_restricted_description),
-            icon = ImageVector.Companion.vectorResource(R.drawable.ic_bugbane_zoom),
+            icon = ImageVector.Companion.vectorResource(logoRes()),
             buttonText = stringResource(R.string.slideshow_restricted_button),
         )
         AppState.NeedWelcomeScreen -> return SlideshowPageData(
             title = stringResource(R.string.slideshow_welcome_title),
             description = stringResource(R.string.slideshow_welcome_description),
-            icon = ImageVector.Companion.vectorResource(R.drawable.ic_bugbane_zoom),
+            icon = ImageVector.Companion.vectorResource(logoRes()),
             buttonText = stringResource(R.string.slideshow_welcome_button),
         )
         AppState.NeedWifi -> return SlideshowPageData(
@@ -101,8 +102,24 @@ fun getSlideshowScreenContent(state: AppState): SlideshowPageData {
 
 @Composable
 fun SlideshowPage(state: AppState, onClickContinue: (() -> Unit)) {
-    val page = getSlideshowScreenContent(state)
+    SlideshowPageContent(
+        page = getSlideshowScreenContent(state),
+        onClickContinue = onClickContinue,
+        enabled = state != AppState.AdbConnecting && state != AppState.TryAutoConnect,
+        isError = AppState.isErrorState(state),
+    )
+}
 
+/** Icon, title, description, [middle], primary button (if any text), [extra]. */
+@Composable
+fun SlideshowPageContent(
+    page: SlideshowPageData,
+    onClickContinue: (() -> Unit) = {},
+    enabled: Boolean = true,
+    isError: Boolean = false,
+    middle: @Composable () -> Unit = {},
+    extra: @Composable () -> Unit = {},
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -134,26 +151,27 @@ fun SlideshowPage(state: AppState, onClickContinue: (() -> Unit)) {
             text = page.description,
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
-            color = if (!AppState.isErrorState(state)) {
+            color = if (!isError) {
                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             } else {
                 MaterialTheme.colorScheme.error
             }
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            enabled = (state != AppState.AdbConnecting && state != AppState.TryAutoConnect),
+        middle()
+        if (page.buttonText != null) Button(
+            enabled = enabled,
             onClick = onClickContinue,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 32.dp, vertical = 8.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (!AppState.isErrorState(state)) {
+                containerColor = if (!isError) {
                     MaterialTheme.colorScheme.primary
                 } else {
                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                 },
-                contentColor = if (!AppState.isErrorState(state)) {
+                contentColor = if (!isError) {
                     androidx.compose.ui.graphics.Color.White
                 } else {
                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -168,5 +186,6 @@ fun SlideshowPage(state: AppState, onClickContinue: (() -> Unit)) {
                 )
             }
         }
+        extra()
     }
 }

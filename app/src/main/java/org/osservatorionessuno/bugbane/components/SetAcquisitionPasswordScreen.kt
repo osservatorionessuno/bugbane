@@ -72,6 +72,7 @@ fun SetAcquisitionPasswordScreen(
     kind: PasswordPromptKind,
     onResolved: () -> Unit,
     descriptionOverride: String? = null,
+    allowSkip: Boolean = true,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -208,7 +209,7 @@ fun SetAcquisitionPasswordScreen(
                 }
             }
 
-            when (kind) {
+            if (allowSkip) when (kind) {
                 PasswordPromptKind.SE_OPTIONAL ->
                     TextButton(onClick = { dismiss() }, enabled = !working, modifier = Modifier.padding(top = 4.dp)) {
                         Text(stringResource(R.string.set_password_skip_button))

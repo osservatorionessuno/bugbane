@@ -11,6 +11,11 @@ appId: org.osservatorionessuno.bugbane
 - takeScreenshot: screenshots/01-welcome
 - tapOn:
     text: "^I understand$"
+# Role slide: the default keeps the install in user mode (this device is scanned).
+- extendedWaitUntil:
+    visible: "Check this device"
+    timeout: 15000
+- tapOn: "Check this device"
 # CVE vulnerability page: API 34-36 only.
 - runFlow:
     when:

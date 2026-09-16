@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_bugbane_background_analyst" />
+    <foreground android:drawable="@drawable/ic_bugbane_foreground_analyst" />
+    <monochrome android:drawable="@drawable/ic_bugbane_foreground_analyst" />
+</adaptive-icon>

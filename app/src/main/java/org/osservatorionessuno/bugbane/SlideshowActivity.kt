@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.collectLatest
 import org.osservatorionessuno.bugbane.components.AcquisitionProtectionPage
 import org.osservatorionessuno.bugbane.components.AdbVulnerabilityWarningPage
 import org.osservatorionessuno.bugbane.components.BetaWarningPage
+import org.osservatorionessuno.bugbane.components.RolePage
 import org.osservatorionessuno.bugbane.components.SlideshowPage
 import org.osservatorionessuno.bugbane.ui.theme.Theme
 import org.osservatorionessuno.bugbane.utils.AppState
@@ -107,6 +108,7 @@ fun SlideshowScreen(
 ) {
     val totalSteps = AppState.distinctSteps()
     val state = viewModel.configurationState.collectAsStateWithLifecycle()
+    val progress = viewModel.appManager.appProgress.collectAsStateWithLifecycle()
 
     // Initial page index (for the circle indicators at the top of the slideshow)
     var initialPage = 0
@@ -120,8 +122,8 @@ fun SlideshowScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     suspend fun updatePager(state: AppState) {
-        if (state == AppState.AdbConnected) {
-            Log.d(TAG, "Adb connected - slideshow complete")
+        if (state == AppState.AdbConnected || state == AppState.AnalystReady) {
+            Log.d(TAG, "$state - slideshow complete")
             onSlideshowComplete()
         } else if (state.step < totalSteps) {
             Log.d(TAG, "updatePager to $state (${state.step})")
@@ -216,7 +218,11 @@ fun SlideshowScreen(
                     AppState.NeedBetaWarning -> BetaWarningPage(
                         onAcknowledge = { viewModel.onChangeStateRequest(state.value) }
                     )
+                    AppState.NeedRole -> RolePage(
+                        onChoose = { viewModel.appManager.setRole(it) }
+                    )
                     AppState.NeedAcquisitionProtection -> AcquisitionProtectionPage(
+                        analyst = progress.value.isAnalyst,
                         // The identity files are the source of truth; re-check so the
                         // state machine advances once protection is in place.
                         onProtected = { viewModel.appManager.checkState() }

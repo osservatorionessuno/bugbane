@@ -54,6 +54,8 @@ import java.time.Instant
 import java.util.Date
 import org.osservatorionessuno.bugbane.utils.Utils
 import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
+import org.osservatorionessuno.qf.storage.AcquisitionIndex
+import org.osservatorionessuno.qf.storage.AcquisitionTransport
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +66,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
 
     var size by remember { mutableStateOf(0L) }
     var meta by remember { mutableStateOf<JSONObject?>(null) }
+    val index = remember(meta) { meta?.let { runCatching { AcquisitionIndex.fromJsonObject(it) }.getOrNull() } }
     var scans by remember { mutableStateOf(listOf<ScanSummary>()) }
     val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
 
@@ -325,9 +328,10 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        stringResource(R.string.acquisition_details_name, acquisitionDir.name),
+                        stringResource(R.string.acquisition_details_name, index?.displayName(acquisitionDir) ?: acquisitionDir.name),
                         style = MaterialTheme.typography.bodyLarge
                     )
+                    DeviceLines(index)
                     meta?.let {
                         val completed = it.optString("completed", "null").let { s ->
                             try {
@@ -405,9 +409,10 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    stringResource(R.string.acquisition_details_name, acquisitionDir.name),
+                    stringResource(R.string.acquisition_details_name, index?.displayName(acquisitionDir) ?: acquisitionDir.name),
                     style = MaterialTheme.typography.bodyLarge
                 )
+                DeviceLines(index)
                 meta?.let {
                     val completed = it.optString("completed", "null").let { s ->
                         try {
@@ -950,4 +955,20 @@ class PendingUnlock(
     val onUnlocked: (DestroyableAgeIdentity) -> Unit,
 ) {
     fun dispose() = inner.fill(0)
+}
+
+@Composable
+private fun DeviceLines(index: AcquisitionIndex?) {
+    index?.device?.summary?.takeIf { it.isNotBlank() }?.let {
+        Text(stringResource(R.string.acquisition_details_device, it), style = MaterialTheme.typography.bodyLarge)
+    }
+    index?.transport?.let { t ->
+        val via = when (t.type) {
+            AcquisitionTransport.USB -> stringResource(R.string.acquisition_transport_usb)
+            AcquisitionTransport.WIFI_DIRECT -> stringResource(R.string.acquisition_transport_wifi, t.hotspotSsid ?: "?")
+            AcquisitionTransport.WIFI_HOTSPOT -> stringResource(R.string.acquisition_transport_hotspot, t.hotspotSsid ?: "?")
+            else -> stringResource(R.string.acquisition_transport_local)
+        }
+        Text(stringResource(R.string.acquisition_details_transport, via), style = MaterialTheme.typography.bodyLarge)
+    }
 }

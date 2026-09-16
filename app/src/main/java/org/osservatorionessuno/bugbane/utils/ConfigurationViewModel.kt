@@ -57,6 +57,7 @@ class ConfigurationViewModel private constructor(
             ConfigurationManager.initialize(appContext)
             SlideshowManager.initialize(appContext)
             WifiConnectivityMonitor.initialize(appContext)
+            HotspotManager.initialize(appContext)
             return ConfigurationViewModel(
                 appContext,
                 AdbManager(appContext)
@@ -161,18 +162,24 @@ class ConfigurationViewModel private constructor(
         if (debuggingRestricted) return AppState.DebuggingRestricted
         if (!appProgress.hasSeenWelcomeScreen) return AppState.NeedWelcomeScreen
         // The order of these checks defines the onboarding order.
+        if (appProgress.role == null) return AppState.NeedRole
         // Beta builds gate onboarding on a "use at your own risk" warning, once.
         if (isBetaBuild && !appProgress.hasAckedBetaWarning) return AppState.NeedBetaWarning
         // Warn devices still exposed to the wireless-ADB bypass (CVE-2026-0073),
-        // once, until acknowledged.
-        if (DeviceVulnerabilityChecker.isAtRisk(appContext) && !appProgress.hasAckedAdbWarning) {
+        // once, until acknowledged. Not for analysts: this device's adbd stays off.
+        if (!appProgress.isAnalyst && DeviceVulnerabilityChecker.isAtRisk(appContext) && !appProgress.hasAckedAdbWarning) {
             return AppState.NeedAdbVulnerabilityWarning
         }
-        if (!notificationsEnabled) return AppState.NeedNotificationPermission
+        // Notifications carry this device's pairing code; analysts don't pair it.
+        if (!notificationsEnabled && !appProgress.isAnalyst) return AppState.NeedNotificationPermission
         // On devices that use the fingerprint gate, lock the acquisition key to the
         // device now (one prompt). Devices without it defer the password to after
-        // the first acquisition, so this passes for them.
+        // the first acquisition, so this passes for them. Analysts need both factors.
         if (!appProgress.hasAcquisitionProtection) return AppState.NeedAcquisitionProtection
+        // Analysts connect to other devices from RemoteScanActivity.
+        if (appProgress.isAnalyst) {
+            return if (appProgress.hasCompletedOnboarding) AppState.AnalystReady else AppState.AdbConnectedFinishOnboarding
+        }
 
         // We require adb_wifi_enabled (Wireless Debugging), not Settings.Global.ADB_ENABLED
         // (USB Debugging). Those are independent settings; wireless ADB does not depend on
@@ -253,6 +260,10 @@ class ConfigurationViewModel private constructor(
 
             AppState.NeedWelcomeScreen -> {
                 appManager.setHasSeenWelcomeScreen()
+            }
+
+            AppState.NeedRole -> {
+                // RolePage records the choice itself.
             }
 
             AppState.NeedAdbVulnerabilityWarning -> {

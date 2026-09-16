@@ -2,6 +2,7 @@ package org.osservatorionessuno.cadb
 
 import android.content.Context
 import android.content.IntentFilter
+import android.hardware.usb.UsbDevice
 import android.os.Build
 import android.util.Log
 import androidx.annotation.WorkerThread
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.osservatorionessuno.qf.AcquisitionRunner
+import org.osservatorionessuno.qf.storage.AcquisitionTransport
 import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
@@ -21,10 +23,13 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.Volatile
 
 private const val TAG = "AdbManager"
+// Time for the target's user to accept the USB debugging prompt.
+private const val USB_AUTH_TIMEOUT_S = 120L
 
 class AdbManager(applicationContext: Context) {
     private val executor: ExecutorService = Executors.newFixedThreadPool(3)
@@ -172,6 +177,7 @@ class AdbManager(applicationContext: Context) {
                         // so that we can try to distinguish between those two cases.
                         if (adbConnectionManager.connectTls(this.appContext!!, 5000)) {
                             Log.d(TAG, "autoconnect successful")
+                            transport = AcquisitionTransport(AcquisitionTransport.LOCAL)
                             _adbState.value = AdbState.ConnectedIdle
                         } else {
                             // Probably an error but could also be a race :(
@@ -198,6 +204,59 @@ class AdbManager(applicationContext: Context) {
             _adbState.value = AdbState.ErrorConnect
         }
     }
+    // Analyst mode: blocking calls from the wizard (Dispatchers.IO) that point the
+    // shared AdbConnectionManager at another device.
+
+    /** Written into the acquisition index. */
+    @Volatile
+    var transport: AcquisitionTransport = AcquisitionTransport(AcquisitionTransport.LOCAL)
+        private set
+
+    fun disconnect() {
+        runCatching { adbConnectionManager.disconnect() }
+            .onFailure { Log.w(TAG, "disconnect: ${it.message}") }
+        if (_adbState.value != AdbState.ConnectedAcquiring && _adbState.value != AdbState.Cancelling) {
+            _adbState.value = AdbState.Ready
+        }
+    }
+
+    /** USB permission already granted; waits for the target's "Allow USB debugging?" prompt. */
+    @WorkerThread
+    fun connectUsb(device: UsbDevice) {
+        disconnect()
+        _adbState.value = AdbState.Connecting
+        try {
+            adbConnectionManager.setTimeout(USB_AUTH_TIMEOUT_S, TimeUnit.SECONDS)
+            if (!adbConnectionManager.connectUsb(appContext!!, device)) throw IOException("USB connection refused")
+            transport = AcquisitionTransport(AcquisitionTransport.USB)
+            _adbState.value = AdbState.ConnectedIdle
+        } catch (t: Throwable) {
+            _adbState.value = AdbState.ErrorConnect
+            throw t
+        } finally {
+            adbConnectionManager.setTimeout(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    @WorkerThread
+    fun pairRemote(host: String, port: Int, code: String): Boolean =
+        adbConnectionManager.pair(host, port, code)
+
+    /** Connect to a paired device's `_adb-tls-connect` service; [via] is recorded. */
+    @WorkerThread
+    fun connectRemote(host: String, port: Int, via: AcquisitionTransport) {
+        disconnect()
+        _adbState.value = AdbState.Connecting
+        try {
+            if (!adbConnectionManager.connect(host, port)) throw IOException("Connection refused by $host:$port")
+            transport = via
+            _adbState.value = AdbState.ConnectedIdle
+        } catch (t: Throwable) {
+            _adbState.value = AdbState.ErrorConnect
+            throw t
+        }
+    }
+
     @Volatile
     private var clearEnabled = false
     private val outputGenerator = Runnable {
@@ -283,7 +342,7 @@ class AdbManager(applicationContext: Context) {
         qfFuture = executor.submit(Runnable {
             try {
                 val out = AcquisitionRunner()
-                    .run(this.appContext!!, adbConnectionManager, baseDir, listener)
+                    .run(this.appContext!!, adbConnectionManager, baseDir, listener, transport)
                 if (qfCancelled.get()) {
                     commandOutput.postValue("QuickForensics cancelled")
                     _adbState.value = AdbState.ConnectedIdle
