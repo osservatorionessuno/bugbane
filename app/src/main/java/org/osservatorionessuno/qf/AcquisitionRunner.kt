@@ -159,6 +159,7 @@ class AcquisitionRunner(
             var completedCount = 0
             val failedModules = mutableListOf<String>()
             val skippedModules = mutableListOf<String>()
+            val moduleErrors = mutableMapOf<String, String>()
 
             val adbHostKey = runCatching { manager.hostPublicKey() }
                 .onFailure { Log.w(TAG, "Could not encode host adb public key", it) }
@@ -256,6 +257,7 @@ class AcquisitionRunner(
                         // Handled by the flag check below.
                     } catch (t: Throwable) {
                         success = false
+                        moduleErrors[module.name] = (t.message ?: t.javaClass.simpleName).take(500)
                         Log.e(TAG, "Module ${module.name} failed", t)
                     }
                     // The flag, not the throw, is authoritative (modules may swallow it in runCatching).
@@ -278,7 +280,7 @@ class AcquisitionRunner(
 
                 val completed = Instant.now()
                 index = if (cancelled) index.markAsCancelled(completed)
-                    else index.markAsFinished(completed, failedModules, skippedModules)
+                    else index.markAsFinished(completed, failedModules, skippedModules, moduleErrors)
                 writer.writeIndex(index)
                 output = acquisitionDir
             } catch (io: IOException) {

@@ -43,6 +43,8 @@ data class AcquisitionIndex(
     // "complete" when both are empty.
     val failedModules: List<String> = emptyList(),
     val skippedModules: List<String> = emptyList(),
+    // Why each failed module failed (exception message).
+    val moduleErrors: Map<String, String> = emptyMap(),
     val device: DeviceInfo? = null,
     // User label; the UI falls back to the device label, then the uuid.
     val name: String? = null,
@@ -69,6 +71,7 @@ data class AcquisitionIndex(
         adbHostPublicKey?.let { root.put("adb_host_public_key", it) }
         if (failedModules.isNotEmpty()) root.put("failed_modules", JSONArray(failedModules))
         if (skippedModules.isNotEmpty()) root.put("skipped_modules", JSONArray(skippedModules))
+        if (moduleErrors.isNotEmpty()) root.put("module_errors", JSONObject(moduleErrors))
         device?.let { root.put("device", it.toJsonObject()) }
         name?.let { root.put("name", it) }
         transport?.let { root.put("transport", it.toJsonObject()) }
@@ -81,10 +84,15 @@ data class AcquisitionIndex(
     }
 
     /** Finalize a run: [STATUS_INCOMPLETE] if any module failed or was skipped. */
-    fun markAsFinished(completedAt: Instant, failed: List<String>, skipped: List<String>): AcquisitionIndex {
+    fun markAsFinished(
+        completedAt: Instant,
+        failed: List<String>,
+        skipped: List<String>,
+        errors: Map<String, String> = emptyMap(),
+    ): AcquisitionIndex {
         val status = if (failed.isEmpty() && skipped.isEmpty()) STATUS_COMPLETE else STATUS_INCOMPLETE
         return copy(status = status, completed = completedAt.toString(),
-            failedModules = failed, skippedModules = skipped)
+            failedModules = failed, skippedModules = skipped, moduleErrors = errors)
     }
 
     fun markAsCancelled(cancelledAt: Instant): AcquisitionIndex {
@@ -116,6 +124,9 @@ data class AcquisitionIndex(
                 adbHostPublicKey = root.optString("adb_host_public_key").ifBlank { null },
                 failedModules = root.optJSONArray("failed_modules").toStringList(),
                 skippedModules = root.optJSONArray("skipped_modules").toStringList(),
+                moduleErrors = root.optJSONObject("module_errors")?.let { o ->
+                    o.keys().asSequence().associateWith { o.optString(it) }
+                } ?: emptyMap(),
                 device = root.optJSONObject("device")?.let { DeviceInfo.fromJsonObject(it) },
                 name = root.optString("name").ifBlank { null },
                 transport = root.optJSONObject("transport")?.let { AcquisitionTransport.fromJsonObject(it) },

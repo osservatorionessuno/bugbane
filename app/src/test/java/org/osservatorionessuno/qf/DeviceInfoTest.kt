@@ -69,6 +69,9 @@ class AcquisitionTransportTest {
         val back = org.osservatorionessuno.qf.storage.AcquisitionIndex.fromJsonObject(JSONObject(index.toJsonObject().toString()))
         assertEquals(index.transport, back.transport)
         assertEquals("DIRECT-bb-bugbane-k3f9a2", back.transport?.hotspotSsid)
+        val failed = index.markAsFinished(java.time.Instant.EPOCH, listOf("bugreport"), emptyList(), mapOf("bugreport" to "Shell command inactive"))
+        val failedBack = org.osservatorionessuno.qf.storage.AcquisitionIndex.fromJsonObject(JSONObject(failed.toJsonObject().toString()))
+        assertEquals("Shell command inactive", failedBack.moduleErrors["bugreport"])
         // Older indexes have no transport block.
         assertNull(org.osservatorionessuno.qf.storage.AcquisitionIndex.fromJsonObject(JSONObject("""{"uuid":"u"}""")).transport)
     }
