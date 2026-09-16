@@ -35,6 +35,7 @@ import org.osservatorionessuno.bugbane.utils.AppState
 import org.osservatorionessuno.bugbane.utils.ConfigurationViewModel
 import org.osservatorionessuno.bugbane.utils.SlideshowManager
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
+import org.osservatorionessuno.cadb.AdbState
 
 private const val TAG = "MainActivity"
 class MainActivity : ComponentActivity() {
@@ -125,6 +126,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainContent() {
     val context = androidx.compose.ui.platform.LocalContext.current
+    // A locked phone freezes the process and can suspend USB; keep it awake while acquiring.
+    val adbState = ViewModelFactory.get(context.applicationContext as android.app.Application)
+        .adbManager.adbState.collectAsStateWithLifecycle().value
+    val view = androidx.compose.ui.platform.LocalView.current
+    val acquiring = adbState == AdbState.ConnectedAcquiring || adbState == AdbState.Cancelling
+    DisposableEffect(acquiring) {
+        view.keepScreenOn = acquiring
+        onDispose { view.keepScreenOn = false }
+    }
     val configuration = LocalConfiguration.current
     val pagerState = rememberPagerState(pageCount = { 2 })
     val coroutineScope = rememberCoroutineScope()
