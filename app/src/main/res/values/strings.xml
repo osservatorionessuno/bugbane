@@ -198,6 +198,7 @@
     <string name="protection_recovery_description">Set up protection again to keep using Bugbane: add a screen lock, or set an acquisition password that survives a lock removal.</string>
     <string name="protection_set_screen_lock">Set a screen lock</string>
     <string name="protection_use_password">Set a password instead</string>
+    <string name="protection_set_password">Set a password</string>
     <string name="set_password_chooser_description">Choose an acquisition password. You\'ll enter it to open or export acquisitions and it can\'t be recovered, so store it safely. It also keeps them protected if the screen lock is later removed.</string>
     <string name="set_password_field_label">Password</string>
     <string name="set_password_confirm_label">Confirm password</string>
@@ -332,4 +333,66 @@
     <string name="mvt_selinux_status_message">SELinux is not being enforced.</string>
     <string name="mvt_artifact_parse_failed_title">Incomplete analysis</string>
     <string name="mvt_artifact_parse_failed_message">These parts of the acquisition could not be read, so they were left unanalysed:</string>
+
+    <!-- Role slide (once per install) -->
+    <string name="slideshow_role_title">Who is using Bugbane?</string>
+    <string name="slideshow_role_description">Bugbane checks this phone for signs of spyware.\n\nIf you are an analyst and want to scan other people\'s devices from this phone, choose the analyst mode below instead. The choice is permanent: to change it, clear the app\'s data.</string>
+    <string name="slideshow_role_user_button">Check this device</string>
+    <string name="slideshow_role_analyst_button">I\'m an analyst: scan other devices instead</string>
+    <string name="slideshow_protection_analyst_description">An analyst install holds other people\'s data, so both a screen lock and an acquisition password are required to open acquisitions. Set a screen lock first if this phone has none.</string>
+    <string name="set_password_analyst_description">Choose the acquisition password. Together with your screen lock it is needed to open or export acquisitions. It can\'t be recovered, so store it safely.</string>
+
+    <!-- Analyst home -->
+    <string name="home_scan_device_button">Scan a device</string>
+    <string name="scan_analyst_welcome_title">Scan a device</string>
+    <string name="scan_analyst_welcome_description">Have the device to scan at hand and a USB cable if possible, then press “Scan a device”.</string>
+
+    <!-- Analyst scan wizard -->
+    <string name="remote_transport_title">How is the device connected?</string>
+    <string name="remote_transport_description">A USB cable is faster and more reliable. Over Wi‑Fi, this phone shares a network with no internet access for the other device to join.</string>
+    <string name="remote_transport_usb_button">Use a USB cable (recommended)</string>
+    <string name="remote_transport_wifi_button">Use Wi‑Fi instead</string>
+    <string name="remote_transport_usb_unsupported">This phone can\'t act as a USB host.</string>
+    <string name="remote_next_button">Next</string>
+    <string name="remote_retry_button">Retry</string>
+    <string name="remote_error_title">Something went wrong</string>
+    <string name="remote_usb_cable_title">Connect the cable</string>
+    <string name="remote_usb_cable_description">Connect the two phones with a USB cable.\n\nOnly one setup works: this phone must control the connection. Open the USB notification on this phone and choose “USB controlled by: This device”; if the other device asks, choose “Connected device” there.</string>
+    <string name="remote_usb_debugging_title">Enable USB debugging on the other device</string>
+    <string name="remote_usb_debugging_description">On the device to scan, open Settings › About phone and tap “Build number” seven times to enable Developer options. Then open Developer options and turn on “USB debugging”.</string>
+    <string name="remote_usb_waiting">Waiting for the device…</string>
+    <string name="remote_usb_permission_denied">Access to the USB device was denied. Reconnect the cable and allow Bugbane to access it.</string>
+    <string name="remote_usb_connect_failed">The USB connection failed. Check that USB debugging is on and that the prompt on the other device was accepted, then retry.</string>
+    <string name="remote_usb_allow_title">Allow USB debugging</string>
+    <string name="remote_usb_allow_description">On the other device, accept “Allow USB debugging?”. Leave “Always allow” unticked so this phone\'s key is not kept on it.</string>
+    <string name="remote_connecting_title">Connecting…</string>
+    <string name="remote_connecting_description">Pairing with the device and opening the connection.</string>
+    <string name="remote_hotspot_title">Join this phone\'s network</string>
+    <string name="remote_hotspot_description">This phone is sharing a Wi‑Fi network with no internet access. On the device to scan, scan this code with the camera or from Wi‑Fi settings, or enter the details by hand.</string>
+    <string name="remote_hotspot_permission">Android needs the nearby devices permission to share a network. Bugbane does not use your location.</string>
+    <string name="remote_hotspot_permission_button">Allow</string>
+    <string name="remote_hotspot_location_hint">On this Android version, Location must be on for the network to start.</string>
+    <string name="remote_hotspot_error">Couldn\'t share the network. Make sure Wi‑Fi is on and no other Wi‑Fi Direct connection, hotspot or tethering is active, then try again.</string>
+    <string name="remote_hotspot_keep_open">Keep Bugbane open: on this phone the shared network stops if you leave the app.</string>
+    <string name="remote_wifi_pairing_title">Pair with the device</string>
+    <string name="remote_wifi_pairing_description">On the device to scan, enable Developer options (tap “Build number” seven times in About phone), then open Developer options › Wireless debugging, turn it on, tap “Pair device with QR code” and scan this code.</string>
+    <string name="remote_wifi_waiting">Waiting for the device to scan the code…</string>
+    <string name="remote_wifi_pairing_failed">Pairing failed. Turn Wireless debugging off and on again on the other device, then retry.</string>
+    <string name="remote_wifi_connect_failed">The device was paired but could not be reached. Check it is still on this phone\'s network with Wireless debugging on, then retry.</string>
+
+    <!-- Acquisition device identity -->
+    <string name="acquisitions_completed">Completed: %1$s</string>
+    <string name="acquisition_details_device">Device: %1$s</string>
+    <string name="acquisition_details_transport">Connection: %1$s</string>
+    <string name="acquisition_transport_local">this phone (wireless debugging)</string>
+    <string name="acquisition_transport_usb">USB cable</string>
+    <string name="acquisition_transport_wifi">Wi‑Fi Direct network “%1$s”</string>
+    <string name="acquisition_transport_hotspot">Wi‑Fi hotspot “%1$s”</string>
+
+    <!-- Settings: role -->
+    <string name="settings_role_title">Mode</string>
+    <string name="settings_role_user">User: this phone is the one being checked.</string>
+    <string name="settings_role_analyst">Analyst: other devices are scanned from this phone.</string>
+    <string name="settings_role_desc">The mode is permanent. To change it, clear the app\'s storage from App info; this deletes every acquisition.</string>
+    <string name="settings_role_button">Open App info</string>
 </resources>

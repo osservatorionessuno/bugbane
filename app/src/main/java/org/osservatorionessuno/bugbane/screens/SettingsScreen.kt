@@ -26,6 +26,8 @@ import org.osservatorionessuno.bugbane.BuildConfig
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.components.MIN_ACQUISITION_PASSWORD_LENGTH
 import org.osservatorionessuno.bugbane.utils.ConfigurationManager
+import org.osservatorionessuno.bugbane.utils.Role
+import org.osservatorionessuno.bugbane.utils.SlideshowManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -124,6 +126,9 @@ fun SettingsScreen() {
         // Add/remove a protection factor (only where there's a fingerprint gate to
         // add a password to, or a two-factor setup to drop a factor from).
         ManageProtectionCard()
+        Spacer(modifier = Modifier.height(16.dp))
+
+        RoleCard()
         Spacer(modifier = Modifier.height(16.dp))
 
         // Only offer to disable Developer Options while they are actually on.
@@ -319,6 +324,41 @@ private fun ChangeAcquisitionPasswordCard() {
     )
 }
 
+@Composable
+private fun RoleCard() {
+    val context = LocalContext.current
+    val role = remember { SlideshowManager.role() } ?: return
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = stringResource(R.string.settings_role_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(if (role == Role.ANALYST) R.string.settings_role_analyst else R.string.settings_role_user),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_role_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = {
+                val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(android.net.Uri.fromParts("package", context.packageName, null))
+                runCatching { context.startActivity(intent) }
+            }) {
+                Text(stringResource(R.string.settings_role_button))
+            }
+        }
+    }
+}
+
 private enum class ProtectionAction { ADD_PASSWORD, REMOVE_PASSWORD, REMOVE_FINGERPRINT }
 
 /**
@@ -336,6 +376,8 @@ private fun ManageProtectionCard() {
     var version by remember { mutableStateOf(0) }
     val tier = remember(version) { AcquisitionIdentityVault.tier(context) }
     if (tier == null || !tier.usesBiometric) return
+    // Analysts keep both factors.
+    val analyst = remember { SlideshowManager.role() == Role.ANALYST }
 
     var action by remember { mutableStateOf<ProtectionAction?>(null) }
 
@@ -353,7 +395,7 @@ private fun ManageProtectionCard() {
                 ProtectionActionRow(R.string.settings_add_password, R.string.settings_add_password_desc) {
                     action = ProtectionAction.ADD_PASSWORD
                 }
-            } else {
+            } else if (!analyst) {
                 ProtectionActionRow(R.string.settings_remove_password, R.string.settings_remove_password_desc) {
                     action = ProtectionAction.REMOVE_PASSWORD
                 }

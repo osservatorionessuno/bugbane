@@ -33,3 +33,10 @@ val OnSurfaceDark = Color(0xFFE6E4E4)
 val SurfaceVariantDark = Color(0xFF3D3636)
 val OnSurfaceVariantDark = Color(0xFFCFC4C4)
 val OutlineDark = Color(0xFF8A7E7E)
+
+// Analyst installs (procio.network violet); white text stays above 4.5:1 on both.
+val AnalystPrimary = Color(0xFF442D9A)
+val AnalystPrimaryDark = Color(0xFF7161AB)
+val AnalystSecondary = Color(0xFF644079)
+val AnalystSecondaryDark = Color(0xFFB9ACE7)
+val AnalystOnSecondaryDark = Color(0xFF1A1040)

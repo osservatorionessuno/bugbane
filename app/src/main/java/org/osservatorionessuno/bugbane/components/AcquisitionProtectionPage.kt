@@ -63,7 +63,7 @@ private const val TAG = "AcquisitionProtection"
  * explanation. Calls [onProtected] once an identity exists.
  */
 @Composable
-fun AcquisitionProtectionPage(onProtected: () -> Unit) {
+fun AcquisitionProtectionPage(onProtected: () -> Unit, analyst: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var working by remember { mutableStateOf(false) }
@@ -71,6 +71,11 @@ fun AcquisitionProtectionPage(onProtected: () -> Unit) {
 
     val recovery = remember { AcquisitionIdentityVault.isRecoveryPending(context) }
     val hardwareKeystore = remember { AcquisitionIdentityVault.hasHardwareKeystore() }
+    // Analysts need both factors; with the lock gate in place only the password is missing.
+    var version by remember { mutableStateOf(0) }
+    val analystNeedsPassword = analyst && remember(version) {
+        AcquisitionIdentityVault.tier(context)?.let { !it.usesPassphrase } == true
+    }
 
     // Re-read on resume: the user may have just added a screen lock via the button
     // below, which turns the biometric option on without any state change here.
@@ -86,12 +91,24 @@ fun AcquisitionProtectionPage(onProtected: () -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    if (analystNeedsPassword) {
+        SetAcquisitionPasswordScreen(
+            kind = AcquisitionIdentityVault.passwordPromptKind(context),
+            descriptionOverride = stringResource(R.string.set_password_analyst_description),
+            allowSkip = false,
+            onResolved = onProtected,
+        )
+        return
+    }
+
     // Password branch reuses the full "set a password" screen; back returns here.
     if (showPassword) {
         BackHandler { showPassword = false }
         SetAcquisitionPasswordScreen(
             kind = PasswordPromptKind.MANDATORY,
-            descriptionOverride = stringResource(R.string.set_password_chooser_description),
+            descriptionOverride = stringResource(
+                if (analyst) R.string.set_password_analyst_description else R.string.set_password_chooser_description
+            ),
             onResolved = onProtected,
         )
         return
@@ -110,7 +127,7 @@ fun AcquisitionProtectionPage(onProtected: () -> Unit) {
                 if (!strongBoxWorked) {
                     AcquisitionIdentityVault.setupTeeAuth(context)
                 }
-                onProtected()
+                if (analyst) version++ else onProtected()
             } catch (_: AcquisitionIdentityVault.UserAuthenticationException) {
                 // prompt dismissed — stay on the page so the user can retry
             } catch (e: Exception) {
@@ -140,9 +157,9 @@ fun AcquisitionProtectionPage(onProtected: () -> Unit) {
     when {
         canBiometric -> { primaryLabel = R.string.slideshow_protection_biometric_button; primaryAction = ::protect }
         !deviceSecure -> { primaryLabel = R.string.protection_set_screen_lock; primaryAction = ::openScreenLockSettings }
-        else -> { primaryLabel = R.string.protection_use_password; primaryAction = { showPassword = true } }
+        else -> { primaryLabel = if (analyst) R.string.protection_set_password else R.string.protection_use_password; primaryAction = { showPassword = true } }
     }
-    val passwordIsSecondary = canBiometric || !deviceSecure
+    val passwordIsSecondary = (canBiometric || !deviceSecure) && !analyst
 
     Column(
         modifier = Modifier
@@ -170,8 +187,11 @@ fun AcquisitionProtectionPage(onProtected: () -> Unit) {
 
         Text(
             text = stringResource(
-                if (recovery) R.string.protection_recovery_description
-                else R.string.slideshow_protection_biometric_description
+                when {
+                    recovery -> R.string.protection_recovery_description
+                    analyst -> R.string.slideshow_protection_analyst_description
+                    else -> R.string.slideshow_protection_biometric_description
+                }
             ),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,

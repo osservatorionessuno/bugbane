@@ -29,14 +29,16 @@ import java.io.File
 import java.text.DateFormat
 import java.time.Instant
 import java.util.Date
-import org.json.JSONObject
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.ui.theme.logoRes
 import org.osservatorionessuno.bugbane.AcquisitionActivity
+import org.osservatorionessuno.qf.storage.AcquisitionIndex
 
 data class AcquisitionItem(
     val dir: File,
     val name: String,
-    val completed: Date?
+    val completed: Date?,
+    val device: String? = null,
 )
 
 @Composable
@@ -50,17 +52,9 @@ fun AcquisitionsScreen() {
     fun loadAcquisitions() {
         val baseDir = File(context.filesDir, "acquisitions")
         acquisitionItems = baseDir.listFiles()?.filter { it.isDirectory }?.mapNotNull { dir ->
-            val metaFile = File(dir, "acquisition.json")
-            if (!metaFile.exists()) return@mapNotNull null
-            try {
-                val json = JSONObject(metaFile.readText())
-                val completed = json.optString("completed", "null").let {
-                    try { Date.from(Instant.parse(it)) } catch (e: Exception) { null }
-                }
-                AcquisitionItem(dir, dir.name, completed)
-            } catch (_: Throwable) {
-                null
-            }
+            val index = AcquisitionIndex.readSidecar(dir) ?: return@mapNotNull null
+            val completed = index.completed?.let { runCatching { Date.from(Instant.parse(it)) }.getOrNull() }
+            AcquisitionItem(dir, index.displayName(dir), completed, index.device?.summary?.ifBlank { null })
         }?.sortedByDescending { it.completed } ?: emptyList()
     }
 
@@ -105,7 +99,7 @@ fun AcquisitionsScreen() {
                     verticalArrangement = Arrangement.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.ic_bugbane_zoom),
+                        painter = painterResource(id = logoRes()),
                         contentDescription = "Bugbane Logo",
                         modifier = Modifier.size(200.dp),
                         alpha = 0.4f
@@ -139,25 +133,10 @@ fun AcquisitionsScreen() {
                             context.startActivity(intent)
                         },
                         onRename = { newName ->
-                            val invalid = newName.contains('/') || newName.contains("\\") ||
-                                newName == "." || newName == ".."
-                            if (invalid) {
-                                Toast.makeText(
-                                    context,
-                                    R.string.acquisitions_rename_invalid,
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                            if (AcquisitionIndex.rename(item.dir, newName)) {
+                                loadAcquisitions()
                             } else {
-                                val newDir = File(item.dir.parentFile, newName)
-                                if (!newDir.exists() && item.dir.renameTo(newDir)) {
-                                    loadAcquisitions()
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        R.string.acquisitions_rename_failed,
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
+                                Toast.makeText(context, R.string.acquisitions_rename_failed, Toast.LENGTH_SHORT).show()
                             }
                         },
                         onDelete = {
@@ -261,10 +240,18 @@ fun AcquisitionItemRow(
                     ),
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                item.device?.let {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
                 item.completed?.let {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Completed: ${dateFormat.format(it)}",
+                        text = stringResource(R.string.acquisitions_completed, dateFormat.format(it)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )

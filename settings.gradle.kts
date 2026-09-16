@@ -50,3 +50,23 @@ if (useLocalLibmvt) {
     }
 }
 
+
+// Same for the libadb fork (../libadb-android-bc), e.g. to work on the USB transport.
+val useLocalLibadb = providers.gradleProperty("libadbLocal")
+    .orElse("false")
+    .get()
+    .toBoolean()
+
+if (useLocalLibadb) {
+    gradle.startParameter.dependencyVerificationMode = DependencyVerificationMode.OFF
+    includeBuild("../libadb-android-bc") {
+        dependencySubstitution {
+            substitute(module("com.github.osservatorionessuno:libadb-android-bc"))
+                .using(project(":libadb"))
+        }
+    }
+    println("using local libadb, dependency verification is off")
+    if (gradle.startParameter.taskNames.any { "Production" in it }) {
+        throw GradleException("Cannot build the production flavor with libadbLocal=true. Unset libadbLocal for a production build.")
+    }
+}

@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.osservatorionessuno.bugbane.BuildConfig
 import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.ui.theme.logoRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,7 +89,7 @@ private fun TopBarTitle() {
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Icon(
-            painter = painterResource(R.drawable.ic_bugbane_zoom),
+            painter = painterResource(logoRes()),
             contentDescription = null,
             modifier = Modifier.size(32.dp),
             tint = MaterialTheme.colorScheme.onPrimary

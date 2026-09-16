@@ -5,6 +5,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.bugbane.utils.SlideshowManager
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -55,19 +60,40 @@ private val DarkColorScheme = darkColorScheme(
     outline = OutlineDark,
 )
 
+private val AnalystLightColorScheme = LightColorScheme.copy(
+    primary = AnalystPrimary,
+    secondary = AnalystSecondary,
+)
+
+private val AnalystDarkColorScheme = DarkColorScheme.copy(
+    primary = AnalystPrimaryDark,
+    secondary = AnalystSecondaryDark,
+    onSecondary = AnalystOnSecondaryDark,
+)
+
+val LocalAnalyst = staticCompositionLocalOf { false }
+
+@Composable
+fun logoRes(): Int = if (LocalAnalyst.current) R.drawable.ic_bugbane_zoom_analyst else R.drawable.ic_bugbane_zoom
+
 @Composable
 fun Theme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
+    val analyst = SlideshowManager.appProgress.collectAsStateWithLifecycle().value.isAnalyst
     val colorScheme = when {
+        analyst && darkTheme -> AnalystDarkColorScheme
+        analyst -> AnalystLightColorScheme
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalAnalyst provides analyst) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
