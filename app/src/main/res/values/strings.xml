@@ -350,14 +350,14 @@
     <!-- Analyst scan wizard -->
     <string name="remote_transport_title">How is the device connected?</string>
     <string name="remote_transport_description">A USB cable is faster and more reliable. Over Wi‑Fi, this phone shares a network with no internet access for the other device to join.</string>
-    <string name="remote_transport_usb_button">Use a USB cable (recommended)</string>
+    <string name="remote_transport_usb_button">Use a USB cable</string>
     <string name="remote_transport_wifi_button">Use Wi‑Fi instead</string>
     <string name="remote_transport_usb_unsupported">This phone can\'t act as a USB host.</string>
     <string name="remote_next_button">Next</string>
     <string name="remote_retry_button">Retry</string>
     <string name="remote_error_title">Something went wrong</string>
     <string name="remote_usb_cable_title">Connect the cable</string>
-    <string name="remote_usb_cable_description">Connect the two phones with a USB cable.\n\nOnly one setup works: this phone must control the connection. Open the USB notification on this phone and choose “USB controlled by: This device”; if the other device asks, choose “Connected device” there.</string>
+    <string name="remote_usb_cable_description">Connect the two phones with a USB cable.\n\nOnly one setup works. Open the USB notification on this phone and set “USB controlled by” to “Connected device” and “Use USB for” to “File transfer”.</string>
     <string name="remote_usb_debugging_title">Enable USB debugging on the other device</string>
     <string name="remote_usb_debugging_description">On the device to scan, open Settings › About phone and tap “Build number” seven times to enable Developer options. Then open Developer options and turn on “USB debugging”.</string>
     <string name="remote_usb_waiting">Waiting for the device…</string>
