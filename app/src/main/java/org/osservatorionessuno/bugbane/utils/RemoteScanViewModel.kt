@@ -141,7 +141,8 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
                 .map { list -> list.firstOrNull { it.kind == ServiceKind.TLS_PAIRING && it.serviceName == credentials.serviceName } }
                 .filter { it != null }.first()!!
             _step.value = Step.Connecting(usb = false)
-            val paired = withContext(Dispatchers.IO) { adbManager.pairRemote(pairing.host, pairing.port, credentials.password) }
+            // The link may still be settling: the first packets can fail to route.
+            val paired = retrying { adbManager.pairRemote(pairing.host, pairing.port, credentials.password) } == true
             if (!paired) {
                 _step.value = Step.Error(R.string.remote_wifi_pairing_failed, Step.Hotspot)
                 return@restart
@@ -155,16 +156,14 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
                 _step.value = Step.Error(R.string.remote_wifi_connect_failed, Step.Hotspot)
                 return@restart
             }
-            try {
-                val shared = HotspotManager.state.value as? HotspotManager.HotspotState.Active
-                val via = AcquisitionTransport(
-                    if (shared?.wifiDirect == false) AcquisitionTransport.WIFI_HOTSPOT else AcquisitionTransport.WIFI_DIRECT,
-                    shared?.ssid,
-                )
-                withContext(Dispatchers.IO) { adbManager.connectRemote(connect.host, connect.port, via) }
+            val shared = HotspotManager.state.value as? HotspotManager.HotspotState.Active
+            val via = AcquisitionTransport(
+                if (shared?.wifiDirect == false) AcquisitionTransport.WIFI_HOTSPOT else AcquisitionTransport.WIFI_DIRECT,
+                shared?.ssid,
+            )
+            if (retrying { adbManager.connectRemote(connect.host, connect.port, via); true } == true) {
                 _step.value = Step.Connected
-            } catch (t: Throwable) {
-                Log.w(TAG, "Wi-Fi connection failed", t)
+            } else {
                 _step.value = Step.Error(R.string.remote_wifi_connect_failed, Step.Hotspot)
             }
         }
@@ -186,6 +185,19 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
             else -> Step.Transport
         }
         if (_step.value == Step.Transport) HotspotManager.stop()
+    }
+
+    /** Run a blocking transport call on IO up to [ATTEMPTS] times; null when all failed. */
+    private suspend fun <T> retrying(block: () -> T): T? {
+        repeat(ATTEMPTS) { attempt ->
+            try {
+                return withContext(Dispatchers.IO) { block() }
+            } catch (t: Throwable) {
+                Log.w(TAG, "attempt ${attempt + 1}/$ATTEMPTS failed", t)
+                if (attempt < ATTEMPTS - 1) delay(RETRY_DELAY_MS)
+            }
+        }
+        return null
     }
 
     private fun restart(block: suspend () -> Unit) {
@@ -216,5 +228,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         private const val POLL_INTERVAL_MS = 1_000L
         private const val CONNECT_DISCOVERY_TIMEOUT_MS = 30_000L
+        private const val ATTEMPTS = 5
+        private const val RETRY_DELAY_MS = 4_000L
     }
 }
