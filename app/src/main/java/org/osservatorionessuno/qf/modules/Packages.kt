@@ -12,6 +12,7 @@ import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
 import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.security.MessageDigest
 
 /**
@@ -156,14 +157,43 @@ class Packages : Module {
         return FileHashes(md5, sha1, sha256, sha512)
     }
 
+    /** Copy of an APK on another device, so it can be hashed and parsed like a local one. */
+    private fun pullToTemp(sync: AdbSync, packagePath: String, cacheDir: File): File? {
+        val temp = File.createTempFile("apk", ".apk", cacheDir)
+        return runCatching { FileOutputStream(temp).use { sync.pull(packagePath, it) }; temp }
+            .onFailure { Log.w(TAG, "Failed to pull $packagePath: ${it.message}"); temp.delete() }
+            .getOrNull()
+    }
+
+    private fun buildPackageFile(
+        shell: AdbShell,
+        sync: AdbSync,
+        writer: ArtifactSink,
+        cacheDir: File,
+        packageName: String,
+        packagePath: String,
+    ): PackageFile {
+        // Acquiring another device: its APKs aren't on this filesystem.
+        val local = File(packagePath).takeIf { it.canRead() }
+        val temp = if (local == null) pullToTemp(sync, packagePath, cacheDir) else null
+        val apk = local ?: temp
+        try {
+            return buildPackageFile(shell, sync, writer, packageName, packagePath, apk, temp)
+        } finally {
+            temp?.delete()
+        }
+    }
+
     private fun buildPackageFile(
         shell: AdbShell,
         sync: AdbSync,
         writer: ArtifactSink,
         packageName: String,
         packagePath: String,
+        apk: File?,
+        pulled: File?,
     ): PackageFile {
-        val hashes = hashFileLocally(File(packagePath)) ?: hashFileRemotely(shell, packagePath)
+        val hashes = apk?.let { hashFileLocally(it) } ?: hashFileRemotely(shell, packagePath)
         val packageFile = PackageFile(
             path = packagePath,
             localName = "", // not set/used here
@@ -176,8 +206,8 @@ class Packages : Module {
             infiles = emptyList(),
         )
 
-        runCatching {
-            val apkInfo = APKParser.parseAPK(File(packagePath))
+        if (apk != null) runCatching {
+            val apkInfo = APKParser.parseAPK(apk)
             packageFile.suspicious = apkInfo.suspicious
             packageFile.certificates = apkInfo.certificates
             packageFile.infiles = apkInfo.files
@@ -189,7 +219,7 @@ class Packages : Module {
             Log.i(TAG, "downloading $packagePath")
             val result = runCatching {
                 writer.useArtifact(archivePath) { output ->
-                    sync.pull(packagePath, output)
+                    if (pulled != null) pulled.inputStream().use { it.copyTo(output) } else sync.pull(packagePath, output)
                 }
             }
             if (result.isFailure) {
@@ -309,7 +339,7 @@ class Packages : Module {
             val pkg = packages[i]
             val packagePaths = pathsByPackage[pkg.name] ?: continue
             packages[i] = pkg.copy(
-                files = packagePaths.map { buildPackageFile(shell, sync, writer, pkg.name, it) },
+                files = packagePaths.map { buildPackageFile(shell, sync, writer, context.cacheDir, pkg.name, it) },
             )
         }
 
