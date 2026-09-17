@@ -41,7 +41,17 @@ run_flow() {  # <flow-file>
   return $rc
 }
 
+# Experiment: live sample of the shell uid's appops + granted permissions per API level,
+# before and after the acquisition, so we can see which entries the scan itself creates
+# (libmvt flags every appops entry of com.android.shell as a risky permission).
+shell_snapshot() {  # <label>
+  # full dump, not --package: same output shape on every API level in the matrix
+  adb shell dumpsys appops > "$ART/appops-$1.txt" 2>&1 || true
+  adb shell dumpsys package com.android.shell > "$ART/shell-package-$1.txt" 2>&1 || true
+}
+
 adb wait-for-device
+shell_snapshot before
 adb shell settings put global stay_on_while_plugged_in 3 || true
 adb shell settings put global verifier_verify_adb_installs 0 || true
 # Underpowered CI emulators throw "isn't responding" ANR dialogs that cover the UI;
@@ -79,6 +89,7 @@ done
 echo "::group::maestro connect-acquire.yaml"
 maestro test -e CODE="$CODE" "$FLOWS/connect-acquire.yaml"; rc=$?
 echo "::endgroup::"
+shell_snapshot after
 if [ "$rc" -ne 0 ]; then echo "FLOW FAILED: connect-acquire.yaml (rc=$rc)"; exit 1; fi
 
 # Scrape the one-time passphrase from the still-open dialog before closing it.
@@ -101,7 +112,8 @@ python3 "$DIR/verify_export.py" "$ART/$NAME" "$PASSPHRASE" ${FIXTURE:+"$SUSPICIO
 # Cross-check: upstream MVT must independently flag the planted IOC in the decrypted
 # export, using bugbane's own bundled indicators (same IOC set on both sides).
 cp "$(dirname "$DIR")/app/src/main/assets/bundled-indicators/indicators.json" "$ART/indicators.stix2"
-python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" "$ART/indicators.stix2" "/data/local/tmp/wd/pred.so" || exit 1
+mkdir -p "$ART/mvt-out"
+MVT_OUT="$ART/mvt-out" python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" "$ART/indicators.stix2" "/data/local/tmp/wd/pred.so" || exit 1
 adb shell 'rm -rf /data/local/tmp/wd' || true
 
 echo "INTEGRATION E2E PASS"

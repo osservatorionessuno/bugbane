@@ -48,7 +48,8 @@ def main(path, passphrase, stix2, expected):
     with tempfile.TemporaryDirectory() as tmp:
         acq = os.path.join(tmp, "acq")
         zipfile.ZipFile(io.BytesIO(plaintext)).extractall(acq)
-        matches = mvt_matches(acq, stix2, os.path.join(tmp, "out"))
+        # MVT_OUT keeps MVT's full output (incl. its own shell appops alerts) as a CI artifact.
+        matches = mvt_matches(acq, stix2, os.environ.get("MVT_OUT") or os.path.join(tmp, "out"))
     # The planted file is flagged either directly or via a prefix IOC (e.g. its dir).
     hit = [m for m in matches if expected in m or m in expected]
     if not hit:
