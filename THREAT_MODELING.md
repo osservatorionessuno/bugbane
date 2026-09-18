@@ -55,10 +55,13 @@ The attacker in this scenario has a privileged network position meaning:
 - they are connected on the same Wi-Fi network as the device, detecting the usage of Wireless ADB.
 - they monitor the network traffic, detecting the fetch and download of IoC.
 
+A local attacker on the same network can also exploit Wireless ADB itself: devices on Android 11+ missing the May 2026 security patch are affected by [CVE-2026-0073](https://nvd.nist.gov/vuln/detail/CVE-2026-0073), a wireless-ADB authentication bypass that grants device access with no user interaction while Wireless Debugging is enabled.
+
 ### Countermeasures
 
 Bugbane should inform the user that using it on untrusted, public or shared Wi-Fi network is unsafe from a privacy perspective.
 It should suggest to use a trusted Wi-Fi or alternatively an hot-spot from another trusted device.
+Bugbane should push the user to turn Wireless Debugging off as soon as the acquisition is done, and warn on unpatched devices.
 
 IoC MUST always be downloaded via HTTPS and should be downloaded via OHTTP.
 
