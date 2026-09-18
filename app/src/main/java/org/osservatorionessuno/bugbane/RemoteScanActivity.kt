@@ -54,15 +54,12 @@ import com.google.accompanist.permissions.rememberPermissionState
 import org.osservatorionessuno.bugbane.components.SlideshowPageContent
 import org.osservatorionessuno.bugbane.components.SlideshowPageData
 import org.osservatorionessuno.bugbane.ui.theme.Theme
-import org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker
 import org.osservatorionessuno.bugbane.utils.HotspotManager.HotspotState
 import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel
 import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel.Step
-import org.osservatorionessuno.bugbane.utils.ViewModelFactory
 import org.osservatorionessuno.cadb.QrCode
-import java.io.File
 
-/** Connect another device over USB or Wi-Fi, then start its acquisition. */
+/** Connect another device over USB or Wi-Fi; the home screen then starts its acquisition. */
 class RemoteScanActivity : ComponentActivity() {
     private val viewModel: RemoteScanViewModel by viewModels()
 
@@ -73,14 +70,8 @@ class RemoteScanActivity : ComponentActivity() {
         setContent {
             Theme {
                 val step by viewModel.step.collectAsStateWithLifecycle()
-                val context = LocalContext.current
-                LaunchedEffect(step) {
-                    if (step == Step.Connected) {
-                        val adbManager = ViewModelFactory.get(application).adbManager
-                        AcquisitionProgressTracker.start(context, adbManager, File(filesDir, "acquisitions"))
-                        finish()
-                    }
-                }
+                // The home screen shows the connected device and starts the acquisition.
+                LaunchedEffect(step) { if (step == Step.Connected) finish() }
                 BackHandler(enabled = step != Step.Transport) { viewModel.back() }
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                     // Centred when the step fits, scrollable when it doesn't.
