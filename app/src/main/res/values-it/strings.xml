@@ -49,7 +49,6 @@
     <string name="beta_warning_message">Questa è una versione beta: usala a tuo rischio. Segnala eventuali bug su GitHub.</string>
     <string name="beta_warning_quit">Esci dall\'app</string>
     <string name="beta_warning_understand">Ho capito</string>
-    <string name="settings_description">Configura qui le tue preferenze e le impostazioni dell\'app.</string>
     <string name="settings_general">Impostazioni generali</string>
     <string name="settings_developer_options">Disabilita opzioni sviluppatore</string>
     <string name="settings_developer_options_desc">Si raccomanda di disabilitare le opzioni sviluppatore dopo ogni sessione e ri-abilitarle solamente quando necessario.</string>
