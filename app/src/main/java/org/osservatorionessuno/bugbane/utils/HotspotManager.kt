@@ -34,7 +34,8 @@ object HotspotManager {
     sealed class HotspotState {
         object Inactive : HotspotState()
         object Starting : HotspotState()
-        data class Active(val ssid: String?, val passphrase: String?, val wifiDirect: Boolean) : HotspotState()
+        /** [clients] counts stations on the Wi-Fi Direct group; a local-only hotspot reports none. */
+        data class Active(val ssid: String?, val passphrase: String?, val wifiDirect: Boolean, val clients: Int = 0) : HotspotState()
         data class Error(val reason: Int?) : HotspotState()
     }
 
@@ -99,9 +100,15 @@ object HotspotManager {
             val info = IntentCompat.getParcelableExtra(intent, WifiP2pManager.EXTRA_WIFI_P2P_INFO, WifiP2pInfo::class.java)
             val group = IntentCompat.getParcelableExtra(intent, WifiP2pManager.EXTRA_WIFI_P2P_GROUP, WifiP2pGroup::class.java)
             if (info?.groupFormed == true && info.isGroupOwner && group != null) {
-                if (_state.value is HotspotState.Starting) {
+                val current = _state.value
+                // The owner is told about every station that joins, legacy Wi-Fi clients included.
+                val clients = group.clientList.size
+                if (current is HotspotState.Starting) {
                     Log.d(TAG, "group ${group.networkName} up on ${group.`interface`}")
-                    _state.value = HotspotState.Active(group.networkName, group.passphrase, wifiDirect = true)
+                    _state.value = HotspotState.Active(group.networkName, group.passphrase, wifiDirect = true, clients = clients)
+                } else if (current is HotspotState.Active && current.wifiDirect && current.clients != clients) {
+                    Log.d(TAG, "group has $clients client(s)")
+                    _state.value = current.copy(clients = clients)
                 }
             } else if (_state.value is HotspotState.Active) {
                 Log.d(TAG, "group gone")

@@ -125,7 +125,21 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun chooseWifi() { _step.value = Step.Hotspot }
+    fun chooseWifi() {
+        _step.value = Step.Hotspot
+        watchJoin()
+    }
+
+    /** Move on by itself once a station joins the Wi-Fi Direct group; Next stays for the rest. */
+    private fun watchJoin() {
+        val before = (HotspotManager.state.value as? HotspotManager.HotspotState.Active)?.clients ?: 0
+        restart {
+            HotspotManager.state
+                .filter { it is HotspotManager.HotspotState.Active && it.wifiDirect && it.clients > before }
+                .first()
+            if (_step.value == Step.Hotspot) hotspotJoined()
+        }
+    }
 
     val hotspot: StateFlow<HotspotManager.HotspotState> get() = HotspotManager.state
 
@@ -185,6 +199,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
             else -> Step.Transport
         }
         if (_step.value == Step.Transport) HotspotManager.stop()
+        if (_step.value == Step.Hotspot) watchJoin()
     }
 
     /** Run a blocking transport call on IO up to [ATTEMPTS] times; null when all failed. */
