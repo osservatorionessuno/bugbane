@@ -1,0 +1,37 @@
+# Analyst: open the scan wizard, pick Wi-Fi, let the Wi-Fi Direct group form, then
+# reach the pairing QR (left on screen for the host to decode).
+appId: org.osservatorionessuno.bugbane
+---
+# Android 16 emulators can lock while a flow runs; the harness PIN is 1234.
+- runFlow:
+    when:
+      visible:
+        text: ".*(Unlock for all features and data|Enter your PIN).*"
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 30%"
+      - inputText: "1234"
+      - pressKey: Enter
+# The title and the button share the text; the button comes second.
+- tapOn:
+    text: "Scan a device"
+    index: 1
+- extendedWaitUntil:
+    visible: "How is the device connected?"
+    timeout: 15000
+- tapOn: "Use Wi‑Fi instead"
+- extendedWaitUntil:
+    visible: "Join this phone's network"
+    timeout: 15000
+# Group up: the wizard shows the generated SSID.
+- extendedWaitUntil:
+    visible:
+      text: "DIRECT-bb-bugbane-.*"
+    timeout: 60000
+- takeScreenshot: screenshots/a04-network-qr
+- tapOn: "Next"
+- extendedWaitUntil:
+    visible: "Waiting for the device to scan the code…"
+    timeout: 15000
+- takeScreenshot: screenshots/a05-pairing-qr

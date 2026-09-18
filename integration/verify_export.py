@@ -2,7 +2,7 @@
 with the scraped passphrase and check the ZIP holds a real acquisition.
 
 CLI: python3 integration/verify_export.py <file.zip.age> <passphrase> [suspicious-appid]
-         [--sideloaded a,b,...]
+         [--sideloaded a,b,...] [--transport wifi_direct]
 
 --sideloaded is the exact set of app ids the harness itself installed over adb.
 packages.json must mark exactly those as sideloaded (installer "null" and not
@@ -21,7 +21,7 @@ REQUIRED_ENTRIES = ["acquisition.json", "dumpsys.txt", "getprop.txt", "packages.
 MIN_BUGREPORT_BYTES = 100_000
 
 
-def verify(path, passphrase, suspicious_appid=None, sideloaded=None):
+def verify(path, passphrase, suspicious_appid=None, sideloaded=None, transport=None):
     with open(path, "rb") as f:
         ciphertext = f.read()
     plaintext = pyrage.passphrase.decrypt(ciphertext, passphrase)
@@ -60,6 +60,16 @@ def verify(path, passphrase, suspicious_appid=None, sideloaded=None):
             raise AssertionError("sideloaded package set mismatch: unexpected=%s missing=%s (expected exactly %s)"
                                  % (unexpected, missing, sorted(expected)))
         print("sideloaded set exact: %s" % sorted(expected), flush=True)
+    # Analyst runs: the index names the acquired device and how it was reached.
+    if transport:
+        rec = index.get("transport") or {}
+        if rec.get("type") != transport:
+            raise AssertionError("transport %r, expected %r" % (rec, transport))
+        if transport.startswith("wifi") and not (rec.get("hotspot_ssid") or "").startswith("DIRECT-bb-bugbane-"):
+            raise AssertionError("transport lacks the shared network SSID: %r" % rec)
+        if not (index.get("device") or {}).get("model"):
+            raise AssertionError("acquisition.json lacks device.model: %r" % index.get("device"))
+        print("transport %s via %s, device %s" % (rec["type"], rec.get("hotspot_ssid"), index["device"]["model"]), flush=True)
     bugreport = z.getinfo("bugreport.zip").file_size
     if bugreport < MIN_BUGREPORT_BYTES:
         raise AssertionError("bugreport.zip suspiciously small: %d bytes" % bugreport)
@@ -74,6 +84,9 @@ if __name__ == "__main__":
     ap.add_argument("suspicious_appid", nargs="?", default=None)
     ap.add_argument("--sideloaded", default=None,
                     help="comma-separated exact set of app ids expected sideloaded")
+    ap.add_argument("--transport", default=None,
+                    help="expected transport.type in acquisition.json (analyst runs)")
     args = ap.parse_args()
-    verify(args.archive, args.passphrase, args.suspicious_appid,
-           args.sideloaded.split(",") if args.sideloaded else None)
+    # --sideloaded "" means "exactly none".
+    sideloaded = None if args.sideloaded is None else [a for a in args.sideloaded.split(",") if a]
+    verify(args.archive, args.passphrase, args.suspicious_appid, sideloaded, args.transport)

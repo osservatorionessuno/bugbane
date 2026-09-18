@@ -1,0 +1,12 @@
+# Target: back on the Wireless debugging page, open the QR scanner again.
+appId: com.android.settings
+---
+- extendedWaitUntil:
+    visible: "Pair device with QR code"
+    timeout: 20000
+- tapOn:
+    containsChild: "Pair device with QR code"
+- extendedWaitUntil:
+    visible:
+      text: ".*(Scan QR code|Pairing device|Paired devices).*"
+    timeout: 20000

@@ -1,0 +1,56 @@
+# Analyst onboarding on a fresh install: role slide → password (no hardware keystore
+# on emulators, so the lock gate is the PIN the harness set) → home.
+appId: org.osservatorionessuno.bugbane
+---
+- launchApp:
+    clearState: true
+- runFlow: dismiss-anr.yaml
+- extendedWaitUntil:
+    visible:
+      text: ".*(Welcome to Bugbane|Unlock for all features and data|Enter your PIN).*"
+    timeout: 60000
+# Android 16 emulators can lock while a flow runs; the harness PIN is 1234.
+- runFlow:
+    when:
+      visible:
+        text: ".*(Unlock for all features and data|Enter your PIN).*"
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 30%"
+      - inputText: "1234"
+      - pressKey: Enter
+- extendedWaitUntil:
+    visible: "Welcome to Bugbane"
+    timeout: 60000
+- tapOn:
+    text: "^I understand$"
+- extendedWaitUntil:
+    visible: "Check this device"
+    timeout: 15000
+- takeScreenshot: screenshots/a01-role
+- tapOn: "I'm an analyst: scan other devices instead"
+# Choosing analyst swaps the launcher alias and restarts the app in a new task.
+- extendedWaitUntil:
+    visible: "Protect your acquisitions"
+    timeout: 60000
+- takeScreenshot: screenshots/a02-protection
+- tapOn: "Set a password"
+- extendedWaitUntil:
+    visible: "Set an acquisition password"
+    timeout: 15000
+- tapOn: "Password"
+- inputText: "bugbane-e2e-pass1"
+- hideKeyboard
+- tapOn: "Confirm password"
+- inputText: "bugbane-e2e-pass1"
+- hideKeyboard
+- tapOn: "Set password"
+- extendedWaitUntil:
+    visible: "Get Started"
+    timeout: 30000
+- tapOn: "Get Started"
+- extendedWaitUntil:
+    visible: "Scan a device"
+    timeout: 20000
+- takeScreenshot: screenshots/a03-home

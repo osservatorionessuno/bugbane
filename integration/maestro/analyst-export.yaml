@@ -1,0 +1,51 @@
+# Analyst: once the target is connected the home screen shows it; confirm, wait for
+# the acquisition, then export (passphrase dialog left open for the host to scrape).
+appId: org.osservatorionessuno.bugbane
+---
+# Android 16 emulators can lock while a flow runs; the harness PIN is 1234.
+- runFlow:
+    when:
+      visible:
+        text: ".*(Unlock for all features and data|Enter your PIN).*"
+    commands:
+      - swipe:
+          start: "50%, 80%"
+          end: "50%, 30%"
+      - inputText: "1234"
+      - pressKey: Enter
+- extendedWaitUntil:
+    visible: "Device connected"
+    timeout: 180000
+- takeScreenshot: screenshots/a05b-device-connected
+- tapOn: "Start Acquisition"
+- extendedWaitUntil:
+    visible: "Stop Acquisition"
+    timeout: 60000
+- takeScreenshot: screenshots/a06-acquiring
+- extendedWaitUntil:
+    visible: "Export"
+    timeout: 1200000
+- takeScreenshot: screenshots/a07-acquisition-complete
+# The planted IOC on the target must be detected; also gates on analysis done.
+- extendedWaitUntil:
+    visible:
+      text: ".*CRITICAL.*"
+    timeout: 300000
+- takeScreenshot: screenshots/a08-scan-results
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible: "SAVE"
+          commands:
+            - tapOn: "Export"
+            - extendedWaitUntil:
+                visible: "SAVE"
+                timeout: 20000
+- assertVisible: "SAVE"
+- tapOn: "SAVE"
+- extendedWaitUntil:
+    visible: "Copy to clipboard"
+    timeout: 120000
+- takeScreenshot: screenshots/a09-export-passphrase

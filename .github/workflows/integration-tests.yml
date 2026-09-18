@@ -18,20 +18,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        uses: gradle/actions/wrapper-validation@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
 
       - name: Set up JDK
-        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
           packages: |
             platforms;android-36 build-tools;36.0.0
@@ -48,14 +48,14 @@ jobs:
             --out app-production-release.apk \
             app/build/outputs/apk/production/release/app-production-release-unsigned.apk
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: integration-apk
           path: app-production-release.apk
           compression-level: 0
           retention-days: 3
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: integration-fixture-apk
           path: fixtures/suspicious-apk/build/outputs/apk/debug/suspicious-apk-debug.apk
@@ -86,7 +86,7 @@ jobs:
           - { api-level: 35, target: google_apis_playstore }
           - { api-level: 36, target: google_apis_playstore }
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Enable KVM
         run: |
@@ -94,20 +94,20 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: integration-apk
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: integration-fixture-apk
 
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
 
       - name: Set up JDK
-        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '17'
@@ -133,11 +133,120 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot
           script: ./integration/run.sh app-production-release.apk suspicious-apk-debug.apk
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           # run number in the name so downloaded artifacts are unambiguous across
           # runs (higher = newer); RUN_INFO.txt inside carries the commit sha.
           name: integration-artifacts-api${{ matrix.api-level }}-run${{ github.run_number }}
           path: integration/artifacts/
+          retention-days: 7
+
+  # Analyst mode over Wi-Fi with two emulators: A (analyst) acquires B (target) through
+  # the Wi-Fi Direct wizard. Emulators on one host share a virtual Wi-Fi network, so
+  # the group, mDNS, pairing and TLS are real; only B's camera view of the pairing QR
+  # is staged (see integration/analyst.sh). Wireless debugging needs API 30+, the QR
+  # pairing scanner and the virtual-scene camera work from API 34 in the emulator.
+  analyst-wifi:
+    needs: build-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [34, 35, 36]
+    env:
+      IMAGE: system-images;android-${{ matrix.api-level }};google_apis;x86_64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: integration-apk
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: integration-fixture-apk
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: |
+            platform-tools emulator ${{ env.IMAGE }}
+
+      - name: Install Maestro + host dependencies
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          pip install -r integration/requirements.txt
+          sudo apt-get update -q && sudo apt-get install -y -q zbar-tools qrencode
+
+      - name: Boot two emulators
+        env:
+          # avdmanager and the emulator must agree on where the AVDs live.
+          ANDROID_AVD_HOME: /home/runner/.android/avd
+        run: |
+          nproc; free -g
+          mkdir -p "$ANDROID_AVD_HOME"
+          EMU="$ANDROID_HOME/emulator/emulator"
+          for name in analyst target; do
+            echo no | avdmanager create avd -n "$name" -k "$IMAGE" -d pixel_5 --force
+          done
+          "$EMU" -list-avds
+          OPTS="-no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -cores 2 -memory 2048"
+          # Start the second emulator only once the first is up: two emulators starting
+          # together each spawn a netsim Wi-Fi daemon with its own DHCP pool, and both
+          # devices then get the same address.
+          nohup "$EMU" -avd analyst -port 5554 $OPTS -camera-back none -camera-front none > analyst-emu.log 2>&1 &
+          PID_A=$!
+          timeout 300 adb -s emulator-5554 wait-for-device || { echo "analyst emulator never registered"; tail -n 60 analyst-emu.log; exit 1; }
+          nohup "$EMU" -avd target  -port 5556 $OPTS -camera-back virtualscene -camera-front none > target-emu.log 2>&1 &
+          PID_B=$!
+          sleep 30
+          for pid in $PID_A $PID_B; do
+            kill -0 "$pid" 2>/dev/null || { echo "emulator process $pid exited"; tail -n 60 analyst-emu.log target-emu.log; exit 1; }
+          done
+          adb devices
+          for s in emulator-5554 emulator-5556; do
+            timeout 300 adb -s "$s" wait-for-device || { echo "$s never registered"; tail -n 60 analyst-emu.log target-emu.log; exit 1; }
+            timeout 900 sh -c "until [ \"\$(adb -s $s shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')\" = 1 ]; do sleep 5; done" \
+              || { echo "$s did not finish booting"; tail -n 60 analyst-emu.log target-emu.log; exit 1; }
+            adb -s "$s" shell settings put global window_animation_scale 0
+            adb -s "$s" shell settings put global transition_animation_scale 0
+            adb -s "$s" shell settings put global animator_duration_scale 0
+          done
+          adb devices
+
+      - name: Run analyst Wi-Fi E2E (Maestro)
+        timeout-minutes: 60
+        run: ./integration/analyst.sh emulator-5554 emulator-5556 app-production-release.apk suspicious-apk-debug.apk
+
+      - name: Emulator logs
+        if: failure()
+        run: tail -n 80 analyst-emu.log target-emu.log || true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: analyst-wifi-artifacts-api${{ matrix.api-level }}-run${{ github.run_number }}
+          path: |
+            integration/artifacts/
+            analyst-emu.log
+            target-emu.log
           retention-days: 7

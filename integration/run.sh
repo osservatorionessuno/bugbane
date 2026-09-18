@@ -18,9 +18,10 @@ PKG=org.osservatorionessuno.bugbane
 
 echo "sha=${GITHUB_SHA:-unknown} run=${GITHUB_RUN_NUMBER:-?} ref=${GITHUB_REF_NAME:-?}" > "$ART/RUN_INFO.txt"
 
+LOGCAT_PID=""
 capture() {
   adb exec-out screencap -p > "$ART/final.png" 2>/dev/null || true
-  adb logcat -d > "$ART/logcat.txt" 2>/dev/null || true
+  kill "$LOGCAT_PID" 2>/dev/null || true
   # Maestro drops screenshots/logs per run under ~/.maestro/tests; keep the latest.
   latest="$(ls -dt "$HOME"/.maestro/tests/* 2>/dev/null | head -1)"
   [ -n "$latest" ] && cp -r "$latest" "$ART/maestro-debug" 2>/dev/null || true
@@ -42,11 +43,15 @@ run_flow() {  # <flow-file>
 }
 
 adb wait-for-device
+# Underpowered CI emulators throw "isn't responding" ANR dialogs that cover the UI;
+# suppress crash/ANR dialogs device-wide before anything else can raise one.
+adb shell settings put global hide_error_dialogs 1 || true
 adb shell settings put global stay_on_while_plugged_in 3 || true
 adb shell settings put global verifier_verify_adb_installs 0 || true
-# Underpowered CI emulators throw "isn't responding" ANR dialogs that cover the UI;
-# suppress crash/ANR dialogs device-wide so they can't block the flows.
-adb shell settings put global hide_error_dialogs 1 || true
+# Maestro clears the device log at every flow start, so stream it for the whole run.
+adb logcat > "$ART/logcat.txt" 2>&1 &
+LOGCAT_PID=$!
+"$DIR/wait_boot.sh" "$(adb get-serialno)"
 # Android 16 throttles notifications when several arrive at once, which can drop
 # bugbane's pairing notification; disable it device-wide.
 adb shell settings put system notification_cooldown_enabled 0 || true
@@ -61,7 +66,8 @@ adb install -r -g "$APK"
 adb shell 'mkdir -p /data/local/tmp/wd && echo planted > /data/local/tmp/wd/pred.so' || true
 
 # Onboard + open the Settings pairing dialog (6-digit code left on screen).
-run_flow pair.yaml || exit 1
+# Restartable (clears app state): one retry absorbs a transient dialog or a slow start.
+run_flow pair.yaml || run_flow pair.yaml || exit 1
 
 # Scrape the pairing code from the dialog, then open the notification shade via adb
 # (the swipe gesture misses over the pairing dialog on slow CI emulators) and wait for
@@ -89,7 +95,11 @@ printf '%s' "$PASSPHRASE" > "$ART/passphrase.txt"
 run_flow set-password.yaml || exit 1
 
 # Pull the exported archive (newest first) and verify it host-side.
-NAME="$(adb shell 'ls -t /sdcard/Download/' | tr -d '\r' | grep -m1 '\.zip\.age$')"
+# The archive is moved into Download a moment after the passphrase dialog shows.
+for _ in $(seq 1 10); do
+  NAME="$(adb shell 'ls -t /sdcard/Download/' | tr -d '\r' | grep -m1 '\.zip\.age$')"
+  [ -n "$NAME" ] && break; sleep 3
+done
 if [ -z "$NAME" ]; then echo "NO EXPORT IN DOWNLOADS"; exit 1; fi
 adb pull "/sdcard/Download/$NAME" "$ART/$NAME"
 # --sideloaded: the harness adb-installs exactly bugbane, Maestro's on-device driver

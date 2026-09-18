@@ -1,0 +1,10 @@
+# Underpowered CI emulators raise "isn't responding" dialogs during boot, before the
+# harness can turn error dialogs off; one left on screen covers whatever a flow
+# launches. Choosing "Wait" closes it.
+appId: org.osservatorionessuno.bugbane
+---
+- runFlow:
+    when:
+      visible: "^Wait$"
+    commands:
+      - tapOn: "^Wait$"
