@@ -10,18 +10,35 @@ appId: org.osservatorionessuno.bugbane
       text: "Analysis date.*"
     timeout: 30000
 # Cards are collapsed; "Expand" flips to "Collapse" once tapped, so tapping the first
-# "Expand" each round walks down the list (CRITICAL cards sort first).
+# "Expand" each round walks down the list (CRITICAL cards sort first). The marker is
+# one bullet among several, so scroll the sheet once a card is open.
 - repeat:
     times: 6
     while:
       notVisible:
         text: ".*custom-marker.*"
     commands:
-      - tapOn: "Expand"
+      - tapOn:
+          text: "Expand"
+          optional: true
+      - scrollUntilVisible:
+          element:
+            text: ".*custom-marker.*"
+            optional: true
+          direction: DOWN
+          timeout: 10000
 - assertVisible:
     text: ".*/data/local/tmp/bugbane-e2e/custom-marker.*"
 - takeScreenshot: screenshots/06b-custom-ioc-detected
-- pressKey: Back
+# Back does not always dismiss a scrolled sheet; use its own handle first.
+- tapOn:
+    text: "Close sheet"
+    optional: true
+- runFlow:
+    when:
+      notVisible: "Export"
+    commands:
+      - pressKey: Back
 - extendedWaitUntil:
     visible: "Export"
     timeout: 20000

@@ -94,7 +94,7 @@
     <string name="settings_indicators_version">Version: %1$s</string>
     <string name="settings_indicators_last_fetch">Last fetch: %1$s</string>
     <string name="settings_indicators_last_update">Last update: %1$s</string>
-    <string name="settings_indicators_count">Indicator files: %1$s</string>
+    <string name="settings_indicators_count">Indicators: %1$s</string>
     <string name="settings_indicators_desc">Indicators of compromise (IoCs) identify signs of infection or surveillance on Android devices.</string>
     <string name="settings_custom_indicators_title">Custom indicators</string>
     <string name="settings_custom_indicators_desc">Import your own indicator files (STIX 2, as used by MVT). Analyses use them together with the built-in set.</string>
@@ -304,7 +304,7 @@
 
     <!-- MVT strings -->
     <string name="mvt_ioc_title">Indicators of Compromise found</string>
-    <string name="mvt_ioc_message">The following traces of compromission were found:</string>
+    <string name="mvt_ioc_message">The following indicators of compromise were found:</string>
     <string name="mvt_adb_fingerprint_title">ADB Fingerprints</string>
     <string name="mvt_adb_fingerprint_message">Fingerprints of past devices connected via Android Debug Bridge (ADB) were found:</string>
     <string name="mvt_adb_host_fingerprint_title">Acquisition ADB key</string>

@@ -4,15 +4,26 @@
 # IOCS_SHA256 (from run.sh) is the fixture's hash, asserted against the Settings row.
 appId: org.osservatorionessuno.bugbane
 ---
-- tapOn: "Settings"
+# The gear can swallow a tap while the home screen is still settling after onboarding.
+- repeat:
+    times: 3
+    while:
+      notVisible: "Indicators of Compromise (IoCs)"
+    commands:
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn: "Settings"
+      - waitForAnimationToEnd:
+          timeout: 3000
 - extendedWaitUntil:
-    visible: "Custom indicators"
+    visible: "Indicators of Compromise (IoCs)"
     timeout: 15000
+# The card sits below the fold of the settings list.
 - scrollUntilVisible:
     element:
       text: "Import indicators file"
     direction: DOWN
-    timeout: 10000
+    timeout: 20000
 - tapOn: "Import indicators file"
 # DocumentsUI: the pushed file normally shows under Recent; otherwise browse the
 # Downloads root from the drawer.
@@ -44,6 +55,5 @@ appId: org.osservatorionessuno.bugbane
 - takeScreenshot: screenshots/03b-custom-iocs-imported
 - pressKey: Back
 - extendedWaitUntil:
-    visible:
-      text: ".*(Ready to Start|Get Started|Acquire Data).*"
+    visible: "Start Acquisition"
     timeout: 15000
