@@ -5,6 +5,7 @@ appId: org.osservatorionessuno.bugbane
 ---
 - launchApp:
     clearState: true
+- runFlow: dismiss-anr.yaml
 - extendedWaitUntil:
     visible: "Welcome to Bugbane"
     timeout: 60000
@@ -29,11 +30,16 @@ appId: org.osservatorionessuno.bugbane
     commands:
       - tapOn:
           text: "Enable"
+      # Settings can take a while to come up on a slow emulator.
+      - extendedWaitUntil:
+          visible:
+            text: ".*(About|Build number).*"
+          timeout: 45000
       - scrollUntilVisible:
           element:
             text: "Build number"
           direction: DOWN
-          timeout: 20000
+          timeout: 40000
       - repeat:
           times: 7
           commands:
@@ -44,49 +50,84 @@ appId: org.osservatorionessuno.bugbane
     timeout: 25000
 - takeScreenshot: screenshots/02-pair-wizard
 - tapOn: "Pair"
-# The app redirects to Settings developer options; scroll to the row and enter it.
-- scrollUntilVisible:
-    element:
-      text: "^Wireless debugging$"
-    direction: DOWN
-    timeout: 40000
-- tapOn:
-    containsChild: "Wireless debugging"
-# Turn wireless debugging on if off. API 31+ has a labelled toggle; API 30 a bare
-# master switch (id switch_bar). Wait for the allow-dialog before the fallback so it
-# can't misfire while the toggle is settling.
-- runFlow:
-    when:
+# The app deep-links into Developer options, which animates and scrolls to the row.
+# Settings layouts differ per API level, so act on whatever is on screen until the
+# pairing entry appears: the network dialog, the subscreen toggle, the row, or scroll.
+- extendedWaitUntil:
+    visible: "Developer options"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 3000
+- repeat:
+    times: 10
+    while:
       notVisible: "Pair device with pairing code"
     commands:
-      - runFlow:
-          when:
-            visible: "Use wireless debugging"
-          commands:
-            - tapOn:
-                containsChild: "Use wireless debugging"
-            - extendedWaitUntil:
-                visible:
-                  text: ".*(Allow wireless debugging on this network|Pair device with pairing code).*"
-                timeout: 10000
-      - runFlow:
-          when:
-            notVisible: "Use wireless debugging"
-            notVisible:
-              text: ".*Allow wireless debugging on this network.*"
-          commands:
-            - tapOn:
-                id: "switch_bar"
-            - extendedWaitUntil:
-                visible:
-                  text: ".*(Allow wireless debugging on this network|Pair device with pairing code).*"
-                timeout: 10000
       - runFlow:
           when:
             visible:
               text: ".*Allow wireless debugging on this network.*"
           commands:
-            - tapOn: "Allow"
+            - tapOn:
+                text: "Allow"
+                optional: true
+      # Subscreen with debugging off (the description only shows while it is off).
+      # API 31+ has a labelled toggle, API 30 a bare master switch (id switch_bar).
+      - runFlow:
+          when:
+            visible:
+              text: ".*turn on wireless debugging.*"
+            notVisible:
+              text: ".*Allow wireless debugging on this network.*"
+          commands:
+            - runFlow:
+                when:
+                  visible: "Use wireless debugging"
+                commands:
+                  - tapOn:
+                      containsChild: "Use wireless debugging"
+                      optional: true
+            - runFlow:
+                when:
+                  notVisible: "Use wireless debugging"
+                commands:
+                  - tapOn:
+                      id: "switch_bar"
+                      optional: true
+      # Developer options list: open the row by its summary. The row's switch is also
+      # labelled "Wireless debugging", so that text selects the switch when the title
+      # is scrolled off screen and toggles debugging instead of opening the screen.
+      - runFlow:
+          when:
+            visible: "Debug mode when Wi.Fi is connected"
+            notVisible:
+              text: ".*(Use wireless debugging|turn on wireless debugging|Allow wireless debugging on this network).*"
+          commands:
+            - waitForAnimationToEnd:
+                timeout: 3000
+            - tapOn:
+                text: "Debug mode when Wi.Fi is connected"
+                optional: true
+      # Row not on screen: look up, then down.
+      - runFlow:
+          when:
+            notVisible:
+              text: ".*(Debug mode when Wi.Fi is connected|Use wireless debugging|turn on wireless debugging|Allow wireless debugging on this network|Pair device with).*"
+          commands:
+            - scrollUntilVisible:
+                element:
+                  text: "Debug mode when Wi.Fi is connected"
+                  optional: true
+                direction: UP
+                timeout: 10000
+            - scrollUntilVisible:
+                element:
+                  text: "Debug mode when Wi.Fi is connected"
+                  optional: true
+                direction: DOWN
+                timeout: 20000
+      - waitForAnimationToEnd:
+          timeout: 3000
 - extendedWaitUntil:
     visible: "Pair device with pairing code"
     timeout: 30000
