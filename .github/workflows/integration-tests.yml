@@ -210,9 +210,8 @@ jobs:
           done
           "$EMU" -list-avds
           OPTS="-no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -cores 2 -memory 2048"
-          # Start the second emulator only once the first is up: two emulators starting
-          # together each spawn a netsim Wi-Fi daemon with its own DHCP pool, and both
-          # devices then get the same address.
+          # Start the second emulator only once the first is up so it attaches to the
+          # first one's netsim Wi-Fi daemon instead of spawning its own.
           nohup "$EMU" -avd analyst -port 5554 $OPTS -camera-back none -camera-front none > analyst-emu.log 2>&1 &
           PID_A=$!
           timeout 300 adb -s emulator-5554 wait-for-device || { echo "analyst emulator never registered"; tail -n 60 analyst-emu.log; exit 1; }
@@ -232,6 +231,9 @@ jobs:
             adb -s "$s" shell settings put global animator_duration_scale 0
           done
           adb devices
+          # One shared daemon is what makes unicast between the emulators work.
+          pgrep -a netsimd || echo "no netsimd process"
+          ls -la /tmp/android-*/netsimd* 2>/dev/null || true
 
       - name: Run analyst Wi-Fi E2E (Maestro)
         timeout-minutes: 60

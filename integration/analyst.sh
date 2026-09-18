@@ -27,6 +27,7 @@ PKG=org.osservatorionessuno.bugbane
 MACRO="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/emulator/resources/macros/Walk_to_image_room"
 
 echo "sha=${GITHUB_SHA:-unknown} run=${GITHUB_RUN_NUMBER:-?} ref=${GITHUB_REF_NAME:-?} A=$A B=$B" > "$ART/RUN_INFO.txt"
+exec > >(tee -a "$ART/harness.log") 2>&1
 
 LOGCAT_PIDS=()
 capture() {
@@ -98,28 +99,36 @@ adb -s "$B" shell settings put global verifier_verify_adb_installs 0 || true
 [ -n "$FIXTURE" ] && adb -s "$B" install -r -g "$FIXTURE"
 adb -s "$B" shell 'mkdir -p /data/local/tmp/wd && echo planted > /data/local/tmp/wd/pred.so' || true
 
-unlock_a; # Emulators on one host share a virtual Wi-Fi network, but unicast between them can
-# take a while to route; prime it both ways and fail loudly if it never does.
-ip_of() { adb -s "$1" shell ip -4 -o addr show wlan0 | awk '{print $4}' | cut -d/ -f1 | tr -d '\r'; }
+unlock_a
+# Emulators on one host share a virtual Wi-Fi network (netsim). Broadcast and mDNS
+# always cross it, but unicast between the two stations only works when both are
+# attached to the same netsim daemon: otherwise ARP never resolves and every pairing
+# attempt fails with "Host unreachable" (runs 117-123). Prime the route both ways,
+# re-associate B once if it does not come up, then fail here with diagnostics rather
+# than minutes later in pairing.
+ip_of() { adb -s "$1" shell ip -4 -o addr show wlan0 | awk '{print $4}' | cut -d/ -f1 | tr -d '\r' | head -1; }
 IP_A="$(ip_of "$A")"; IP_B="$(ip_of "$B")"; echo "wlan0: A=$IP_A B=$IP_B"
-# Each emulator's netsim daemon runs its own DHCP server from the same pool, so two
-# emulators started together can end up with the same address (runs 117/121:
-# "Host unreachable" on every pairing attempt). Ask B for a new lease, then give up
-# loudly rather than fail later in pairing.
-for _ in 1 2 3; do
-  [ "$IP_A" != "$IP_B" ] && break
-  echo "both emulators hold $IP_A; requesting a new lease on B"
-  adb -s "$B" shell svc wifi disable; sleep 3; adb -s "$B" shell svc wifi enable
-  for _ in $(seq 1 20); do sleep 2; IP_B="$(ip_of "$B")"; [ -n "$IP_B" ] && break; done
-  echo "wlan0: A=$IP_A B=$IP_B"
+[ -n "$IP_A" ] && [ "$IP_A" != "$IP_B" ] || { echo "UNUSABLE WLAN0 ADDRESSES: A=$IP_A B=$IP_B"; exit 1; }
+reachable=""
+for attempt in 1 2; do
+  for _ in $(seq 1 12); do
+    adb -s "$B" shell ping -c 1 -W 2 "$IP_A" >/dev/null 2>&1
+    adb -s "$A" shell ping -c 1 -W 2 "$IP_B" >/dev/null 2>&1 && { reachable=1; break; }
+    sleep 5
+  done
+  [ -n "$reachable" ] && break
+  echo "A cannot reach B; re-associating B"
+  adb -s "$B" shell svc wifi disable; sleep 3; adb -s "$B" shell svc wifi enable; sleep 10
+  IP_B="$(ip_of "$B")"; echo "wlan0: A=$IP_A B=$IP_B"
 done
-[ "$IP_A" != "$IP_B" ] || { echo "BOTH EMULATORS HOLD $IP_A"; exit 1; }
-for _ in $(seq 1 12); do
-  adb -s "$B" shell ping -c 1 -W 2 "$IP_A" >/dev/null 2>&1
-  adb -s "$A" shell ping -c 1 -W 2 "$IP_B" >/dev/null 2>&1 && { echo "A reaches B"; break; }
-  sleep 5
-done
-adb -s "$A" shell ping -c 2 -W 2 "$IP_B" | tail -2
+if [ -z "$reachable" ]; then
+  echo "A NEVER REACHED B"
+  for s in "$A" "$B"; do echo "--- $s"; adb -s "$s" shell 'ip -4 addr show wlan0; ip neigh show dev wlan0'; done
+  pgrep -a netsimd || echo "no netsimd on host"
+  ls -la "${TMPDIR:-/tmp}"/android-*/netsimd* 2>/dev/null; cat "${TMPDIR:-/tmp}"/android-*/netsimd/*.ini 2>/dev/null
+  exit 1
+fi
+echo "A reaches B"
 
 # Restartable (clears app state): one retry absorbs a transient dialog or a slow start.
 unlock_a; flow "$A" analyst-onboard.yaml || { unlock_a; flow "$A" analyst-onboard.yaml; } || exit 1
@@ -135,7 +144,7 @@ POSTER="$ART/poster-$(date +%s).png"
 qrencode -s 16 -m 4 -l M -o "$POSTER" "$PAYLOAD"
 adb -s "$B" emu virtualscene-image wall "$POSTER"
 
-flow "$B" target-wireless-qr.yaml || exit 1
+flow "$B" target-wireless-qr.yaml || { adb -s "$B" wait-for-device; flow "$B" target-wireless-qr.yaml; } || exit 1
 
 # The emulator camera sometimes fails to start, and the analyst can miss the target's
 # mDNS announcement on the virtual Wi-Fi (run 117: advertised, never seen). Scanning
