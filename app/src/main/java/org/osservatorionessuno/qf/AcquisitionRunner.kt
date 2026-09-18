@@ -122,6 +122,7 @@ class AcquisitionRunner(
         baseOutputDir: File,
         listener: ProgressListener? = null,
         transport: AcquisitionTransport? = null,
+        knownDevice: DeviceInfo? = null,
     ): File {
         if (!baseOutputDir.exists() && !baseOutputDir.mkdirs()) {
             throw IOException("Unable to create base output directory: $baseOutputDir")
@@ -153,7 +154,7 @@ class AcquisitionRunner(
             }
             if (!tmpDir.endsWith('/')) tmpDir += '/'
             if (!sdCard.endsWith('/')) sdCard += '/'
-            val device = DeviceInfo.collect(shell)
+            val device = knownDevice ?: DeviceInfo.collect(shell)
 
             val total = modules.size
             var completedCount = 0

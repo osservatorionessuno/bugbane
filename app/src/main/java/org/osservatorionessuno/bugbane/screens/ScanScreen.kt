@@ -38,6 +38,11 @@ import org.osservatorionessuno.bugbane.utils.AcquisitionRecovery
 import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
 import org.osservatorionessuno.bugbane.INTENT_EXIT_BACKPRESS
 import org.osservatorionessuno.cadb.AdbState
+import org.osservatorionessuno.bugbane.utils.HotspotManager
+import org.osservatorionessuno.qf.DeviceInfo
+import org.osservatorionessuno.qf.storage.AcquisitionTransport
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker
 import org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker.ModuleScanStatus
 import org.osservatorionessuno.bugbane.utils.AppState
@@ -164,6 +169,10 @@ fun ScanScreen() {
     val isAnalyst = viewModel.appManager.appProgress.collectAsStateWithLifecycle().value.isAnalyst
     val adbManager = viewModel.adbManager
     val adbState = adbManager.adbState.collectAsStateWithLifecycle()
+    val remoteDevice = adbManager.remoteDevice.collectAsStateWithLifecycle()
+    // Analyst with another device connected: confirm it here before acquiring.
+    val remoteConnected = isAnalyst && remoteDevice.value != null && adbState.value == AdbState.ConnectedIdle
+    val scope = rememberCoroutineScope()
 
     // Progress lives in an application-scoped tracker so it survives this
     // screen (or the whole activity) being recreated mid-acquisition.
@@ -191,7 +200,7 @@ fun ScanScreen() {
             identityLost = true
             return
         }
-        if (isAnalyst) {
+        if (isAnalyst && !remoteConnected) {
             context.startActivity(Intent(context, RemoteScanActivity::class.java))
         } else {
             AcquisitionProgressTracker.start(context, adbManager, File(context.filesDir, "acquisitions"))
@@ -389,7 +398,16 @@ fun ScanScreen() {
                 modifier = Modifier.fillMaxSize()
             ) {
                 // Welcome content in the center
-                if (isLandscape) {
+                if (remoteConnected) {
+                    ConnectedDeviceCard(
+                        device = remoteDevice.value!!,
+                        transport = adbManager.transport,
+                        onDisconnect = {
+                            scope.launch(Dispatchers.IO) { adbManager.disconnect(); HotspotManager.stop() }
+                        },
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                } else if (isLandscape) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -547,7 +565,7 @@ fun ScanScreen() {
                         text = when (appState.value) {
                             AppState.AdbScanning -> stringResource(R.string.home_scanning_button)
                             AppState.AdbConnected -> stringResource(R.string.home_scan_button)
-                            AppState.AnalystReady -> stringResource(R.string.home_scan_device_button)
+                            AppState.AnalystReady -> stringResource(if (remoteConnected) R.string.home_scan_button else R.string.home_scan_device_button)
                             AppState.TryAutoConnect, AppState.AdbConnecting -> stringResource(R.string.button_working_adb_pairing)
                             else
                                 -> stringResource(R.string.home_permissions_button)
@@ -557,6 +575,55 @@ fun ScanScreen() {
                         )
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectedDeviceCard(
+    device: DeviceInfo,
+    transport: AcquisitionTransport,
+    onDisconnect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val via = when (transport.type) {
+        AcquisitionTransport.USB -> stringResource(R.string.acquisition_transport_usb)
+        AcquisitionTransport.WIFI_DIRECT -> stringResource(R.string.acquisition_transport_wifi, transport.hotspotSsid ?: "?")
+        AcquisitionTransport.WIFI_HOTSPOT -> stringResource(R.string.acquisition_transport_hotspot, transport.hotspotSsid ?: "?")
+        else -> stringResource(R.string.acquisition_transport_local)
+    }
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(stringResource(R.string.remote_connected_title), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                device.label ?: stringResource(R.string.remote_connected_unknown_device),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(stringResource(R.string.acquisition_details_transport, via), style = MaterialTheme.typography.bodyLarge)
+            device.androidVersion?.let { Text(stringResource(R.string.remote_connected_android, it), style = MaterialTheme.typography.bodyLarge) }
+            device.securityPatch?.let { Text(stringResource(R.string.remote_connected_patch, it), style = MaterialTheme.typography.bodyLarge) }
+            device.serial?.let { Text(stringResource(R.string.remote_connected_serial, it), style = MaterialTheme.typography.bodyLarge) }
+            device.imei.takeIf { it.isNotEmpty() }?.let {
+                Text(stringResource(R.string.remote_connected_imei, it.joinToString(", ")), style = MaterialTheme.typography.bodyLarge)
+            }
+            device.androidId?.let { Text(stringResource(R.string.remote_connected_android_id, it), style = MaterialTheme.typography.bodyLarge) }
+            Text(
+                stringResource(R.string.remote_connected_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            TextButton(onClick = onDisconnect, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(R.string.remote_disconnect_button))
             }
         }
     }

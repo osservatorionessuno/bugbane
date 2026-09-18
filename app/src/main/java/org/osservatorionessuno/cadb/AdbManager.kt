@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.osservatorionessuno.qf.AcquisitionRunner
+import org.osservatorionessuno.qf.DeviceInfo
 import org.osservatorionessuno.qf.storage.AcquisitionTransport
 import java.io.BufferedReader
 import java.io.File
@@ -212,12 +213,24 @@ class AdbManager(applicationContext: Context) {
     var transport: AcquisitionTransport = AcquisitionTransport(AcquisitionTransport.LOCAL)
         private set
 
+    private val _remoteDevice = MutableStateFlow<DeviceInfo?>(null)
+    /** Identity of the connected remote device, probed right after connecting. */
+    val remoteDevice: StateFlow<DeviceInfo?> = _remoteDevice.asStateFlow()
+
     fun disconnect() {
         runCatching { adbConnectionManager.disconnect() }
             .onFailure { Log.w(TAG, "disconnect: ${it.message}") }
+        _remoteDevice.value = null
+        transport = AcquisitionTransport(AcquisitionTransport.LOCAL)
         if (_adbState.value != AdbState.ConnectedAcquiring && _adbState.value != AdbState.Cancelling) {
             _adbState.value = AdbState.Ready
         }
+    }
+
+    private fun remoteConnected(via: AcquisitionTransport) {
+        transport = via
+        _remoteDevice.value = DeviceInfo.collect(AdbShell(adbConnectionManager))
+        _adbState.value = AdbState.ConnectedIdle
     }
 
     /** USB permission already granted; waits for the target's "Allow USB debugging?" prompt. */
@@ -228,8 +241,7 @@ class AdbManager(applicationContext: Context) {
         try {
             adbConnectionManager.setTimeout(USB_AUTH_TIMEOUT_S, TimeUnit.SECONDS)
             if (!adbConnectionManager.connectUsb(appContext!!, device)) throw IOException("USB connection refused")
-            transport = AcquisitionTransport(AcquisitionTransport.USB)
-            _adbState.value = AdbState.ConnectedIdle
+            remoteConnected(AcquisitionTransport(AcquisitionTransport.USB))
         } catch (t: Throwable) {
             _adbState.value = AdbState.ErrorConnect
             throw t
@@ -249,8 +261,7 @@ class AdbManager(applicationContext: Context) {
         _adbState.value = AdbState.Connecting
         try {
             if (!adbConnectionManager.connect(host, port)) throw IOException("Connection refused by $host:$port")
-            transport = via
-            _adbState.value = AdbState.ConnectedIdle
+            remoteConnected(via)
         } catch (t: Throwable) {
             _adbState.value = AdbState.ErrorConnect
             throw t
@@ -342,7 +353,7 @@ class AdbManager(applicationContext: Context) {
         qfFuture = executor.submit(Runnable {
             try {
                 val out = AcquisitionRunner()
-                    .run(this.appContext!!, adbConnectionManager, baseDir, listener, transport)
+                    .run(this.appContext!!, adbConnectionManager, baseDir, listener, transport, _remoteDevice.value)
                 if (qfCancelled.get()) {
                     commandOutput.postValue("QuickForensics cancelled")
                     _adbState.value = AdbState.ConnectedIdle
@@ -350,6 +361,8 @@ class AdbManager(applicationContext: Context) {
                     commandOutput.postValue("QuickForensics completed: " + out.getAbsolutePath())
                     _adbState.value = AdbState.ConnectedIdle
                 }
+                // Another person's device: drop the connection once its acquisition is over.
+                if (transport.type != AcquisitionTransport.LOCAL) disconnect()
             } catch (io: IOException) {
                 // Could be reconnection issue
                 io.printStackTrace()

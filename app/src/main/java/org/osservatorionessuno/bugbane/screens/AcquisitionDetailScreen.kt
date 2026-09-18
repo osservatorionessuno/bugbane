@@ -55,7 +55,6 @@ import java.util.Date
 import org.osservatorionessuno.bugbane.utils.Utils
 import org.osservatorionessuno.qf.storage.ARCHIVE_FILE
 import org.osservatorionessuno.qf.storage.AcquisitionIndex
-import org.osservatorionessuno.qf.storage.AcquisitionTransport
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -961,14 +960,5 @@ class PendingUnlock(
 private fun DeviceLines(index: AcquisitionIndex?) {
     index?.device?.summary?.takeIf { it.isNotBlank() }?.let {
         Text(stringResource(R.string.acquisition_details_device, it), style = MaterialTheme.typography.bodyLarge)
-    }
-    index?.transport?.let { t ->
-        val via = when (t.type) {
-            AcquisitionTransport.USB -> stringResource(R.string.acquisition_transport_usb)
-            AcquisitionTransport.WIFI_DIRECT -> stringResource(R.string.acquisition_transport_wifi, t.hotspotSsid ?: "?")
-            AcquisitionTransport.WIFI_HOTSPOT -> stringResource(R.string.acquisition_transport_hotspot, t.hotspotSsid ?: "?")
-            else -> stringResource(R.string.acquisition_transport_local)
-        }
-        Text(stringResource(R.string.acquisition_details_transport, via), style = MaterialTheme.typography.bodyLarge)
     }
 }
