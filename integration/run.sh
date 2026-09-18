@@ -89,6 +89,14 @@ for _ in $(seq 1 30); do
   if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then break; fi
   sleep 3
 done
+# Expand bugbane's notification so its inline "Enter pairing code" action shows. Other
+# notifications carry the same "Expand" button, so pick the one next to bugbane's title.
+for _ in 1 2 3; do
+  tree="$(maestro hierarchy 2>/dev/null)"
+  echo "$tree" | grep -q "Enter pairing code" && break
+  point="$(echo "$tree" | python3 "$DIR/scrape.py" expand)" || break
+  adb shell input tap $point; sleep 2
+done
 # Enter the code + import the custom IOCs + acquire + export in one flow (no relaunch
 # gap after pairing, where the wireless connection drops and the app reverts to the
 # pair page).
