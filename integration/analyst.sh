@@ -125,7 +125,8 @@ if [ -z "$reachable" ]; then
   echo "A NEVER REACHED B"
   for s in "$A" "$B"; do echo "--- $s"; adb -s "$s" shell 'ip -4 addr show wlan0; ip neigh show dev wlan0'; done
   pgrep -a netsimd || echo "no netsimd on host"
-  ls -la "${TMPDIR:-/tmp}"/android-*/netsimd* 2>/dev/null; cat "${TMPDIR:-/tmp}"/android-*/netsimd/*.ini 2>/dev/null
+  ls -la "${TMPDIR:-/tmp}"/android-*/netsimd* 2>/dev/null
+  tail -n 60 "${TMPDIR:-/tmp}"/android-*/netsimd/netsim_stderr.log "${TMPDIR:-/tmp}"/android-*/netsimd/netsim_stdout.log 2>/dev/null
   exit 1
 fi
 echo "A reaches B"
@@ -193,7 +194,7 @@ python3 "$DIR/verify_export.py" "$ART/$NAME" "$PASSPHRASE" ${FIXTURE:+"$SUSPICIO
   --sideloaded "${FIXTURE:+$SUSPICIOUS_APPID}" --transport wifi_direct || exit 1
 
 cp "$(dirname "$DIR")/app/src/main/assets/bundled-indicators/indicators.json" "$ART/indicators.stix2"
-python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" "$ART/indicators.stix2" "/data/local/tmp/wd/pred.so" || exit 1
+python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" -i "$ART/indicators.stix2" -e "/data/local/tmp/wd/pred.so" || exit 1
 adb -s "$B" shell 'rm -rf /data/local/tmp/wd' || true
 
 echo "ANALYST WIFI E2E PASS"

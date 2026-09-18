@@ -30,10 +30,17 @@ appId: org.osservatorionessuno.bugbane
 - assertVisible:
     text: ".*/data/local/tmp/bugbane-e2e/custom-marker.*"
 - takeScreenshot: screenshots/06b-custom-ioc-detected
-# Back does not always dismiss a scrolled sheet; use its own handle first.
-- tapOn:
-    text: "Close sheet"
-    optional: true
+# Neither Back nor a tap on the handle reliably dismisses the scrolled sheet: drag it
+# down (the first drag may only scroll its content back up), then Back as a fallback.
+- repeat:
+    times: 3
+    while:
+      notVisible: "Export"
+    commands:
+      - swipe:
+          start: "50%, 20%"
+          end: "50%, 95%"
+          duration: 600
 - runFlow:
     when:
       notVisible: "Export"
