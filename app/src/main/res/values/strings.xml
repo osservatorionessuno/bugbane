@@ -13,12 +13,10 @@
     \n\n
     The absence of detection from this app does not mean that your device is safe or secure.
     \n</string>
-    <string name="slideshow_unsupported_version">Sorry, Bugbane is not supported on Android versions lower than 11 (API level 30). Please use AndroidQF or MVT from a trusted computer.</string>
+    <string name="slideshow_unsupported_version">Bugbane needs Android 11 or newer. Use AndroidQF or MVT from a trusted computer instead.</string>
     <string name="slideshow_button_exit">Exit</string>
     <string name="slideshow_restricted_title">This device is managed</string>
-    <string name="slideshow_restricted_description">Bugbane cannot run on this device. A device administrator (for example a work or school MDM policy) has disabled debugging features, so ADB Wireless Debugging cannot be enabled.
-    \n\n
-    If this is a work device, use AndroidQF or MVT from a trusted computer instead. If you did not expect this device to be managed, that is itself worth investigating.</string>
+    <string name="slideshow_restricted_description">Bugbane cannot run on this device: a device administrator (for example a work or school policy) has disabled debugging.</string>
     <string name="slideshow_restricted_button">Show who manages this device</string>
     <string name="slideshow_welcome_button">I understand</string>
 
@@ -89,18 +87,17 @@
     <string name="beta_warning_quit">Quit the app</string>
 
     <!-- Settings screen strings -->
-    <string name="settings_description">Configure your preferences and app settings here.</string>
     <string name="settings_general">General Settings</string>
     <string name="settings_developer_options">Disable Developer Options</string>
-    <string name="settings_developer_options_desc">It\'s recommended to disable Developer Options after each session and re-enable them only when needed.</string>
+    <string name="settings_developer_options_desc">Disable Developer Options after each session and re-enable them only when needed.</string>
     <string name="settings_indicators_title">Indicators of Compromise (IoCs)</string>
     <string name="settings_indicators_version">Version: %1$s</string>
     <string name="settings_indicators_last_fetch">Last fetch: %1$s</string>
     <string name="settings_indicators_last_update">Last update: %1$s</string>
     <string name="settings_indicators_count">Indicator files: %1$s</string>
-    <string name="settings_indicators_desc">The indicators of compromise (IoCs) are used to identify signs of infections or surveillance on Android devices. They are updated periodically to ensure the accuracy of the analysis.</string>
+    <string name="settings_indicators_desc">Indicators of compromise (IoCs) identify signs of infection or surveillance on Android devices.</string>
     <string name="settings_custom_indicators_title">Custom indicators</string>
-    <string name="settings_custom_indicators_desc">Add your own indicator files (STIX 2 bundles, as used by MVT). They are checked and copied into the app, and every analysis uses them together with the built-in set.</string>
+    <string name="settings_custom_indicators_desc">Import your own indicator files (STIX 2, as used by MVT). Analyses use them together with the built-in set.</string>
     <string name="settings_custom_indicators_import">Import indicators file</string>
     <string name="settings_custom_indicators_empty">No custom indicators imported.</string>
     <plurals name="settings_custom_indicators_count">
@@ -112,13 +109,13 @@
     <string name="settings_custom_indicators_sha256">SHA-256</string>
     <string name="settings_custom_indicators_remove">Remove %1$s</string>
     <string name="settings_custom_indicators_remove_title">Remove custom indicators?</string>
-    <string name="settings_custom_indicators_remove_message">%1$s will no longer be used in analyses. You can import it again later.</string>
+    <string name="settings_custom_indicators_remove_message">%1$s will no longer be used in analyses.</string>
     <string name="settings_custom_indicators_remove_confirm">Remove</string>
     <string name="settings_custom_indicators_removed">Custom indicators removed</string>
     <string name="settings_custom_indicators_success">Imported %1$s</string>
     <string name="settings_custom_indicators_duplicate">This file is already imported</string>
     <string name="settings_custom_indicators_malformed">Not a valid JSON file</string>
-    <string name="settings_custom_indicators_unsupported">Not an indicators file (expected a STIX 2 bundle)</string>
+    <string name="settings_custom_indicators_unsupported">Not a STIX 2 indicators file</string>
     <string name="settings_custom_indicators_none_found">No usable indicators found in this file</string>
     <string name="settings_custom_indicators_too_large">File too large (max %1$d MB)</string>
     <string name="settings_custom_indicators_read_error">Couldn\'t read the selected file</string>
@@ -181,7 +178,7 @@
     <string name="export_in_progress">Export in progress...</string>
 
     <!-- Messages for export/share passphrases -->
-    <string name="acquisition_export_passphrase">The exported archive contains potentially private information and has been encrypted. The password will be shown only once:\n\n%1$s</string>
+    <string name="acquisition_export_passphrase">The exported archive is encrypted because it may contain private information. The password is shown only once:\n\n%1$s</string>
     <string name="acquisition_share_message">Acquisition archive. Passphrase: %1$s</string>
     <string name="acquisition_passphrase_copy">Copy to clipboard</string>
     <string name="acquisition_passphrase_close">Close</string>
@@ -202,19 +199,19 @@
 
     <!-- Onboarding: acquisition protection step (fingerprint) -->
     <string name="slideshow_protection_title">Protect your acquisitions</string>
-    <string name="slideshow_protection_biometric_description">Acquisitions are encrypted on this device. Locking the key to your fingerprint or screen lock stops even a forensic tool from reading them without you.\n\nRemoving your screen lock erases the key, and acquisitions can\'t be recovered — set an acquisition password in Settings to keep them if that happens.</string>
+    <string name="slideshow_protection_biometric_description">Acquisitions are encrypted and the key is locked to your fingerprint or screen lock, so not even a forensic tool can read them without you.\n\nRemoving the screen lock erases the key. To keep acquisitions readable in that case, set an acquisition password in Settings.</string>
     <string name="slideshow_protection_biometric_button">Protect with screen lock</string>
     <string name="slideshow_protection_error">Couldn\'t set up acquisition protection. Please try again.</string>
 
     <!-- Post-acquisition: set a password (tutorial-style screen) -->
     <string name="set_password_title">Set an acquisition password</string>
-    <string name="set_password_mandatory_description">This device has no screen lock, so a password is the only protection. You\'ll need it to open or export acquisitions and it can\'t be recovered. Leaving without setting one discards this acquisition.</string>
-    <string name="set_password_tee_description">Add a password for stronger protection — on this device it guards acquisitions against a forensic tool, beyond what the screen lock alone can do.</string>
-    <string name="set_password_se_description">Optionally add a password on top of your screen lock. Both are then needed to read acquisitions, protecting them even if this phone is fully compromised, and keeping them readable if you remove your screen lock.</string>
+    <string name="set_password_mandatory_description">This device has no screen lock, so a password is the only protection. It is needed to open or export acquisitions and can\'t be recovered. Leaving without one discards this acquisition.</string>
+    <string name="set_password_tee_description">Add a password for stronger protection: on this device it guards acquisitions against a forensic tool better than the screen lock alone.</string>
+    <string name="set_password_se_description">Optionally add a password on top of your screen lock. Both are then needed to read acquisitions, even if this phone is fully compromised, and they stay readable if you remove the screen lock.</string>
 
     <!-- Screen lock removed: the biometric-gated key was permanently invalidated -->
     <string name="acquisition_identity_lost_title">Acquisitions can no longer be unlocked</string>
-    <string name="acquisition_identity_lost_message">Your screen lock was removed, so Android erased the key that protected your acquisitions and they can no longer be decrypted.\n\nReset protection to keep using Bugbane. The old acquisitions are unreadable and will be removed.</string>
+    <string name="acquisition_identity_lost_message">Your screen lock was removed, so Android erased the key protecting your acquisitions; they can no longer be decrypted.\n\nReset protection to keep using Bugbane. The old acquisitions will be removed.</string>
     <string name="acquisition_identity_lost_reset">Reset protection</string>
 
     <!-- Re-establish protection (onboarding chooser + post-invalidation recovery) -->
@@ -222,7 +219,7 @@
     <string name="protection_set_screen_lock">Set a screen lock</string>
     <string name="protection_use_password">Set a password instead</string>
     <string name="protection_set_password">Set a password</string>
-    <string name="set_password_chooser_description">Choose an acquisition password. You\'ll enter it to open or export acquisitions and it can\'t be recovered, so store it safely. It also keeps them protected if the screen lock is later removed.</string>
+    <string name="set_password_chooser_description">Choose an acquisition password. It is needed to open or export acquisitions, can\'t be recovered, and keeps them protected if the screen lock is later removed.</string>
     <string name="set_password_field_label">Password</string>
     <string name="set_password_confirm_label">Confirm password</string>
     <string name="set_password_too_short">Use at least %1$d characters</string>
@@ -232,13 +229,13 @@
     <string name="set_password_skip_link">Continue without a password</string>
     <string name="set_password_error">Couldn\'t set the password. Please try again.</string>
     <string name="set_password_skip_tee_title">Continue without a password?</string>
-    <string name="set_password_skip_tee_message">Without a password, only your screen lock protects acquisitions — a forensic tool, or someone who learns your PIN, may be able to read them. Use a strong screen lock: at least 10 characters, ideally letters and numbers rather than a short PIN.</string>
+    <string name="set_password_skip_tee_message">Without a password, only your screen lock protects acquisitions: a forensic tool, or someone who learns your PIN, may read them. Use a strong screen lock of at least 10 characters, ideally letters and numbers.</string>
     <string name="set_password_skip_tee_confirm">Continue anyway</string>
     <string name="set_password_skip_tee_cancel">Set a password</string>
 
     <!-- Settings: change acquisition password -->
     <string name="settings_change_password">Acquisition password</string>
-    <string name="settings_change_password_desc">Change the password that protects your acquisitions. Existing acquisitions stay readable; only the protection changes.</string>
+    <string name="settings_change_password_desc">Change the password that protects your acquisitions.</string>
     <string name="settings_change_password_button">Change password</string>
     <string name="settings_change_password_current">Current password</string>
     <string name="settings_change_password_new">New password</string>
@@ -249,18 +246,18 @@
     <!-- Settings: manage protection factors -->
     <string name="settings_protection_title">Protection factors</string>
     <string name="settings_add_password">Add a password</string>
-    <string name="settings_add_password_desc">Require a password in addition to your fingerprint or screen lock. Both will be needed to open acquisitions.</string>
+    <string name="settings_add_password_desc">Require a password in addition to your fingerprint or screen lock.</string>
     <string name="settings_remove_password">Remove password</string>
     <string name="settings_remove_password_desc">Keep only the fingerprint / screen-lock requirement.</string>
     <string name="settings_remove_fingerprint">Remove fingerprint requirement</string>
-    <string name="settings_remove_fingerprint_desc">Protect with the password alone. Unlike the fingerprint, this survives removing your screen lock — do it before removing the lock if you want to keep your acquisitions.</string>
+    <string name="settings_remove_fingerprint_desc">Protect with the password alone; it survives removing your screen lock. Do it before removing the lock to keep your acquisitions.</string>
     <string name="settings_protection_confirm_remove">Remove</string>
     <string name="settings_protection_updated">Protection updated</string>
     <string name="settings_auth_mode_title">Unlock confirmation</string>
     <string name="settings_auth_mode_window">Recent unlock</string>
     <string name="settings_auth_mode_window_desc">No prompt while the device was unlocked within the last %1$d minutes.</string>
     <string name="settings_auth_mode_per_op">Every operation</string>
-    <string name="settings_auth_mode_per_op_desc">Confirm your fingerprint or screen lock each time acquisitions are unlocked.</string>
+    <string name="settings_auth_mode_per_op_desc">Confirm your fingerprint or screen lock every time.</string>
     <string name="settings_protection_error">Couldn\'t update protection</string>
 
     <!-- Scan details strings -->
@@ -274,7 +271,7 @@
     <string name="analysis_delete">Delete Analysis</string>
     <string name="analysis_delete_confirm_title">Delete Analysis</string>
     <string name="analysis_delete_confirm_message">Are you sure you want to delete this analysis? This action cannot be undone.</string>
-    <string name="analysis_spyware_warning_title">Potential spyware indicators were found in this analysis. For help and support, consider contacting a trusted helpline.</string>
+    <string name="analysis_spyware_warning_title">Potential spyware indicators were found. For help, consider contacting a trusted helpline.</string>
     <string name="analysis_spyware_warning_button">Contact support</string>
 
     <!-- About screen strings -->
@@ -359,11 +356,11 @@
 
     <!-- Role slide (once per install) -->
     <string name="slideshow_role_title">Who is using Bugbane?</string>
-    <string name="slideshow_role_description">Bugbane checks this phone for signs of spyware.\n\nIf you are an analyst and want to scan other people\'s devices from this phone, choose the analyst mode below instead. The choice is permanent: to change it, clear the app\'s data.</string>
+    <string name="slideshow_role_description">Bugbane checks this phone for signs of spyware.\n\nAnalysts scanning other people\'s devices from this phone should choose analyst mode below. The choice is permanent: to change it, clear the app\'s data.</string>
     <string name="slideshow_role_user_button">Check this device</string>
     <string name="slideshow_role_analyst_button">I\'m an analyst: scan other devices instead</string>
-    <string name="slideshow_protection_analyst_description">An analyst install holds other people\'s data, so both a screen lock and an acquisition password are required to open acquisitions. Set a screen lock first if this phone has none.</string>
-    <string name="set_password_analyst_description">Choose the acquisition password. Together with your screen lock it is needed to open or export acquisitions. It can\'t be recovered, so store it safely.</string>
+    <string name="slideshow_protection_analyst_description">An analyst install holds other people\'s data, so a screen lock and an acquisition password are both required. Set a screen lock first if this phone has none.</string>
+    <string name="set_password_analyst_description">Choose the acquisition password. With your screen lock, it is needed to open or export acquisitions. It can\'t be recovered, so store it safely.</string>
 
     <!-- Analyst home -->
     <string name="home_scan_device_button">Scan a device</string>
@@ -385,13 +382,13 @@
     <string name="remote_usb_debugging_description">On the device to scan, open Settings › About phone and tap “Build number” seven times to enable Developer options. Then open Developer options and turn on “USB debugging”.</string>
     <string name="remote_usb_waiting">Waiting for the device…</string>
     <string name="remote_usb_permission_denied">Access to the USB device was denied. Reconnect the cable and allow Bugbane to access it.</string>
-    <string name="remote_usb_connect_failed">The USB connection failed. Check that USB debugging is on and that the prompt on the other device was accepted, then retry.</string>
+    <string name="remote_usb_connect_failed">The USB connection failed. Check USB debugging is on and the prompt on the other device was accepted, then retry.</string>
     <string name="remote_usb_allow_title">Allow USB debugging</string>
     <string name="remote_usb_allow_description">On the other device, accept “Allow USB debugging?”. Leave “Always allow” unticked so this phone\'s key is not kept on it.</string>
     <string name="remote_connecting_title">Connecting…</string>
     <string name="remote_connecting_description">Pairing with the device and opening the connection.</string>
     <string name="remote_hotspot_title">Join this phone\'s network</string>
-    <string name="remote_hotspot_description">This phone is sharing a Wi‑Fi network with no internet access. On the device to scan, scan this code with the camera or from Wi‑Fi settings, or enter the details by hand.</string>
+    <string name="remote_hotspot_description">This phone is sharing a Wi‑Fi network without internet. On the device to scan, scan this code with the camera or from Wi‑Fi settings, or enter the details by hand.</string>
     <string name="remote_hotspot_permission">Android needs the nearby devices permission to share a network. Bugbane does not use your location.</string>
     <string name="remote_hotspot_permission_button">Allow</string>
     <string name="remote_hotspot_location_hint">On this Android version, Location must be on for the network to start.</string>
