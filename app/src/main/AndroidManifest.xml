@@ -25,6 +25,12 @@
         android:maxSdkVersion="32" />
     <!-- Analyst mode, USB transport (this phone is the host) -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+
+    <!-- libadb's library manifest carries no uses-sdk, so the merger implies the legacy
+         phone-state and storage permissions for it. Bugbane uses none of them. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
     <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
 
     <!-- Package visibility (Android 11+): needed to read the Mainline train date
