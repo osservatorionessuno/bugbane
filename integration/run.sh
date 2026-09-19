@@ -17,6 +17,7 @@ mkdir -p "$ART" "$ART/screenshots"
 PKG=org.osservatorionessuno.bugbane
 
 echo "sha=${GITHUB_SHA:-unknown} run=${GITHUB_RUN_NUMBER:-?} ref=${GITHUB_REF_NAME:-?}" > "$ART/RUN_INFO.txt"
+exec > >(tee -a "$ART/harness.log") 2>&1
 
 LOGCAT_PID=""
 capture() {
@@ -89,19 +90,26 @@ run_flow pair.yaml || run_flow pair.yaml || exit 1
 CODE="$(maestro hierarchy 2>/dev/null | python3 "$DIR/scrape.py" code)"
 if [ -z "$CODE" ]; then echo "PAIRING CODE SCRAPE FAILED"; exit 1; fi
 echo "pairing code = $CODE"
+# Engineering builds (/e/OS's sdk_phone image) run adbd without authentication, so
+# bugbane's autoconnect can succeed before any code is entered; then no pairing is
+# needed and the pairing notification may never show. Detect that and skip the code.
 NOTIF_SEEN=""
 for _ in $(seq 1 60); do
+  if adb logcat -d 2>/dev/null | grep -q "AdbManager: autoconnect successful"; then
+    echo "device accepted the connection without pairing; skipping the code"
+    CODE=""; break
+  fi
   adb shell cmd statusbar expand-notifications || true
   if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then NOTIF_SEEN=1; break; fi
   sleep 3
 done
-if [ -z "$NOTIF_SEEN" ]; then
+if [ -n "$CODE" ] && [ -z "$NOTIF_SEEN" ]; then
   echo "PAIRING NOTIFICATION NOT SEEN AFTER 3 MINUTES (continuing; the flow waits once more)"
   maestro hierarchy > "$ART/pairing-wait-hierarchy.json" 2>/dev/null || true
 fi
 # Expand bugbane's notification so its inline "Enter pairing code" action shows. Other
 # notifications carry the same "Expand" button, so pick the one next to bugbane's title.
-for _ in 1 2 3; do
+[ -n "$CODE" ] && for _ in 1 2 3; do
   tree="$(maestro hierarchy 2>/dev/null)"
   echo "$tree" | grep -q "Enter pairing code" && break
   point="$(echo "$tree" | python3 "$DIR/scrape.py" expand)" || break
@@ -123,13 +131,16 @@ printf '%s' "$PASSPHRASE" > "$ART/passphrase.txt"
 run_flow set-password.yaml || exit 1
 
 # Pull the exported archive (newest first) and verify it host-side.
-# The archive is moved into Download a moment after the passphrase dialog shows.
+# The archive is moved into place a moment after the passphrase dialog shows. The file
+# picker saves into Download on stock images; other ROMs' pickers may default elsewhere,
+# so search the whole shared storage.
 for _ in $(seq 1 10); do
-  NAME="$(adb shell 'ls -t /sdcard/Download/' | tr -d '\r' | grep -m1 '\.zip\.age$')"
-  [ -n "$NAME" ] && break; sleep 3
+  EXPORT="$(adb shell 'find /sdcard -maxdepth 4 -name "*.zip.age" -newer /sdcard/Download/e2e-iocs.stix2 2>/dev/null' | tr -d '\r' | head -1)"
+  [ -n "$EXPORT" ] && break; sleep 3
 done
-if [ -z "$NAME" ]; then echo "NO EXPORT IN DOWNLOADS"; exit 1; fi
-adb pull "/sdcard/Download/$NAME" "$ART/$NAME"
+if [ -z "$EXPORT" ]; then echo "NO EXPORT FOUND UNDER /sdcard"; adb shell 'ls -lat /sdcard /sdcard/Download /sdcard/Documents 2>/dev/null | head -30'; exit 1; fi
+NAME="$(basename "$EXPORT")"; echo "export: $EXPORT"
+adb pull "$EXPORT" "$ART/$NAME"
 # --sideloaded: the harness adb-installs exactly bugbane, Maestro's on-device driver
 # apps (+ the fixture); any other package the acquisition marks as sideloaded is a
 # false positive and fails here.
