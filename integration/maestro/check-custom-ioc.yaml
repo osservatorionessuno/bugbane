@@ -1,0 +1,51 @@
+# Bugbane's own detection of the custom set: open the analysis from the acquisition
+# detail (row marked CRITICAL), expand result cards until the planted marker from
+# e2e-iocs.stix2 shows, then return to the acquisition detail for the export.
+appId: org.osservatorionessuno.bugbane
+---
+- tapOn:
+    containsChild: "CRITICAL"
+- extendedWaitUntil:
+    visible:
+      text: "Analysis date.*"
+    timeout: 30000
+# Cards are collapsed; "Expand" flips to "Collapse" once tapped, so tapping the first
+# "Expand" each round walks down the list (CRITICAL cards sort first). The marker is
+# one bullet among several, so scroll the sheet once a card is open.
+- repeat:
+    times: 6
+    while:
+      notVisible:
+        text: ".*custom-marker.*"
+    commands:
+      - tapOn:
+          text: "Expand"
+          optional: true
+      - scrollUntilVisible:
+          element:
+            text: ".*custom-marker.*"
+            optional: true
+          direction: DOWN
+          timeout: 10000
+- assertVisible:
+    text: ".*/data/local/tmp/bugbane-e2e/custom-marker.*"
+- takeScreenshot: screenshots/06b-custom-ioc-detected
+# Neither Back nor a tap on the handle reliably dismisses the scrolled sheet: drag it
+# down (the first drag may only scroll its content back up), then Back as a fallback.
+- repeat:
+    times: 3
+    while:
+      notVisible: "Export"
+    commands:
+      - swipe:
+          start: "50%, 20%"
+          end: "50%, 95%"
+          duration: 600
+- runFlow:
+    when:
+      notVisible: "Export"
+    commands:
+      - pressKey: Back
+- extendedWaitUntil:
+    visible: "Export"
+    timeout: 20000

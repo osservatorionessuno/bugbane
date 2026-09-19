@@ -43,7 +43,6 @@
     <string name="beta_warning_message">Это бета-версия: используйте её на свой страх и риск. Сообщайте об ошибках на GitHub.</string>
     <string name="beta_warning_understand">Понятно</string>
     <string name="beta_warning_quit">Выйти из приложения</string>
-    <string name="settings_description">Настройте здесь свои предпочтения и параметры приложения.</string>
     <string name="settings_general">Основные настройки</string>
     <string name="settings_developer_options">Отключить режим разработчика</string>
     <string name="settings_developer_options_desc">Рекомендуется отключать режим разработчика после каждого сеанса и включать его только при необходимости.</string>

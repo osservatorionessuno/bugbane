@@ -6,28 +6,33 @@
 # with `maestro test -e CODE=<6 digits>`.
 appId: org.osservatorionessuno.bugbane
 ---
-- extendedWaitUntil:
-    visible:
-      text: ".*(Enter pairing code|ADB pairing service|Pairing with ADB).*"
-    timeout: 60000
-# Expand bugbane's notification if the inline-reply action isn't already showing.
-- repeat:
-    times: 3
+# CODE is empty when the device accepted the connection without pairing (run.sh).
+- runFlow:
+    when:
+      true: ${CODE != ''}
     commands:
-      - runFlow:
-          when:
-            notVisible: "Enter pairing code"
+      - extendedWaitUntil:
+          visible:
+            text: ".*(Enter pairing code|ADB pairing service|Pairing with ADB).*"
+          timeout: 60000
+      # Expand bugbane's notification if the inline-reply action isn't already showing.
+      - repeat:
+          times: 3
           commands:
-            - tapOn:
-                text: "Expand"
-                optional: true
-            - extendedWaitUntil:
-                visible: "Enter pairing code"
-                timeout: 6000
-- assertVisible: "Enter pairing code"
-- tapOn: "Enter pairing code"
-- inputText: "${CODE}"
-- pressKey: Enter
+            - runFlow:
+                when:
+                  notVisible: "Enter pairing code"
+                commands:
+                  - tapOn:
+                      text: "Expand"
+                      optional: true
+                  - extendedWaitUntil:
+                      visible: "Enter pairing code"
+                      timeout: 6000
+      - assertVisible: "Enter pairing code"
+      - tapOn: "Enter pairing code"
+      - inputText: "${CODE}"
+      - pressKey: Enter
 # Close the shade (Home is reliable) and land on the paired home screen.
 - pressKey: Home
 - launchApp
@@ -36,12 +41,20 @@ appId: org.osservatorionessuno.bugbane
       text: ".*(Ready to Start|Get Started|Acquire Data).*"
     timeout: 90000
 - takeScreenshot: screenshots/03-home-paired
-# --- acquisition + export (same flow, no relaunch gap after pairing) ---
+# Pairing lands on the last onboarding slide; the home screen (with Settings) is behind
+# "Get Started".
 - runFlow:
     when:
       visible: "Get Started"
     commands:
       - tapOn: "Get Started"
+- extendedWaitUntil:
+    visible: "Start Acquisition"
+    timeout: 20000
+# Import the custom IOC set now (same process, so the wireless connection stays up),
+# so the auto-analysis below runs against feed + custom indicators.
+- runFlow: import-iocs.yaml
+# --- acquisition + export (same flow, no relaunch gap after pairing) ---
 - extendedWaitUntil:
     visible: "Start Acquisition"
     timeout: 20000
@@ -59,6 +72,8 @@ appId: org.osservatorionessuno.bugbane
       text: ".*CRITICAL.*"
     timeout: 300000
 - takeScreenshot: screenshots/06-scan-results
+# The custom set must have matched too (its planted marker, see run.sh).
+- runFlow: check-custom-ioc.yaml
 # Tapping Export right after can race the SAF picker, so retry until SAVE shows.
 - repeat:
     times: 3

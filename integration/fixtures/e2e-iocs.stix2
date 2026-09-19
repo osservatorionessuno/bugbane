@@ -1,0 +1,61 @@
+{
+  "type": "bundle",
+  "id": "bundle--e2e00000-0000-4000-8000-000000000001",
+  "objects": [
+    {
+      "type": "malware",
+      "spec_version": "2.1",
+      "id": "malware--e2e00000-0000-4000-8000-000000000010",
+      "created": "2026-01-01T00:00:00.000Z",
+      "modified": "2026-01-01T00:00:00.000Z",
+      "name": "Bugbane E2E test set",
+      "description": "Custom indicator fixture imported through Settings by the integration test.",
+      "is_family": true,
+      "malware_types": ["spyware"]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--e2e00000-0000-4000-8000-000000000021",
+      "created": "2026-01-01T00:00:00.000Z",
+      "modified": "2026-01-01T00:00:00.000Z",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[file:path = '/data/local/tmp/bugbane-e2e/custom-marker.so']",
+      "pattern_type": "stix",
+      "pattern_version": "2.1",
+      "valid_from": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--e2e00000-0000-4000-8000-000000000022",
+      "created": "2026-01-01T00:00:00.000Z",
+      "modified": "2026-01-01T00:00:00.000Z",
+      "indicator_types": ["malicious-activity"],
+      "pattern": "[app:id = 'org.osservatorionessuno.fixture.suspicious']",
+      "pattern_type": "stix",
+      "pattern_version": "2.1",
+      "valid_from": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--e2e00000-0000-4000-8000-000000000031",
+      "created": "2026-01-01T00:00:00.000Z",
+      "modified": "2026-01-01T00:00:00.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--e2e00000-0000-4000-8000-000000000021",
+      "target_ref": "malware--e2e00000-0000-4000-8000-000000000010"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--e2e00000-0000-4000-8000-000000000032",
+      "created": "2026-01-01T00:00:00.000Z",
+      "modified": "2026-01-01T00:00:00.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--e2e00000-0000-4000-8000-000000000022",
+      "target_ref": "malware--e2e00000-0000-4000-8000-000000000010"
+    }
+  ]
+}

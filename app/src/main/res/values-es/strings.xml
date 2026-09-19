@@ -43,7 +43,6 @@
     <string name="beta_warning_message">Esta es una versión beta: úsela bajo su propia responsabilidad. Informe de cualquier error en GitHub.</string>
     <string name="beta_warning_understand">Comprendo</string>
     <string name="beta_warning_quit">Salir de la app</string>
-    <string name="settings_description">Configure sus preferencias y los ajustes de app aquí.</string>
     <string name="settings_general">Ajustes Generales</string>
     <string name="settings_developer_options">Deshabilitar Opciones de Desarrollo</string>
     <string name="settings_developer_options_desc">Está recomendado deshabilitar Opciones de Desarrollador tras cada sesión y re‐habilitarlas solo cuando se necesite.</string>

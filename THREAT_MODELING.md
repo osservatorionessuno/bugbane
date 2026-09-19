@@ -68,5 +68,7 @@ IoC MUST always be downloaded via HTTPS and should be downloaded via OHTTP.
 ## Threat: User adds a malicious upstream Indicator Source
 The attacker can force the user into downloading files that Bugbane will later load as indicators.
 
+Bugbane also lets the user import indicator files from local storage (Settings → Custom indicators). These are additive: they cannot remove or replace the signed feed, so a crafted file can at most add false positives (e.g. to scare the user towards a fake "helpline"). Files are validated as STIX 2 / MVT JSON before being copied into app storage, Settings shows each file's SHA-256 so it can be checked against the sender out of band, and every analysis records the name and hash of each indicator file it used.
+
 ### Countermeasures
 
