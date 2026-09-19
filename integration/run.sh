@@ -135,7 +135,8 @@ run_flow set-password.yaml || exit 1
 # picker saves into Download on stock images; other ROMs' pickers may default elsewhere,
 # so search the whole shared storage.
 for _ in $(seq 1 10); do
-  EXPORT="$(adb shell 'find /sdcard -maxdepth 4 -name "*.zip.age" -newer /sdcard/Download/e2e-iocs.stix2 2>/dev/null' | tr -d '\r' | head -1)"
+  # Trailing slash: /sdcard is a symlink and find does not follow it otherwise.
+  EXPORT="$(adb shell 'find /sdcard/ -maxdepth 3 -name "*.zip.age" -newer /sdcard/Download/e2e-iocs.stix2 2>/dev/null' | tr -d '\r' | head -1)"
   [ -n "$EXPORT" ] && break; sleep 3
 done
 if [ -z "$EXPORT" ]; then echo "NO EXPORT FOUND UNDER /sdcard"; adb shell 'ls -lat /sdcard /sdcard/Download /sdcard/Documents 2>/dev/null | head -30'; exit 1; fi
