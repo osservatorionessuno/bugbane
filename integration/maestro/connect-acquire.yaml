@@ -6,28 +6,33 @@
 # with `maestro test -e CODE=<6 digits>`.
 appId: org.osservatorionessuno.bugbane
 ---
-- extendedWaitUntil:
-    visible:
-      text: ".*(Enter pairing code|ADB pairing service|Pairing with ADB).*"
-    timeout: 60000
-# Expand bugbane's notification if the inline-reply action isn't already showing.
-- repeat:
-    times: 3
+# CODE is empty when the device accepted the connection without pairing (run.sh).
+- runFlow:
+    when:
+      true: ${CODE != ''}
     commands:
-      - runFlow:
-          when:
-            notVisible: "Enter pairing code"
+      - extendedWaitUntil:
+          visible:
+            text: ".*(Enter pairing code|ADB pairing service|Pairing with ADB).*"
+          timeout: 60000
+      # Expand bugbane's notification if the inline-reply action isn't already showing.
+      - repeat:
+          times: 3
           commands:
-            - tapOn:
-                text: "Expand"
-                optional: true
-            - extendedWaitUntil:
-                visible: "Enter pairing code"
-                timeout: 6000
-- assertVisible: "Enter pairing code"
-- tapOn: "Enter pairing code"
-- inputText: "${CODE}"
-- pressKey: Enter
+            - runFlow:
+                when:
+                  notVisible: "Enter pairing code"
+                commands:
+                  - tapOn:
+                      text: "Expand"
+                      optional: true
+                  - extendedWaitUntil:
+                      visible: "Enter pairing code"
+                      timeout: 6000
+      - assertVisible: "Enter pairing code"
+      - tapOn: "Enter pairing code"
+      - inputText: "${CODE}"
+      - pressKey: Enter
 # Close the shade (Home is reliable) and land on the paired home screen.
 - pressKey: Home
 - launchApp
