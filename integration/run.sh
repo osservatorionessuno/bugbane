@@ -47,6 +47,11 @@ adb wait-for-device
 # suppress crash/ANR dialogs device-wide before anything else can raise one.
 adb shell settings put global hide_error_dialogs 1 || true
 adb shell settings put global stay_on_while_plugged_in 3 || true
+# /e/OS ships an enabled password manager whose "Save credentials" sheet covers the app
+# after password entry; turn autofill/credential providers off (no-op on stock images).
+adb shell settings put secure autofill_service null || true
+adb shell settings put secure credential_service null || true
+adb shell settings put secure credential_service_primary null || true
 adb shell settings put global verifier_verify_adb_installs 0 || true
 # Maestro clears the device log at every flow start, so stream it for the whole run.
 adb logcat > "$ART/logcat.txt" 2>&1 &
@@ -84,11 +89,16 @@ run_flow pair.yaml || run_flow pair.yaml || exit 1
 CODE="$(maestro hierarchy 2>/dev/null | python3 "$DIR/scrape.py" code)"
 if [ -z "$CODE" ]; then echo "PAIRING CODE SCRAPE FAILED"; exit 1; fi
 echo "pairing code = $CODE"
-for _ in $(seq 1 30); do
+NOTIF_SEEN=""
+for _ in $(seq 1 60); do
   adb shell cmd statusbar expand-notifications || true
-  if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then break; fi
+  if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then NOTIF_SEEN=1; break; fi
   sleep 3
 done
+if [ -z "$NOTIF_SEEN" ]; then
+  echo "PAIRING NOTIFICATION NOT SEEN AFTER 3 MINUTES (continuing; the flow waits once more)"
+  maestro hierarchy > "$ART/pairing-wait-hierarchy.json" 2>/dev/null || true
+fi
 # Expand bugbane's notification so its inline "Enter pairing code" action shows. Other
 # notifications carry the same "Expand" button, so pick the one next to bugbane's title.
 for _ in 1 2 3; do
