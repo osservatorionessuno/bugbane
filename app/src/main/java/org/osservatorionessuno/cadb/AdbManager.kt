@@ -48,7 +48,8 @@ class AdbManager(applicationContext: Context) {
             onFailure = { errorMessage ->
                 Log.e(TAG, "Failed pairing attempt: $errorMessage")
                 _adbState.value = AdbState.ErrorConnect
-                stopAdbPairingService()
+                // Keep the receiver: the user may retry from the notification.
+                // The service stops itself.
             }
         )
 
@@ -61,16 +62,18 @@ class AdbManager(applicationContext: Context) {
 
     private var adbShellStream: AdbStream? = null
 
-    internal fun stopAdbPairingService() {
-        adbPairingReceiver.let { it ->
-            try {
-                appContext?.unregisterReceiver(it)
-            } catch (_: IllegalArgumentException) {
-                Log.i(TAG, "Can't unregister adbBroadcastReceiver (already unregistered?)")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error unregistering adbBroadcastreceiver: $e")
-            }
+    private fun unregisterPairingReceiver() {
+        try {
+            appContext?.unregisterReceiver(adbPairingReceiver)
+        } catch (_: IllegalArgumentException) {
+            // not registered
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering adbBroadcastreceiver: $e")
         }
+    }
+
+    internal fun stopAdbPairingService() {
+        unregisterPairingReceiver()
 
         // Cancel the notification, if it's still showing.
         // Note: keep this cleanup despite onTimeout() in AdbPairingService, because Android
@@ -83,6 +86,7 @@ class AdbManager(applicationContext: Context) {
         // Create BroadcastReceiver for pairing results.
         Log.d(TAG, "Start pairing service...")
         val filter = IntentFilter(AdbPairingService.ACTION_PAIRING_RESULT)
+        unregisterPairingReceiver() // may still be registered after a failed attempt
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             // This broadcast is internal to the app, so keep it private

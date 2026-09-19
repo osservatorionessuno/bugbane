@@ -21,9 +21,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.MainActivity
+import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.security.AdbExposureNotifier
 import org.osservatorionessuno.bugbane.security.DeviceVulnerabilityChecker
 import org.osservatorionessuno.cadb.AdbManager
+import org.osservatorionessuno.cadb.AdbPairingService
 import org.osservatorionessuno.cadb.AdbState
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -222,7 +224,17 @@ class ConfigurationViewModel private constructor(
      */
     private fun observeAppState() {
         viewModelScope.launch {
+            var previous: AppState? = null
             configurationState.collect { appState ->
+                // Enabled from Settings: tell the user in the shade and offer the way back.
+                if (previous == AppState.NeedDeveloperOptions && appState == AppState.NeedWirelessDebuggingAndPair) {
+                    AdbPairingService.notifyGuidance(
+                        appContext,
+                        appContext.getString(R.string.notification_guide_developer_done_title),
+                        appContext.getString(R.string.notification_guide_developer_done_text),
+                    )
+                }
+                previous = appState
 
                 if (appState == AppState.TryAutoConnect && autoConnectAttempts.fetchAndAdd(1) < _MAX_AUTOCONNECT_ATTEMPTS) {
                     Log.d(TAG, "Auto-connect to ADB (attempt ${autoConnectAttempts.load()} / $_MAX_AUTOCONNECT_ATTEMPTS)")
@@ -283,7 +295,13 @@ class ConfigurationViewModel private constructor(
             AppState.NeedWifi,
             AppState.NeedNotificationPermission,
             AppState.NeedDeveloperOptions -> {
-
+                if (currentState == AppState.NeedDeveloperOptions) {
+                    AdbPairingService.notifyGuidance(
+                        appContext,
+                        appContext.getString(R.string.notification_guide_developer_title),
+                        appContext.getString(R.string.notification_guide_developer_text),
+                    )
+                }
                 getIntentForAppState(currentState)?.let {
                     it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
                     runCatching { appContext.startActivity(it) }

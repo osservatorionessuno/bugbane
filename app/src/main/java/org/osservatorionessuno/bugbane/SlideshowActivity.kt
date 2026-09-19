@@ -21,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -39,6 +40,7 @@ import org.osservatorionessuno.bugbane.ui.theme.Theme
 import org.osservatorionessuno.bugbane.utils.AppState
 import org.osservatorionessuno.bugbane.utils.ConfigurationViewModel
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
+import org.osservatorionessuno.cadb.AdbPairingService
 
 const val INTENT_EXIT_BACKPRESS = "EXIT_ON_BACK"
 private const val TAG = "SlideshowActivity"
@@ -120,6 +122,7 @@ fun SlideshowScreen(
     val currentPage by remember { derivedStateOf { pagerState.currentPage } }
 
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
 
     suspend fun updatePager(state: AppState) {
         if (state == AppState.AdbConnected || state == AppState.AnalystReady) {
@@ -158,6 +161,7 @@ fun SlideshowScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 Log.d(TAG, "onResume ($state)")
+                AdbPairingService.cancelNotification(context)
                 viewModel.refreshState()
             }
         }
