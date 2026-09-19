@@ -4,12 +4,22 @@
 # IOCS_SHA256 (from run.sh) is the fixture's hash, asserted against the Settings row.
 appId: org.osservatorionessuno.bugbane
 ---
-# The gear can swallow a tap while the home screen is still settling after onboarding.
+# Right after pairing, the "Turn off Wireless Debugging" heads-up can sit over the top
+# bar (API 30 in CI) and a tap on the gear opens Developer options instead. Let it
+# collapse first, and back out of system Settings if a tap still lands there.
+- extendedWaitUntil:
+    notVisible: "^Turn off Wireless Debugging$"
+    timeout: 20000
 - repeat:
     times: 3
     while:
       notVisible: "Indicators of Compromise (IoCs)"
     commands:
+      - runFlow:
+          when:
+            visible: "Search settings"
+          commands:
+            - pressKey: Back
       - waitForAnimationToEnd:
           timeout: 3000
       - tapOn: "Settings"
