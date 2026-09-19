@@ -70,13 +70,5 @@ The attacker can force the user into downloading files that Bugbane will later l
 
 ### Countermeasures
 
-## Threat: User imports a malicious custom indicator file
-Bugbane lets the user add their own indicator files (Settings → Custom indicators). An attacker who gets the user to import a crafted file, or who can write to the app's storage, controls what those indicators match.
-
-Custom indicators are only ever added on top of the bundled and downloaded feed: they cannot remove or replace an indicator, so the worst case is false positives, for example to push the user towards a fake "helpline". Unlike acquisitions, imported files are not encrypted by Bugbane; they rely on the device's own storage encryption and the app sandbox.
-
-### Countermeasures
-
-Files are checked to be valid STIX 2 / MVT indicator files before they are copied into app storage.
-Settings shows each file's SHA-256 so it can be compared with the sender out of band.
-Every analysis records the name and hash of each indicator file it used.
+## Custom indicators
+Users can import their own indicator files, which may be confidential. They are stored in the app sandbox, not separately encrypted like acquisitions, and cannot be exported from the app. They are only additive to the shipped indicators, and STIX 2 is the only supported format.
