@@ -70,3 +70,5 @@ The attacker can force the user into downloading files that Bugbane will later l
 
 ### Countermeasures
 
+## Custom indicators
+Users can import their own indicator files, which may be confidential. They are stored in the app sandbox, not separately encrypted like acquisitions, and cannot be exported from the app. They are only additive to the shipped indicators, and STIX 2 is the only supported format.

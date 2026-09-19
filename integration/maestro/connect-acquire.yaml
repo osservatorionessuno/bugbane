@@ -36,12 +36,20 @@ appId: org.osservatorionessuno.bugbane
       text: ".*(Ready to Start|Get Started|Acquire Data).*"
     timeout: 90000
 - takeScreenshot: screenshots/03-home-paired
-# --- acquisition + export (same flow, no relaunch gap after pairing) ---
+# Pairing lands on the last onboarding slide; the home screen (with Settings) is behind
+# "Get Started".
 - runFlow:
     when:
       visible: "Get Started"
     commands:
       - tapOn: "Get Started"
+- extendedWaitUntil:
+    visible: "Start Acquisition"
+    timeout: 20000
+# Import the custom IOC set now (same process, so the wireless connection stays up),
+# so the auto-analysis below runs against feed + custom indicators.
+- runFlow: import-iocs.yaml
+# --- acquisition + export (same flow, no relaunch gap after pairing) ---
 - extendedWaitUntil:
     visible: "Start Acquisition"
     timeout: 20000
@@ -59,6 +67,8 @@ appId: org.osservatorionessuno.bugbane
       text: ".*CRITICAL.*"
     timeout: 300000
 - takeScreenshot: screenshots/06-scan-results
+# The custom set must have matched too (its planted marker, see run.sh).
+- runFlow: check-custom-ioc.yaml
 # Tapping Export right after can race the SAF picker, so retry until SAVE shows.
 - repeat:
     times: 3

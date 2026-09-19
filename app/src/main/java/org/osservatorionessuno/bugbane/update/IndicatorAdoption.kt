@@ -5,9 +5,10 @@ import java.io.OutputStream
 /**
  * The single point where a candidate indicator set is verified and written to the store.
  *
- * Every source converges here — the online [IndicatorUpdater], the APK-bundled set
- * ([BundledIndicators]), and (future) a set loaded from disk — so nothing reaches the store
- * without passing verification, and the store is only ever written in one place.
+ * Every source of the feed converges here — the online [IndicatorUpdater], the APK-bundled set
+ * ([BundledIndicators]), and (future) a set loaded from disk — so nothing replaces the feed
+ * without passing verification, and the feed is only ever written in one place. User-imported
+ * additive sets are a separate path ([CustomIndicatorStore]) and never touch the feed.
  *
  * Signature / sigsum verification is intentionally NOT done yet; when it is added it goes next to
  * the hash check in [adopt], which is enough to cover every source at once.

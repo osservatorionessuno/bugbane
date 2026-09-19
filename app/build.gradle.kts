@@ -154,6 +154,8 @@ dependencies {
 
     // external libMVT
     implementation(libs.libmvt)
+    // Streaming JSON for validating imported indicator files (libmvt already ships it at runtime)
+    implementation(libs.gson)
 
     // OHTTP update transport (Oblivious HTTP, RFC 9458 + 9292 + 9180)
     implementation(libs.libohttp)
