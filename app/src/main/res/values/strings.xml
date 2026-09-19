@@ -154,9 +154,17 @@
     <!-- ADB Pairing Service strings -->
     <string name="notification_channel_adb_pairing">ADB Pairing</string>
     <string name="notification_adb_pairing_succeed_title">ADB Pairing Successful</string>
+    <string name="notification_adb_pairing_succeed_text">Tap to continue in Bugbane.</string>
     <string name="notification_adb_pairing_failed_title">ADB Pairing Failed</string>
+    <string name="notification_adb_pairing_failed_text">Wrong code? Open “Pair device with pairing code” again and tap Retry.</string>
+    <string name="notification_adb_pairing_retry">Retry</string>
     <string name="notification_adb_pairing_input_code">Enter pairing code</string>
     <string name="notification_adb_pairing_searching_for_service_title">Searching for ADB pairing service</string>
+    <string name="notification_adb_pairing_searching_for_service_text">Turn on Wireless debugging, then tap “Pair device with pairing code”.</string>
+    <string name="notification_guide_developer_title">Enable Developer options</string>
+    <string name="notification_guide_developer_text">Tap “Build number” seven times, then come back to Bugbane.</string>
+    <string name="notification_guide_developer_done_title">Developer options enabled</string>
+    <string name="notification_guide_developer_done_text">Tap to continue in Bugbane.</string>
     <string name="notification_adb_pairing_stop_searching">Stop searching</string>
     <string name="notification_adb_pairing_service_found_title">ADB pairing service found on port %d</string>
     <string name="notification_adb_pairing_working_title">Pairing with ADB service</string>
