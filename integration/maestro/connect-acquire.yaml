@@ -33,9 +33,20 @@ appId: org.osservatorionessuno.bugbane
       - tapOn: "Enter pairing code"
       - inputText: "${CODE}"
       - pressKey: Enter
-# Close the shade (Home is reliable) and land on the paired home screen.
+# Close the shade (Home is reliable) and land on the paired home screen. Settings runs
+# inside bugbane's task, so when pairing was not needed (autoconnect, CODE empty) its
+# dialog is still on top after launchApp: back out of Settings screens until it is gone.
 - pressKey: Home
 - launchApp
+- repeat:
+    times: 4
+    while:
+      visible:
+        text: ".*(Pair with device|Developer options|Use wireless debugging|Wireless debugging).*"
+    commands:
+      - pressKey: Back
+      - waitForAnimationToEnd:
+          timeout: 2000
 - extendedWaitUntil:
     visible:
       text: ".*(Ready to Start|Get Started|Acquire Data).*"
