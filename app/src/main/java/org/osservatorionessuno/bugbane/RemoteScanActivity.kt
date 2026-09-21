@@ -57,6 +57,7 @@ import org.osservatorionessuno.bugbane.ui.theme.Theme
 import org.osservatorionessuno.bugbane.utils.HotspotManager.HotspotState
 import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel
 import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel.Step
+import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel.UsbRole
 import org.osservatorionessuno.cadb.QrCode
 
 /** Connect another device over USB or Wi-Fi; the home screen then starts its acquisition. */
@@ -129,14 +130,21 @@ private fun RemoteScanStep(step: Step, viewModel: RemoteScanViewModel) {
             onClickContinue = { viewModel.usbCableConnected() },
         )
 
-        Step.UsbWaiting -> SlideshowPageContent(
-            page = SlideshowPageData(
-                title = stringResource(R.string.remote_usb_debugging_title),
-                description = stringResource(R.string.remote_usb_debugging_description),
-                icon = Icons.Filled.Usb,
-            ),
-            middle = { Waiting(stringResource(R.string.remote_usb_waiting)) },
-        )
+        is Step.UsbWaiting -> {
+            val (title, description) = when (step.role) {
+                UsbRole.NONE -> R.string.remote_usb_cable_title to R.string.remote_usb_cable_description
+                UsbRole.DEVICE -> R.string.remote_usb_role_title to R.string.remote_usb_role_description
+                UsbRole.HOST -> R.string.remote_usb_debugging_title to R.string.remote_usb_debugging_description
+            }
+            SlideshowPageContent(
+                page = SlideshowPageData(
+                    title = stringResource(title),
+                    description = stringResource(description),
+                    icon = Icons.Filled.Usb,
+                ),
+                middle = { Waiting(stringResource(R.string.remote_usb_waiting)) },
+            )
+        }
 
         is Step.Connecting -> SlideshowPageContent(
             page = SlideshowPageData(

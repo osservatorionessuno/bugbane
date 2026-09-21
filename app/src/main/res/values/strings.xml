@@ -377,7 +377,9 @@
     <string name="remote_retry_button">Retry</string>
     <string name="remote_error_title">Something went wrong</string>
     <string name="remote_usb_cable_title">Connect the cable</string>
-    <string name="remote_usb_cable_description">Connect the two phones with a USB cable.\n\nOnly one setup works. Open the USB notification on this phone and set “USB controlled by” to “Connected device” and “Use USB for” to “File transfer”.</string>
+    <string name="remote_usb_cable_description">Connect the two phones with a USB cable.</string>
+    <string name="remote_usb_role_title">Swap the USB roles</string>
+    <string name="remote_usb_role_description">The other device is controlling this phone\'s USB port. Open the USB notification on this phone and set “USB controlled by” to “Connected device”.</string>
     <string name="remote_usb_debugging_title">Enable USB debugging on the other device</string>
     <string name="remote_usb_debugging_description">On the device to scan, open Settings › About phone and tap “Build number” seven times to enable Developer options. Then open Developer options and turn on “USB debugging”.</string>
     <string name="remote_usb_waiting">Waiting for the device…</string>
