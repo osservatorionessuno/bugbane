@@ -102,6 +102,15 @@
             android:exported="false"
             android:foregroundServiceType="shortService" />
 
+        <!-- Sent by the system to this app only, when its notifications are unblocked. -->
+        <receiver
+            android:name=".NotificationsEnabledReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.app.action.APP_BLOCK_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -17,6 +17,7 @@ mkdir -p "$ART" "$ART/screenshots"
 PKG=org.osservatorionessuno.bugbane
 
 echo "sha=${GITHUB_SHA:-unknown} run=${GITHUB_RUN_NUMBER:-?} ref=${GITHUB_REF_NAME:-?}" > "$ART/RUN_INFO.txt"
+exec > >(tee -a "$ART/harness.log") 2>&1
 
 LOGCAT_PID=""
 capture() {
@@ -47,6 +48,11 @@ adb wait-for-device
 # suppress crash/ANR dialogs device-wide before anything else can raise one.
 adb shell settings put global hide_error_dialogs 1 || true
 adb shell settings put global stay_on_while_plugged_in 3 || true
+# /e/OS ships an enabled password manager whose "Save credentials" sheet covers the app
+# after password entry; turn autofill/credential providers off (no-op on stock images).
+adb shell settings put secure autofill_service null || true
+adb shell settings put secure credential_service null || true
+adb shell settings put secure credential_service_primary null || true
 adb shell settings put global verifier_verify_adb_installs 0 || true
 # Maestro clears the device log at every flow start, so stream it for the whole run.
 adb logcat > "$ART/logcat.txt" 2>&1 &
@@ -64,6 +70,15 @@ adb install -r -g "$APK"
 # Plant a known Predator file-path IOC (present in the bundled indicator set) so the
 # acquisition captures it; bugbane and MVT must both flag it (cross-check below).
 adb shell 'mkdir -p /data/local/tmp/wd && echo planted > /data/local/tmp/wd/pred.so' || true
+# A user-imported IOC set on top of the feed: plant its file-path marker and push the
+# fixture to Downloads, where import-iocs.yaml picks it via the system file picker.
+CUSTOM_IOCS="$DIR/fixtures/e2e-iocs.stix2"
+CUSTOM_MARKER=/data/local/tmp/bugbane-e2e/custom-marker.so
+adb shell "mkdir -p $(dirname "$CUSTOM_MARKER") && echo planted > $CUSTOM_MARKER" || true
+adb push "$CUSTOM_IOCS" /sdcard/Download/e2e-iocs.stix2
+adb shell content call --uri content://media/external/file --method scan_file \
+  --arg /storage/emulated/0/Download/e2e-iocs.stix2 >/dev/null 2>&1 || true
+CUSTOM_SHA="$(shasum -a 256 "$CUSTOM_IOCS" | cut -d' ' -f1)"
 
 # Onboard + open the Settings pairing dialog (6-digit code left on screen).
 # Restartable (clears app state): one retry absorbs a transient dialog or a slow start.
@@ -75,15 +90,36 @@ run_flow pair.yaml || run_flow pair.yaml || exit 1
 CODE="$(maestro hierarchy 2>/dev/null | python3 "$DIR/scrape.py" code)"
 if [ -z "$CODE" ]; then echo "PAIRING CODE SCRAPE FAILED"; exit 1; fi
 echo "pairing code = $CODE"
-for _ in $(seq 1 30); do
+# Engineering builds (/e/OS's sdk_phone image) run adbd without authentication, so
+# bugbane's autoconnect can succeed before any code is entered; then no pairing is
+# needed and the pairing notification may never show. Detect that and skip the code.
+NOTIF_SEEN=""
+for _ in $(seq 1 60); do
+  if adb logcat -d 2>/dev/null | grep -q "AdbManager: autoconnect successful"; then
+    echo "device accepted the connection without pairing; skipping the code"
+    CODE=""; break
+  fi
   adb shell cmd statusbar expand-notifications || true
-  if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then break; fi
+  if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then NOTIF_SEEN=1; break; fi
   sleep 3
 done
-# Enter the code + acquire + export in one flow (no relaunch gap after pairing, where
-# the wireless connection drops and the app reverts to the pair page).
+if [ -n "$CODE" ] && [ -z "$NOTIF_SEEN" ]; then
+  echo "PAIRING NOTIFICATION NOT SEEN AFTER 3 MINUTES (continuing; the flow waits once more)"
+  maestro hierarchy > "$ART/pairing-wait-hierarchy.json" 2>/dev/null || true
+fi
+# Expand bugbane's notification so its inline "Enter pairing code" action shows. Other
+# notifications carry the same "Expand" button, so pick the one next to bugbane's title.
+[ -n "$CODE" ] && for _ in 1 2 3; do
+  tree="$(maestro hierarchy 2>/dev/null)"
+  echo "$tree" | grep -q "Enter pairing code" && break
+  point="$(echo "$tree" | python3 "$DIR/scrape.py" expand)" || break
+  adb shell input tap $point; sleep 2
+done
+# Enter the code + import the custom IOCs + acquire + export in one flow (no relaunch
+# gap after pairing, where the wireless connection drops and the app reverts to the
+# pair page).
 echo "::group::maestro connect-acquire.yaml"
-maestro test -e CODE="$CODE" "$FLOWS/connect-acquire.yaml"; rc=$?
+maestro test -e CODE="$CODE" -e IOCS_SHA256="$CUSTOM_SHA" "$FLOWS/connect-acquire.yaml"; rc=$?
 echo "::endgroup::"
 if [ "$rc" -ne 0 ]; then echo "FLOW FAILED: connect-acquire.yaml (rc=$rc)"; exit 1; fi
 
@@ -95,23 +131,29 @@ printf '%s' "$PASSPHRASE" > "$ART/passphrase.txt"
 run_flow set-password.yaml || exit 1
 
 # Pull the exported archive (newest first) and verify it host-side.
-# The archive is moved into Download a moment after the passphrase dialog shows.
+# The archive is moved into place a moment after the passphrase dialog shows. The file
+# picker saves into Download on stock images; other ROMs' pickers may default elsewhere,
+# so search the whole shared storage.
 for _ in $(seq 1 10); do
-  NAME="$(adb shell 'ls -t /sdcard/Download/' | tr -d '\r' | grep -m1 '\.zip\.age$')"
-  [ -n "$NAME" ] && break; sleep 3
+  # Trailing slash: /sdcard is a symlink and find does not follow it otherwise.
+  EXPORT="$(adb shell 'find /sdcard/ -maxdepth 3 -name "*.zip.age" -newer /sdcard/Download/e2e-iocs.stix2 2>/dev/null' | tr -d '\r' | head -1)"
+  [ -n "$EXPORT" ] && break; sleep 3
 done
-if [ -z "$NAME" ]; then echo "NO EXPORT IN DOWNLOADS"; exit 1; fi
-adb pull "/sdcard/Download/$NAME" "$ART/$NAME"
+if [ -z "$EXPORT" ]; then echo "NO EXPORT FOUND UNDER /sdcard"; adb shell 'ls -lat /sdcard /sdcard/Download /sdcard/Documents 2>/dev/null | head -30'; exit 1; fi
+NAME="$(basename "$EXPORT")"; echo "export: $EXPORT"
+adb pull "$EXPORT" "$ART/$NAME"
 # --sideloaded: the harness adb-installs exactly bugbane, Maestro's on-device driver
 # apps (+ the fixture); any other package the acquisition marks as sideloaded is a
 # false positive and fails here.
 python3 "$DIR/verify_export.py" "$ART/$NAME" "$PASSPHRASE" ${FIXTURE:+"$SUSPICIOUS_APPID"} \
   --sideloaded "$PKG,dev.mobile.maestro,dev.mobile.maestro.test${FIXTURE:+,$SUSPICIOUS_APPID}" || exit 1
 
-# Cross-check: upstream MVT must independently flag the planted IOC in the decrypted
-# export, using bugbane's own bundled indicators (same IOC set on both sides).
+# Cross-check: upstream MVT must independently flag both planted IOCs in the decrypted
+# export, fed the same two sets bugbane used (bundled feed + the imported custom file).
 cp "$(dirname "$DIR")/app/src/main/assets/bundled-indicators/indicators.json" "$ART/indicators.stix2"
-python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" "$ART/indicators.stix2" "/data/local/tmp/wd/pred.so" || exit 1
-adb shell 'rm -rf /data/local/tmp/wd' || true
+python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" \
+  -i "$ART/indicators.stix2" -i "$CUSTOM_IOCS" \
+  -e "/data/local/tmp/wd/pred.so" -e "$CUSTOM_MARKER" || exit 1
+adb shell "rm -rf /data/local/tmp/wd $(dirname "$CUSTOM_MARKER")" || true
 
 echo "INTEGRATION E2E PASS"

@@ -22,6 +22,7 @@ import java.net.InetAddress;
 import io.github.muntashirakon.adb.android.AdbMdns;
 import io.github.muntashirakon.adb.AbsAdbConnectionManager;
 import org.osservatorionessuno.bugbane.R;
+import org.osservatorionessuno.bugbane.SlideshowActivity;
 
 public class AdbPairingService extends Service {
     public static final String NOTIFICATION_CHANNEL = "adb_pairing";
@@ -33,6 +34,9 @@ public class AdbPairingService extends Service {
     private static final int NOTIFICATION_ID = 1;
     private static final int REPLY_REQUEST_ID = 1;
     private static final int STOP_REQUEST_ID = 2;
+    private static final int RETRY_REQUEST_ID = 3;
+    private static final int WIZARD_REQUEST_ID = 4;
+    private static final long GUIDANCE_TIMEOUT_MS = 3 * 60 * 1000;
     private static final String START_ACTION = "start";
     private static final String STOP_ACTION = "stop";
     private static final String REPLY_ACTION = "reply";
@@ -51,21 +55,57 @@ public class AdbPairingService extends Service {
         return new Intent(context, AdbPairingService.class).setAction(REPLY_ACTION).putExtra(PORT_KEY, port);
     }
 
+    /**
+     * Step-by-step card shown while the user is in Settings during onboarding. Same id and
+     * channel as the pairing notifications, so the flow is a single card that changes text;
+     * the service takes it over when pairing starts.
+     */
+    public static void notifyGuidance(Context context, String title, String text) {
+        ensureChannel(context);
+        Notification notification = builder(context)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(new Notification.BigTextStyle().bigText(text))
+                .setTimeoutAfter(GUIDANCE_TIMEOUT_MS)
+                .setAutoCancel(true)
+                .build();
+        context.getSystemService(NotificationManager.class).notify(NOTIFICATION_ID, notification);
+    }
+
+    /** Drop the guidance/result card once the user is back in the wizard. No-op while the service is foreground. */
+    public static void cancelNotification(Context context) {
+        context.getSystemService(NotificationManager.class).cancel(NOTIFICATION_ID);
+    }
+
+    private static void ensureChannel(Context context) {
+        NotificationChannel channel = new NotificationChannel(
+                NOTIFICATION_CHANNEL,
+                context.getString(R.string.notification_channel_adb_pairing),
+                NotificationManager.IMPORTANCE_HIGH);
+        channel.setSound(null, null);
+        channel.setShowBadge(false);
+        channel.setAllowBubbles(false);
+        context.getSystemService(NotificationManager.class).createNotificationChannel(channel);
+    }
+
+    /** Tapping any pairing notification brings the wizard back; it re-checks state on resume. */
+    private static Notification.Builder builder(Context context) {
+        Intent wizard = new Intent(context, SlideshowActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent open = PendingIntent.getActivity(context, WIZARD_REQUEST_ID, wizard,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        return new Notification.Builder(context, NOTIFICATION_CHANNEL)
+                .setSmallIcon(R.drawable.ic_bugbane_zoom)
+                .setContentIntent(open);
+    }
+
     private AdbMdns mAdbMdns;
     private boolean started = false;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        NotificationManager nm = getSystemService(NotificationManager.class);
-        NotificationChannel channel = new NotificationChannel(
-                NOTIFICATION_CHANNEL,
-                getString(R.string.notification_channel_adb_pairing),
-                NotificationManager.IMPORTANCE_HIGH);
-        channel.setSound(null, null);
-        channel.setShowBadge(false);
-        channel.setAllowBubbles(false);
-        nm.createNotificationChannel(channel);
+        ensureChannel(this);
     }
 
     // See docs below on ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE
@@ -170,17 +210,39 @@ public class AdbPairingService extends Service {
             resultIntent.putExtra(EXTRA_ERROR_MESSAGE, errorMessage);
         }
         sendBroadcast(resultIntent);
-        
+
+        // Settings runs inside bugbane's task (ConfigurationViewModel.startSettings), so the
+        // wizard can be brought forward; the result card is only for when that was refused.
+        if (success) SlideshowActivity.bringForward(this);
+
         // Update notification
         stopForeground(Service.STOP_FOREGROUND_REMOVE);
+        if (success && SlideshowActivity.cameForward()) {
+            stopSelf();
+            return;
+        }
         NotificationManager nm = getSystemService(NotificationManager.class);
-        String title = success ? getString(R.string.notification_adb_pairing_succeed_title)
-                : getString(R.string.notification_adb_pairing_failed_title);
-        Notification notification = new Notification.Builder(this, NOTIFICATION_CHANNEL)
-                .setSmallIcon(R.drawable.ic_bugbane_zoom)
-                .setContentTitle(title)
-                .build();
-        nm.notify(NOTIFICATION_ID, notification);
+        Notification.Builder builder = builder(this).setAutoCancel(true);
+        if (success) {
+            String text = getString(R.string.notification_adb_pairing_succeed_text);
+            builder.setContentTitle(getString(R.string.notification_adb_pairing_succeed_title))
+                    .setContentText(text)
+                    .setStyle(new Notification.BigTextStyle().bigText(text));
+        } else {
+            // Wrong code, most likely. Retry restarts the search: the Settings dialog keeps its
+            // code until dismissed, and a reopened dialog is found again over mDNS.
+            String text = getString(R.string.notification_adb_pairing_failed_text);
+            int flags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? PendingIntent.FLAG_IMMUTABLE : 0;
+            PendingIntent retry = PendingIntent.getForegroundService(this, RETRY_REQUEST_ID, startIntent(this), flags);
+            builder.setContentTitle(getString(R.string.notification_adb_pairing_failed_title))
+                    .setContentText(text)
+                    .setStyle(new Notification.BigTextStyle().bigText(text))
+                    .addAction(new Notification.Action.Builder(null,
+                            getString(R.string.notification_adb_pairing_retry), retry).build());
+        }
+        nm.notify(NOTIFICATION_ID, builder.build());
+        // The wizard may have resumed meanwhile, and its own cancel ran before the post.
+        if (success && SlideshowActivity.getInForeground()) nm.cancel(NOTIFICATION_ID);
         stopSelf();
     }
 
@@ -206,9 +268,11 @@ public class AdbPairingService extends Service {
     }
 
     private Notification searchingNotification() {
-        return new Notification.Builder(this, NOTIFICATION_CHANNEL)
-                .setSmallIcon(R.drawable.ic_bugbane_zoom)
+        String text = getString(R.string.notification_adb_pairing_searching_for_service_text);
+        return builder(this)
                 .setContentTitle(getString(R.string.notification_adb_pairing_searching_for_service_title))
+                .setContentText(text)
+                .setStyle(new Notification.BigTextStyle().bigText(text))
                 .addAction(new Notification.Action.Builder(null,
                         getString(R.string.notification_adb_pairing_stop_searching),
                         stopPendingIntent()).build())
@@ -216,16 +280,14 @@ public class AdbPairingService extends Service {
     }
 
     private Notification createInputNotification(int port) {
-        return new Notification.Builder(this, NOTIFICATION_CHANNEL)
-                .setSmallIcon(R.drawable.ic_bugbane_zoom)
+        return builder(this)
                 .setContentTitle(getString(R.string.notification_adb_pairing_service_found_title, port))
                 .addAction(replyAction(port))
                 .build();
     }
 
     private Notification workingNotification() {
-        return new Notification.Builder(this, NOTIFICATION_CHANNEL)
-                .setSmallIcon(R.drawable.ic_bugbane_zoom)
+        return builder(this)
                 .setContentTitle(getString(R.string.notification_adb_pairing_working_title))
                 .build();
     }

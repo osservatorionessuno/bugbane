@@ -21,9 +21,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.osservatorionessuno.bugbane.MainActivity
+import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.bugbane.security.AdbExposureNotifier
 import org.osservatorionessuno.bugbane.security.DeviceVulnerabilityChecker
+import org.osservatorionessuno.bugbane.workers.DeveloperOptionsWorker
 import org.osservatorionessuno.cadb.AdbManager
+import org.osservatorionessuno.cadb.AdbPairingService
 import org.osservatorionessuno.cadb.AdbState
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -240,7 +243,7 @@ class ConfigurationViewModel private constructor(
         }
     }
 
-    fun onChangeStateRequest(currentState: AppState) {
+    fun onChangeStateRequest(currentState: AppState, activity: Context) {
         Log.d(TAG, "onChangeRequest from $currentState")
         when (currentState) {
             AppState.DeviceUnsupported -> {
@@ -283,32 +286,28 @@ class ConfigurationViewModel private constructor(
             AppState.NeedWifi,
             AppState.NeedNotificationPermission,
             AppState.NeedDeveloperOptions -> {
-
-                getIntentForAppState(currentState)?.let {
-                    it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
-                    runCatching { appContext.startActivity(it) }
-                        .onFailure { e -> Log.w(TAG, "No activity for onboarding settings intent", e) }
+                if (currentState == AppState.NeedDeveloperOptions) {
+                    AdbPairingService.notifyGuidance(
+                        appContext,
+                        appContext.getString(R.string.notification_guide_developer_title),
+                        appContext.getString(R.string.notification_guide_developer_text),
+                    )
+                    // Turns the card into "done" while the user is still in Settings.
+                    DeveloperOptionsWorker.enqueue(appContext)
                 }
+                getIntentForAppState(currentState)?.let { startSettings(it, activity) }
             }
 
             AppState.NeedWirelessDebuggingAndPair -> {
 
-                getIntentForAppState(currentState)?.let {
-                    it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
-                    runCatching { appContext.startActivity(it) }
-                        .onFailure { e -> Log.w(TAG, "No activity for onboarding settings intent", e) }
-                }
+                getIntentForAppState(currentState)?.let { startSettings(it, activity) }
                 adbManager.startAdbPairingService()
             }
             AppState.NeedWirelessDebugging -> {
 
                 // Just open settings, don't launch a new pairing service.
                 // Once wireless debugging is re-enabled the state will be updated and autoconnect will be attempted
-                getIntentForAppState(currentState)?.let {
-                    it.addFlags(FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP)
-                    runCatching { appContext.startActivity(it) }
-                        .onFailure { e -> Log.w(TAG, "No activity for onboarding settings intent", e) }
-                }
+                getIntentForAppState(currentState)?.let { startSettings(it, activity) }
             }
             AppState.AdbConnectedFinishOnboarding -> {
                 appManager.markHomepageAsSeen()
@@ -318,6 +317,13 @@ class ConfigurationViewModel private constructor(
                 Log.w(TAG, "$currentState not handled by onChangeStateRequest")
             }
         }
+    }
+
+
+    /** Inside the wizard's task, so Back and the background returns land on the wizard. */
+    private fun startSettings(intent: Intent, activity: Context) {
+        runCatching { activity.startActivity(intent.addFlags(FLAG_ACTIVITY_CLEAR_TOP)) }
+            .onFailure { e -> Log.w(TAG, "No activity for onboarding settings intent", e) }
     }
 
     private fun getIntentForAppState(state: AppState): Intent? {

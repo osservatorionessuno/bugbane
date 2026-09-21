@@ -41,7 +41,6 @@
     <string name="beta_warning_message">Ceci est une version bêta : utilisez-la à vos risques et périls. Merci de signaler les bugs sur GitHub.</string>
     <string name="beta_warning_understand">Je comprend</string>
     <string name="beta_warning_quit">Quitter l\'application</string>
-    <string name="settings_description">Configurez vos préférences et vos paramètres ici.</string>
     <string name="settings_general">Paramètres généraux</string>
     <string name="settings_developer_options">Désactiver le mode développeur</string>
     <string name="home_checklist_title">Listado de Comprobación Forense</string>

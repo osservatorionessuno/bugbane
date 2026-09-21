@@ -43,7 +43,6 @@
     <string name="beta_warning_message">இது பீட்டா பதிப்பு: உங்கள் சொந்தப் பொறுப்பில் பயன்படுத்தவும். பிழைகளை GitHub-இல் தெரிவிக்கவும்.</string>
     <string name="beta_warning_understand">எனக்கு புரிகிறது</string>
     <string name="beta_warning_quit">பயன்பாட்டிலிருந்து வெளியேறு</string>
-    <string name="settings_description">உங்கள் விருப்பத்தேர்வுகள் மற்றும் பயன்பாட்டு அமைப்புகளை இங்கே உள்ளமைக்கவும்.</string>
     <string name="settings_general">பொது அமைப்புகள்</string>
     <string name="settings_developer_options">உருவாக்குபவர் விருப்பங்களை முடக்கு</string>
     <string name="settings_developer_options_desc">ஒவ்வொரு அமர்வுக்குப் பிறகும் உருவாக்குபவர் விருப்பங்களை முடக்கவும், தேவைப்படும்போது மட்டும் அவற்றை மீண்டும் இயக்கவும் பரிந்துரைக்கப்படுகிறது.</string>
