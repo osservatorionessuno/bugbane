@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -40,12 +41,35 @@ import org.osservatorionessuno.bugbane.ui.theme.Theme
 import org.osservatorionessuno.bugbane.utils.AppState
 import org.osservatorionessuno.bugbane.utils.ConfigurationViewModel
 import org.osservatorionessuno.bugbane.utils.ViewModelFactory
+import org.osservatorionessuno.bugbane.workers.DeveloperOptionsWorker
 import org.osservatorionessuno.cadb.AdbPairingService
 
 const val INTENT_EXIT_BACKPRESS = "EXIT_ON_BACK"
 private const val TAG = "SlideshowActivity"
 
 class SlideshowActivity : ComponentActivity() {
+    companion object {
+        @Volatile private var inForeground = false
+
+        /** From a background component. Allowed only while Settings runs inside the wizard's task. */
+        @JvmStatic fun bringForward(context: Context) {
+            runCatching {
+                context.startActivity(
+                    Intent(context, SlideshowActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                )
+            }
+        }
+
+        /** A refused start is silent, so wait a moment and look. Blocking: not for the main thread. */
+        @JvmStatic fun cameForward(): Boolean {
+            SystemClock.sleep(1500)
+            return inForeground
+        }
+    }
+
+    override fun onResume() { super.onResume(); inForeground = true }
+    override fun onPause() { inForeground = false; super.onPause() }
 
     private val configViewModel by lazy {
         ViewModelFactory.get(application)
@@ -162,6 +186,7 @@ fun SlideshowScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 Log.d(TAG, "onResume ($state)")
                 AdbPairingService.cancelNotification(context)
+                DeveloperOptionsWorker.cancel(context)
                 viewModel.refreshState()
             }
         }
@@ -217,10 +242,10 @@ fun SlideshowScreen(
             ) { pageIndex ->
                 when (state.value) {
                     AppState.NeedAdbVulnerabilityWarning -> AdbVulnerabilityWarningPage(
-                        onContinue = { viewModel.onChangeStateRequest(state.value) }
+                        onContinue = { viewModel.onChangeStateRequest(state.value, context) }
                     )
                     AppState.NeedBetaWarning -> BetaWarningPage(
-                        onAcknowledge = { viewModel.onChangeStateRequest(state.value) }
+                        onAcknowledge = { viewModel.onChangeStateRequest(state.value, context) }
                     )
                     AppState.NeedRole -> RolePage(
                         onChoose = { viewModel.appManager.setRole(it) }
@@ -235,7 +260,7 @@ fun SlideshowScreen(
                         state = state.value,
                         onClickContinue = {
                             Log.d(TAG, "onClickContinue with state $state")
-                            viewModel.onChangeStateRequest(state.value)
+                            viewModel.onChangeStateRequest(state.value, context)
                         }
                     )
                 }
