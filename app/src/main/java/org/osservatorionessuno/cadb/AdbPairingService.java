@@ -210,9 +210,17 @@ public class AdbPairingService extends Service {
             resultIntent.putExtra(EXTRA_ERROR_MESSAGE, errorMessage);
         }
         sendBroadcast(resultIntent);
-        
+
+        // Settings runs inside bugbane's task (ConfigurationViewModel.startSettings), so the
+        // wizard can be brought forward; the result card is only for when that was refused.
+        if (success) SlideshowActivity.bringForward(this);
+
         // Update notification
         stopForeground(Service.STOP_FOREGROUND_REMOVE);
+        if (success && SlideshowActivity.cameForward()) {
+            stopSelf();
+            return;
+        }
         NotificationManager nm = getSystemService(NotificationManager.class);
         Notification.Builder builder = builder(this).setAutoCancel(true);
         if (success) {
