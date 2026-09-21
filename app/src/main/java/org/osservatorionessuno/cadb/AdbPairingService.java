@@ -241,6 +241,8 @@ public class AdbPairingService extends Service {
                             getString(R.string.notification_adb_pairing_retry), retry).build());
         }
         nm.notify(NOTIFICATION_ID, builder.build());
+        // The wizard may have resumed meanwhile, and its own cancel ran before the post.
+        if (success && SlideshowActivity.getInForeground()) nm.cancel(NOTIFICATION_ID);
         stopSelf();
     }
 
