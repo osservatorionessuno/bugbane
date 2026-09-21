@@ -44,7 +44,17 @@ appId: org.osservatorionessuno.bugbane
           times: 7
           commands:
             - tapOn: "Build number"
-      - pressKey: Back
+      # Bugbane brings the wizard back on its own once the setting flips. Give it a few
+      # seconds; Back is only the fallback, since Back on the wizard itself quits the app.
+      - extendedWaitUntil:
+          visible: "Enable Wireless Debugging and Pair"
+          timeout: 15000
+          optional: true
+      - runFlow:
+          when:
+            notVisible: "Enable Wireless Debugging and Pair"
+          commands:
+            - pressKey: Back
 - extendedWaitUntil:
     visible: "Enable Wireless Debugging and Pair"
     timeout: 25000
