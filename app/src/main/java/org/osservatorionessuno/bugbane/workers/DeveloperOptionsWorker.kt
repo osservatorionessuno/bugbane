@@ -35,6 +35,8 @@ class DeveloperOptionsWorker(
                     applicationContext.getString(R.string.notification_guide_developer_done_title),
                     applicationContext.getString(R.string.notification_guide_developer_done_text),
                 )
+                // The wizard may have resumed meanwhile, and its own cancel ran before the post.
+                if (SlideshowActivity.inForeground) AdbPairingService.cancelNotification(applicationContext)
             }
         }
         return Result.success()

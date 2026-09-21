@@ -49,7 +49,8 @@ private const val TAG = "SlideshowActivity"
 
 class SlideshowActivity : ComponentActivity() {
     companion object {
-        @Volatile private var inForeground = false
+        @JvmStatic @Volatile var inForeground = false
+            private set
 
         /** From a background component. Allowed only while Settings runs inside the wizard's task. */
         @JvmStatic fun bringForward(context: Context) {
