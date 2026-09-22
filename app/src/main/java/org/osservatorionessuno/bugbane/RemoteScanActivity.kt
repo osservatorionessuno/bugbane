@@ -107,7 +107,10 @@ private fun RemoteScanStep(step: Step, viewModel: RemoteScanViewModel) {
             ),
             middle = {
                 TransportButton(R.string.remote_transport_usb_button, enabled = viewModel.usbHostSupported) { viewModel.chooseUsb() }
-                TransportButton(R.string.remote_transport_wifi_button) { viewModel.chooseWifi() }
+                TransportButton(
+                    if (viewModel.wifiDirectSupported) R.string.remote_transport_wifi_direct_button
+                    else R.string.remote_transport_hotspot_button,
+                ) { viewModel.chooseWifi() }
                 if (!viewModel.usbHostSupported) {
                     Text(
                         text = stringResource(R.string.remote_transport_usb_unsupported),
@@ -120,16 +123,6 @@ private fun RemoteScanStep(step: Step, viewModel: RemoteScanViewModel) {
             },
         )
 
-        Step.UsbCable -> SlideshowPageContent(
-            page = SlideshowPageData(
-                title = stringResource(R.string.remote_usb_cable_title),
-                description = stringResource(R.string.remote_usb_cable_description),
-                icon = Icons.Filled.Cable,
-                buttonText = stringResource(R.string.remote_next_button),
-            ),
-            onClickContinue = { viewModel.usbCableConnected() },
-        )
-
         is Step.UsbWaiting -> {
             val (title, description) = when (step.role) {
                 UsbRole.NONE -> R.string.remote_usb_cable_title to R.string.remote_usb_cable_description
@@ -140,7 +133,7 @@ private fun RemoteScanStep(step: Step, viewModel: RemoteScanViewModel) {
                 page = SlideshowPageData(
                     title = stringResource(title),
                     description = stringResource(description),
-                    icon = Icons.Filled.Usb,
+                    icon = if (step.role == UsbRole.NONE) Icons.Filled.Cable else Icons.Filled.Usb,
                 ),
                 middle = { Waiting(stringResource(R.string.remote_usb_waiting)) },
             )

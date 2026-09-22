@@ -49,7 +49,6 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     sealed interface Step {
         object Transport : Step
-        object UsbCable : Step
         /** Polling for the ADB interface; [role] drives the hint shown meanwhile. */
         data class UsbWaiting(val role: UsbRole = UsbRole.NONE) : Step
         data class Connecting(val usb: Boolean) : Step
@@ -71,6 +70,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     val usbHostSupported: Boolean =
         usbManager != null && appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)
+    val wifiDirectSupported: Boolean
 
     private var job: Job? = null
     private var discovery: AdbNetworkDiscovery? = null
@@ -79,12 +79,11 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         HotspotManager.initialize(appContext)
+        wifiDirectSupported = HotspotManager.wifiDirectSupported()
         viewModelScope.launch(Dispatchers.IO) { adbManager.disconnect() }
     }
 
-    fun chooseUsb() { _step.value = Step.UsbCable }
-
-    fun usbCableConnected() {
+    fun chooseUsb() {
         _step.value = Step.UsbWaiting()
         restart {
             // The ADB interface appears only once this phone is the host and USB debugging is on.
@@ -205,7 +204,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     fun retry(step: Step) {
         when (step) {
-            is Step.UsbWaiting -> usbCableConnected()
+            is Step.UsbWaiting -> chooseUsb()
             else -> { stopWork(); _step.value = step }
         }
     }
@@ -213,8 +212,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
     fun back() {
         stopWork()
         _step.value = when (_step.value) {
-            Step.UsbCable, Step.Hotspot -> Step.Transport
-            is Step.UsbWaiting -> Step.UsbCable
+            is Step.UsbWaiting, Step.Hotspot -> Step.Transport
             is Step.WifiPairing -> Step.Hotspot
             else -> Step.Transport
         }
