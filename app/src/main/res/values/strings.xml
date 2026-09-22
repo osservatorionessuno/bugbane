@@ -370,8 +370,9 @@
     <!-- Analyst scan wizard -->
     <string name="remote_transport_title">How is the device connected?</string>
     <string name="remote_transport_description">A USB cable is faster and more reliable. Over Wi‑Fi, this phone shares a network with no internet access for the other device to join.</string>
-    <string name="remote_transport_usb_button">Use a USB cable</string>
-    <string name="remote_transport_wifi_button">Use Wi‑Fi instead</string>
+    <string name="remote_transport_usb_button">Via USB</string>
+    <string name="remote_transport_wifi_direct_button">Via Wi‑Fi Direct</string>
+    <string name="remote_transport_hotspot_button">Via hotspot</string>
     <string name="remote_transport_usb_unsupported">This phone can\'t act as a USB host.</string>
     <string name="remote_next_button">Next</string>
     <string name="remote_retry_button">Retry</string>
