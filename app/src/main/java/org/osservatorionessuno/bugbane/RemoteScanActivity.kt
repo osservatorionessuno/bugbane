@@ -57,6 +57,7 @@ import org.osservatorionessuno.bugbane.ui.theme.Theme
 import org.osservatorionessuno.bugbane.utils.HotspotManager.HotspotState
 import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel
 import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel.Step
+import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel.UsbRole
 import org.osservatorionessuno.cadb.QrCode
 
 /** Connect another device over USB or Wi-Fi; the home screen then starts its acquisition. */
@@ -106,7 +107,10 @@ private fun RemoteScanStep(step: Step, viewModel: RemoteScanViewModel) {
             ),
             middle = {
                 TransportButton(R.string.remote_transport_usb_button, enabled = viewModel.usbHostSupported) { viewModel.chooseUsb() }
-                TransportButton(R.string.remote_transport_wifi_button) { viewModel.chooseWifi() }
+                TransportButton(
+                    if (viewModel.wifiDirectSupported) R.string.remote_transport_wifi_direct_button
+                    else R.string.remote_transport_hotspot_button,
+                ) { viewModel.chooseWifi() }
                 if (!viewModel.usbHostSupported) {
                     Text(
                         text = stringResource(R.string.remote_transport_usb_unsupported),
@@ -119,24 +123,21 @@ private fun RemoteScanStep(step: Step, viewModel: RemoteScanViewModel) {
             },
         )
 
-        Step.UsbCable -> SlideshowPageContent(
-            page = SlideshowPageData(
-                title = stringResource(R.string.remote_usb_cable_title),
-                description = stringResource(R.string.remote_usb_cable_description),
-                icon = Icons.Filled.Cable,
-                buttonText = stringResource(R.string.remote_next_button),
-            ),
-            onClickContinue = { viewModel.usbCableConnected() },
-        )
-
-        Step.UsbWaiting -> SlideshowPageContent(
-            page = SlideshowPageData(
-                title = stringResource(R.string.remote_usb_debugging_title),
-                description = stringResource(R.string.remote_usb_debugging_description),
-                icon = Icons.Filled.Usb,
-            ),
-            middle = { Waiting(stringResource(R.string.remote_usb_waiting)) },
-        )
+        is Step.UsbWaiting -> {
+            val (title, description) = when (step.role) {
+                UsbRole.NONE -> R.string.remote_usb_cable_title to R.string.remote_usb_cable_description
+                UsbRole.DEVICE -> R.string.remote_usb_role_title to R.string.remote_usb_role_description
+                UsbRole.HOST -> R.string.remote_usb_debugging_title to R.string.remote_usb_debugging_description
+            }
+            SlideshowPageContent(
+                page = SlideshowPageData(
+                    title = stringResource(title),
+                    description = stringResource(description),
+                    icon = if (step.role == UsbRole.NONE) Icons.Filled.Cable else Icons.Filled.Usb,
+                ),
+                middle = { Waiting(stringResource(R.string.remote_usb_waiting)) },
+            )
+        }
 
         is Step.Connecting -> SlideshowPageContent(
             page = SlideshowPageData(
