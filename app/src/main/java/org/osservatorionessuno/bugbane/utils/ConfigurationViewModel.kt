@@ -352,15 +352,25 @@ class ConfigurationViewModel private constructor(
         }
     }
 
+    /**
+     * Opens the screen with the row that enables Developer options and highlights it. Stock
+     * Android shows Build number on About phone; One UI nests it under Software information,
+     * and HyperOS counts taps on its OS version card instead (keys from the OEM Settings apks).
+     */
     private fun developerOptionsIntent(): Intent {
         val EXTRA_FRAGMENT_ARG_KEY = ":settings:fragment_args_key"
         val EXTRA_SHOW_FRAGMENT_ARGUMENTS = ":settings:show_fragment_args"
 
-        return Intent(Settings.ACTION_DEVICE_INFO_SETTINGS).apply {
-            putExtra(EXTRA_FRAGMENT_ARG_KEY, "my_device_info_pref_screen")
-            putExtra(EXTRA_SHOW_FRAGMENT_ARGUMENTS, Bundle().apply {
-                putString(EXTRA_FRAGMENT_ARG_KEY, "build_number")
-            })
+        val samsungSoftwareInfo = Intent().setClassName("com.android.settings", "com.android.settings.Settings\$FirmwareVersionActivity")
+        val (intent, row) = when {
+            Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
+                samsungSoftwareInfo.resolveActivity(appContext.packageManager) != null -> samsungSoftwareInfo to "os_build_number"
+            Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true) -> Intent(Settings.ACTION_DEVICE_INFO_SETTINGS) to "version_name_card_view"
+            else -> Intent(Settings.ACTION_DEVICE_INFO_SETTINGS) to "build_number"
+        }
+        return intent.apply {
+            putExtra(EXTRA_FRAGMENT_ARG_KEY, row)
+            putExtra(EXTRA_SHOW_FRAGMENT_ARGUMENTS, Bundle().apply { putString(EXTRA_FRAGMENT_ARG_KEY, row) })
         }
     }
 
