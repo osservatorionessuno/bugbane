@@ -10,11 +10,12 @@ import org.osservatorionessuno.cadb.AdbSync
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.libmvt.android.parsers.APKParser
 import org.osservatorionessuno.libmvt.android.parsers.CertificateParser
+import org.osservatorionessuno.libmvt.android.parsers.RemoteAPKParser
 import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.io.OutputStream
 import java.security.MessageDigest
 
 /**
@@ -159,47 +160,17 @@ class Packages : Module {
         return FileHashes(md5, sha1, sha256, sha512)
     }
 
-    /** Copy of an APK on another device, so it can be hashed and parsed like a local one. */
-    private fun pullToTemp(sync: AdbSync, packagePath: String, cacheDir: File): File? {
-        val temp = File.createTempFile("apk", ".apk", cacheDir)
-        return runCatching { FileOutputStream(temp).use { sync.pull(packagePath, it) }; temp }
-            .onFailure { Log.w(TAG, "Failed to pull $packagePath: ${it.message}"); temp.delete() }
-            .getOrNull()
-    }
-
     private fun buildPackageFile(
         shell: AdbShell,
         sync: AdbSync,
         writer: ArtifactSink,
-        cacheDir: File,
         packageName: String,
         packagePath: String,
         log: AcquisitionLog,
     ): PackageFile {
-        // Acquiring another device: its APKs aren't on this filesystem.
+        // Local (self) scan can read the APK path; Analyst mode cannot — parse remotely.
         val local = File(packagePath).takeIf { it.canRead() }
-        // Not over ADB, so not recorded by the transport.
-        if (local != null) log.info("Reading $packagePath from this phone's storage (${local.length()} bytes)")
-        val temp = if (local == null) pullToTemp(sync, packagePath, cacheDir) else null
-        val apk = local ?: temp
-        try {
-            return buildPackageFile(shell, sync, writer, packageName, packagePath, apk, temp, log)
-        } finally {
-            temp?.delete()
-        }
-    }
-
-    private fun buildPackageFile(
-        shell: AdbShell,
-        sync: AdbSync,
-        writer: ArtifactSink,
-        packageName: String,
-        packagePath: String,
-        apk: File?,
-        pulled: File?,
-        log: AcquisitionLog,
-    ): PackageFile {
-        val hashes = apk?.let { hashFileLocally(it, log) } ?: hashFileRemotely(shell, packagePath)
+        val hashes = local?.let { hashFileLocally(it, log) } ?: hashFileRemotely(shell, packagePath)
         val packageFile = PackageFile(
             path = packagePath,
             localName = "", // not set/used here
@@ -212,8 +183,12 @@ class Packages : Module {
             infiles = emptyList(),
         )
 
-        if (apk != null) runCatching {
-            val apkInfo = APKParser.parseAPK(apk)
+        runCatching {
+            val apkInfo = if (local != null && !FORCE_REMOTE_APK_PARSER) {
+                APKParser.parseAPK(local)
+            } else {
+                RemoteAPKParser.parse(adbShellAsRemote(shell), packageName, packagePath)
+            }
             packageFile.suspicious = apkInfo.suspicious
             packageFile.certificates = apkInfo.certificates
             packageFile.infiles = apkInfo.files
@@ -225,7 +200,11 @@ class Packages : Module {
             log.step(R.string.step_packages_copying, packagePath)
             val result = runCatching {
                 writer.useArtifact(archivePath) { output ->
-                    if (pulled != null) pulled.inputStream().use { it.copyTo(output) } else sync.pull(packagePath, output)
+                    if (local != null) {
+                        local.inputStream().use { it.copyTo(output) }
+                    } else {
+                        sync.pull(packagePath, output)
+                    }
                 }
             }
             result.onFailure { log.error("Failed to copy $packagePath: ${it.message}") }
@@ -233,6 +212,15 @@ class Packages : Module {
 
         return packageFile
     }
+
+    private fun adbShellAsRemote(shell: AdbShell): RemoteAPKParser.Shell =
+        object : RemoteAPKParser.Shell {
+            override fun execForEachLine(command: String, onLine: (String) -> Unit) =
+                shell.execForEachLine(command, onLine)
+
+            override fun execToStream(command: String, output: OutputStream) =
+                shell.execToStream(command, output)
+        }
 
     override fun run(
         context: Context,
@@ -349,7 +337,7 @@ class Packages : Module {
             val packagePaths = pathsByPackage[pkg.name] ?: continue
             log.step(R.string.step_packages_apk, pkg.name, ++checked, pathsByPackage.size)
             packages[i] = pkg.copy(
-                files = packagePaths.map { buildPackageFile(shell, sync, writer, context.cacheDir, pkg.name, it, log) },
+                files = packagePaths.map { buildPackageFile(shell, sync, writer, pkg.name, it, log) },
             )
         }
 
