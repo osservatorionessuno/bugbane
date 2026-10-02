@@ -83,6 +83,9 @@
     <string name="step_packages_paths">Locating app files</string>
     <string name="step_packages_apk">Checking %1$s (%2$d of %3$d)</string>
     <string name="step_packages_copying">Copying suspicious app %1$s</string>
+    <string name="step_dumpsys_service">Collecting the state of %1$s</string>
+    <string name="step_logcat_current">Copying the system log</string>
+    <string name="step_logcat_old">Copying the system log from before the last reboot</string>
     <string name="step_files_listing">Listing files in %1$s</string>
     <string name="scan_acquisition_failed_message">Warning: Acquisition is incomplete.\nYou can find it in the Acquisitions screen.\nFailed modules: %1$s</string>
     <string name="scan_acquisition_failed_rescan">Perform another acquisition</string>
