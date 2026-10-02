@@ -36,6 +36,10 @@ import org.osservatorionessuno.qf.storage.AcquisitionTransport
 
 private const val TAG = "RemoteScanViewModel"
 private const val ACTION_USB_PERMISSION = "org.osservatorionessuno.bugbane.USB_PERMISSION"
+// Sticky system broadcast (hidden constants): which side of the cable this phone is on.
+private const val ACTION_USB_STATE = "android.hardware.usb.action.USB_STATE"
+private const val EXTRA_USB_CONNECTED = "connected"
+private const val EXTRA_USB_HOST_CONNECTED = "host_connected"
 
 /**
  * The analyst "scan a device" wizard: USB detection and permission, shared network,
@@ -45,14 +49,17 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     sealed interface Step {
         object Transport : Step
-        object UsbCable : Step
-        object UsbWaiting : Step
+        /** Polling for the ADB interface; [role] drives the hint shown meanwhile. */
+        data class UsbWaiting(val role: UsbRole = UsbRole.NONE) : Step
         data class Connecting(val usb: Boolean) : Step
         object Hotspot : Step
         data class WifiPairing(val credentials: AdbQrCredentials) : Step
         data class Error(val messageRes: Int, val retry: Step) : Step
         object Connected : Step
     }
+
+    /** Data role of this phone's USB port. Type-C picks it at random; only the host can open the other device. */
+    enum class UsbRole { NONE, DEVICE, HOST }
 
     private val appContext: Context = app.applicationContext
     private val adbManager: AdbManager = ViewModelFactory.get(app).adbManager
@@ -63,6 +70,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     val usbHostSupported: Boolean =
         usbManager != null && appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_USB_HOST)
+    val wifiDirectSupported: Boolean
 
     private var job: Job? = null
     private var discovery: AdbNetworkDiscovery? = null
@@ -71,17 +79,28 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         HotspotManager.initialize(appContext)
+        wifiDirectSupported = HotspotManager.wifiDirectSupported()
         viewModelScope.launch(Dispatchers.IO) { adbManager.disconnect() }
     }
 
-    fun chooseUsb() { _step.value = Step.UsbCable }
-
-    fun usbCableConnected() {
-        _step.value = Step.UsbWaiting
+    fun chooseUsb() {
+        _step.value = Step.UsbWaiting()
         restart {
-            // The ADB interface appears only once USB debugging is on.
-            val device = pollFlow { usbManager?.deviceList?.values?.firstOrNull(AdbUsb::isAdbDevice) }
+            // The ADB interface appears only once this phone is the host and USB debugging is on.
+            val device = pollFlow {
+                usbManager?.deviceList?.values?.firstOrNull(AdbUsb::isAdbDevice)
+                    ?: run { _step.value = Step.UsbWaiting(usbRole()); null }
+            }
             if (usbManager!!.hasPermission(device)) connectUsb(device) else requestUsbPermission(device)
+        }
+    }
+
+    private fun usbRole(): UsbRole {
+        val state = appContext.registerReceiver(null, IntentFilter(ACTION_USB_STATE)) ?: return UsbRole.NONE
+        return when {
+            state.getBooleanExtra(EXTRA_USB_CONNECTED, false) -> UsbRole.DEVICE
+            state.getBooleanExtra(EXTRA_USB_HOST_CONNECTED, false) -> UsbRole.HOST
+            else -> UsbRole.NONE
         }
     }
 
@@ -102,14 +121,14 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     private val usbPermissionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (_step.value != Step.UsbWaiting) return
+            if (_step.value !is Step.UsbWaiting) return
             val device = IntentCompat.getParcelableExtra(intent, UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
             val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
             if (device == null || device.deviceName != requestedUsbDevice) return
             if (granted) {
                 restart { connectUsb(device) }
             } else {
-                _step.value = Step.Error(R.string.remote_usb_permission_denied, Step.UsbWaiting)
+                _step.value = Step.Error(R.string.remote_usb_permission_denied, Step.UsbWaiting())
             }
         }
     }
@@ -121,7 +140,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
             _step.value = Step.Connected
         } catch (t: Throwable) {
             Log.w(TAG, "USB connection failed", t)
-            _step.value = Step.Error(R.string.remote_usb_connect_failed, Step.UsbWaiting)
+            _step.value = Step.Error(R.string.remote_usb_connect_failed, Step.UsbWaiting())
         }
     }
 
@@ -185,7 +204,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     fun retry(step: Step) {
         when (step) {
-            Step.UsbWaiting -> usbCableConnected()
+            is Step.UsbWaiting -> chooseUsb()
             else -> { stopWork(); _step.value = step }
         }
     }
@@ -193,8 +212,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
     fun back() {
         stopWork()
         _step.value = when (_step.value) {
-            Step.UsbCable, Step.Hotspot -> Step.Transport
-            Step.UsbWaiting -> Step.UsbCable
+            is Step.UsbWaiting, Step.Hotspot -> Step.Transport
             is Step.WifiPairing -> Step.Hotspot
             else -> Step.Transport
         }
