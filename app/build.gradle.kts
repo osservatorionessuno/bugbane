@@ -138,6 +138,14 @@ configurations.all {
     exclude(group = "com.google.auto.service", module = "auto-service")
 }
 
+// The compiled ART profile flips startup flags between identical builds, so
+// assets/dexopt/baseline.prof is not reproducible; drop it (F-Droid's documented workaround).
+tasks.configureEach {
+    if (name.contains("ArtProfile")) {
+        enabled = false
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
