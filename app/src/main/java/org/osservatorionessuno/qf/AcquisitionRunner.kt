@@ -32,6 +32,7 @@ import org.osservatorionessuno.qf.storage.AcquisitionIndex
 import org.osservatorionessuno.qf.storage.AcquisitionTransport
 import org.osservatorionessuno.qf.storage.EncryptedAcquisitionWriter
 import org.osservatorionessuno.qf.storage.InsufficientStorageException
+import org.osservatorionessuno.qf.storage.StoredArtifact
 import org.osservatorionessuno.qf.storage.ACQUISITION_FREE_SPACE_RESERVE_BYTES
 import org.osservatorionessuno.qf.storage.COMMAND_LOG_FILE
 import org.osservatorionessuno.qf.storage.HASHES_FILE
@@ -268,6 +269,7 @@ class AcquisitionRunner(
             var fileKey: ByteArray? = null
             var artifacts = 0
             var storedBytes = 0L
+            val stored = mutableListOf<StoredArtifact>()
             // Tags artifact lines with the module writing them.
             var currentModule = "acquisition metadata"
             val writer = EncryptedAcquisitionWriter(
@@ -278,6 +280,7 @@ class AcquisitionRunner(
                 onArtifact = { path, bytes, sha256 ->
                     artifacts++
                     storedBytes += bytes
+                    stored += StoredArtifact(path, bytes, sha256, currentModule)
                     if (sha256 != null) log.info("Stored artifact $path (module $currentModule): $bytes bytes, sha256 $sha256")
                     else log.error("Stored artifact $path (module $currentModule) truncated at $bytes bytes: storage reserve reached")
                 },
@@ -393,7 +396,7 @@ class AcquisitionRunner(
                     .onFailure { Log.e(TAG, "Failed to write $COMMAND_LOG_FILE", it) }
                 index = if (cancelled) index.markAsCancelled(completed)
                     else index.markAsFinished(completed, failedModules, skippedModules, moduleErrors)
-                writer.writeIndex(index)
+                writer.writeIndex(index, stored)
                 output = acquisitionDir
             } catch (io: IOException) {
                 // Finalizing hit the disk despite the reserve; keep what was collected.

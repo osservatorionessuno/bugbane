@@ -92,12 +92,16 @@ class EncryptedAcquisitionWriter(
         }.use { it.write(log) }
     }
 
-    /** Write [index] as the final [METADATA_FILE] zip entry (before [close]). */
+    /**
+     * Write [index] as the final [METADATA_FILE] zip entry (before [close]),
+     * with the [ColanderFeed] of [artifacts]; the plaintext sidecar gets the index only.
+     */
     @Throws(IOException::class)
-    fun writeIndex(index: AcquisitionIndex) {
+    fun writeIndex(index: AcquisitionIndex, artifacts: List<StoredArtifact> = emptyList()) {
         check(!indexWritten) { "index already written" }
         archiveHashManifestIfNeeded()
-        val json = Utils.toJsonString(index.toJsonObject()).toByteArray(Charsets.UTF_8)
+        val root = index.toJsonObject().also { ColanderFeed.addTo(it, index, artifacts) }
+        val json = Utils.toJsonString(root).toByteArray(Charsets.UTF_8)
         writer.putEntry(METADATA_FILE).use { it.write(json) }
         indexWritten = true
         index.writeSidecar(acquisitionDir)
