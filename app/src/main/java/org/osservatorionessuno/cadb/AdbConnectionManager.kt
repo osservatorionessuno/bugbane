@@ -1,6 +1,7 @@
 package org.osservatorionessuno.cadb
 
 import android.content.Context
+import org.osservatorionessuno.qf.AcquisitionLog
 import android.os.Build
 import android.util.Log
 import io.github.muntashirakon.adb.AbsAdbConnectionManager
@@ -36,6 +37,9 @@ class AdbConnectionManager private constructor(context: Context) : AbsAdbConnect
 
     private val privateKey: PrivateKey
     private val certificate: Certificate
+
+    /** Set during an acquisition: every shell command and sync operation is recorded here. */
+    @Volatile var commandLog: AcquisitionLog? = null
 
     init {
         // The library defaults to API 1, which negotiates 4 KiB packets with checksums.

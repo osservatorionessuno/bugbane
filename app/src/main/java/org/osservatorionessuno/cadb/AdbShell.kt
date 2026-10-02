@@ -5,7 +5,9 @@ import java.io.*
 import java.nio.charset.StandardCharsets
 import java.util.*
 import java.util.concurrent.*
+import org.osservatorionessuno.qf.AcquisitionLog
 import org.osservatorionessuno.qf.AcquisitionCancelledException
+import org.osservatorionessuno.qf.operation
 
 class ShellTimeoutException(message: String) : IOException(message)
 
@@ -26,6 +28,20 @@ class AdbShell(
         private const val READ_BUFFER_SIZE = 1 shl 20
         // How long a silent read waits before probing the progress callback for a cancel.
         private val PROBE_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(1)
+
+        /** The script actually sent to adbd for [command]; [marker] flags its end. */
+        fun wrap(command: String, marker: String): String {
+            // Always run inside a shell and print marker via printf (more reliable than echo).
+            val script = "LC_ALL=C; exec 2>&1; { $command ; }; /system/bin/printf \"%s\\n\" \"$marker\""
+            return "/system/bin/sh -c " + shSingleQuote(script)
+        }
+
+        /** Safely single-quote a script for sh -c. */
+        private fun shSingleQuote(s: String): String {
+            // ' -> '"'"'  (classic POSIX-safe quoting)
+            val escaped = s.replace("'", "'\"'\"'")
+            return "'$escaped'"
+        }
     }
 
     @Deprecated("This method buffers and could use a lot of memory. Use execToStream or execForEachLine whenever possible")
@@ -70,18 +86,27 @@ class AdbShell(
     }
 
     private fun execInternal(command: String, sink: OutputStream) {
+        val log = manager.commandLog
+        val counted = CountingOutputStream(sink)
+        log.operation("shell: $command", { "${counted.count} bytes of output" }) {
+            execAttempts(command, counted, log)
+        }
+    }
+
+    private fun execAttempts(command: String, sink: CountingOutputStream, log: AcquisitionLog?) {
         var lastErr: Throwable? = null
         repeat(RETRIES + 1) { attempt ->
             try {
+                // Report the output of the attempt that succeeded.
+                sink.count = 0
                 val marker = "__QF__${UUID.randomUUID()}__EOX__"
-                // Always run inside a shell and print marker via printf (more reliable than echo).
-                val script = "LC_ALL=C; exec 2>&1; { $command ; }; /system/bin/printf \"%s\\n\" \"$marker\""
-                val wrapped = "/system/bin/sh -c " + shSingleQuote(script)
+                val wrapped = wrap(command, marker)
                 Log.d(tag, "[exec] Running: $wrapped")
 
                 val found = runWithStream("shell:$wrapped", sink, marker)
                 if (!found) {
                     Log.w(tag, "[exec] Marker not seen; stream ended/idle before marker (accepting output)")
+                    log?.warning("Output ended before the end marker of: $command; it may be incomplete")
                 }
                 return
             } catch (t: ShellTimeoutException) {
@@ -94,6 +119,7 @@ class AdbShell(
                 throw c
             } catch (t: Throwable) {
                 Log.w(tag, "[exec] Attempt $attempt failed: ${t.message}")
+                if (attempt < RETRIES) log?.warning("Attempt ${attempt + 1} of: $command failed (${t.message}), retrying; output is restreamed")
                 lastErr = t
             }
         }
@@ -230,11 +256,11 @@ class AdbShell(
         }
     }
 
-    /** Safely single-quote a script for sh -c. */
-    private fun shSingleQuote(s: String): String {
-        // ' -> '"'"'  (classic POSIX-safe quoting)
-        val escaped = s.replace("'", "'\"'\"'")
-        return "'$escaped'"
+    private class CountingOutputStream(private val out: OutputStream) : OutputStream() {
+        var count = 0L
+        override fun write(b: Int) { out.write(b); count++ }
+        override fun write(b: ByteArray, off: Int, len: Int) { out.write(b, off, len); count += len }
+        override fun flush() = out.flush()
     }
 
     /** Buffers shell output and invokes [onLine] once per newline-delimited line. */
