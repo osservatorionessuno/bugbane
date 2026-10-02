@@ -154,6 +154,7 @@ cp "$(dirname "$DIR")/app/src/main/assets/bundled-indicators/indicators.json" "$
 python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" \
   -i "$ART/indicators.stix2" -i "$CUSTOM_IOCS" \
   -e "/data/local/tmp/wd/pred.so" -e "$CUSTOM_MARKER" || exit 1
+python3 "$DIR/colander_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" || exit 1
 adb shell "rm -rf /data/local/tmp/wd $(dirname "$CUSTOM_MARKER")" || true
 
 echo "INTEGRATION E2E PASS"

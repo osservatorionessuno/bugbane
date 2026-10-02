@@ -22,6 +22,7 @@ It runs the whole user journey and verifies the result off-device:
 | `scrape.py` | pull the pairing code / passphrase out of `maestro hierarchy` |
 | `verify_export.py` | `pyrage`-decrypt the archive and assert its contents |
 | `mvt_crosscheck.py` | run upstream `mvt-android check-androidqf` on the decrypted export with the bundled feed and the custom file; every planted IOC must be flagged |
+| `colander_crosscheck.py` | load the decrypted `acquisition.json` as a Colander feed, as Colander's import does; its artifacts must match `hashes.csv` |
 
 ## Analyst mode over Wi-Fi (two emulators)
 

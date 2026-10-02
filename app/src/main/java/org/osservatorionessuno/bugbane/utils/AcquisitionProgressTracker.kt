@@ -58,6 +58,8 @@ object AcquisitionProgressTracker {
         val name: String,
         val bytes: Long = 0L,
         val status: ModuleScanStatus = ModuleScanStatus.Waiting,
+        /** What the module is doing, while it runs. */
+        val step: String? = null,
     )
 
     private val _modules = MutableStateFlow<List<ModuleProgress>>(emptyList())
@@ -130,11 +132,19 @@ object AcquisitionProgressTracker {
                 }
             }
 
+            override fun onModuleStep(name: String, step: String) {
+                _modules.update { list ->
+                    list.map {
+                        if (it.name == name && it.status == ModuleScanStatus.Running) it.copy(step = step) else it
+                    }
+                }
+            }
+
             override fun onModuleComplete(name: String, completed: Int, total: Int, success: Boolean) {
                 val status = if (success) ModuleScanStatus.Completed else ModuleScanStatus.Error
                 _modules.update { list ->
                     if (list.any { it.name == name }) {
-                        list.map { if (it.name == name) it.copy(status = status) else it }
+                        list.map { if (it.name == name) it.copy(status = status, step = null) else it }
                     } else {
                         list + ModuleProgress(name, 0L, status)
                     }
@@ -144,7 +154,7 @@ object AcquisitionProgressTracker {
 
             override fun onModuleSkipped(name: String) {
                 _modules.update { list ->
-                    list.map { if (it.name == name) it.copy(status = ModuleScanStatus.Skipped) else it }
+                    list.map { if (it.name == name) it.copy(status = ModuleScanStatus.Skipped, step = null) else it }
                 }
                 syncCompletedCount()
             }
