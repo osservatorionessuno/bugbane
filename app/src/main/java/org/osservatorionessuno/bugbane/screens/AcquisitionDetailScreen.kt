@@ -331,6 +331,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                         style = MaterialTheme.typography.bodyLarge
                     )
                     DeviceLines(index)
+                    ModuleIssues(index)
                     meta?.let {
                         val completed = it.optString("completed", "null").let { s ->
                             try {
@@ -412,6 +413,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
                     style = MaterialTheme.typography.bodyLarge
                 )
                 DeviceLines(index)
+                ModuleIssues(index)
                 meta?.let {
                     val completed = it.optString("completed", "null").let { s ->
                         try {
@@ -960,5 +962,44 @@ class PendingUnlock(
 private fun DeviceLines(index: AcquisitionIndex?) {
     index?.device?.summary?.takeIf { it.isNotBlank() }?.let {
         Text(stringResource(R.string.acquisition_details_device, it), style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/** Failed or skipped modules, so an incomplete acquisition is never mistaken for a full one. */
+@Composable
+private fun ModuleIssues(index: AcquisitionIndex?) {
+    if (index == null) return
+    val cancelled = index.status == AcquisitionIndex.STATUS_CANCELLED
+    if (!cancelled && index.failedModules.isEmpty() && index.skippedModules.isEmpty()) return
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                stringResource(if (cancelled) R.string.acquisition_details_cancelled else R.string.acquisition_details_incomplete),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            for (module in index.failedModules) {
+                val name = formatModuleDisplayName(module)
+                Text(
+                    index.moduleErrors[module]?.let { stringResource(R.string.acquisition_details_module_failed_error, name, it) }
+                        ?: stringResource(R.string.acquisition_details_module_failed, name),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            if (index.skippedModules.isNotEmpty()) {
+                Text(
+                    stringResource(
+                        R.string.acquisition_details_modules_skipped,
+                        index.skippedModules.joinToString { formatModuleDisplayName(it) },
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
     }
 }

@@ -429,6 +429,11 @@
 
     <!-- Acquisition device identity -->
     <string name="acquisitions_completed">Completed: %1$s</string>
+    <string name="acquisition_details_incomplete">This acquisition is incomplete</string>
+    <string name="acquisition_details_cancelled">This acquisition was cancelled before it finished</string>
+    <string name="acquisition_details_module_failed">%1$s failed</string>
+    <string name="acquisition_details_module_failed_error">%1$s failed: %2$s</string>
+    <string name="acquisition_details_modules_skipped">Skipped because storage ran out: %1$s</string>
     <string name="acquisition_details_device">Device: %1$s</string>
     <string name="acquisition_details_transport">Connection: %1$s</string>
     <string name="acquisition_transport_local">this phone (wireless debugging)</string>
