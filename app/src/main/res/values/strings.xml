@@ -74,6 +74,20 @@
     <string name="scan_cancelling_button">Cancelling...</string>
     <string name="scan_module_running">Running %1$s: %2$s</string>
     <string name="scan_module_completed">Completed %1$s: %2$s</string>
+    <!-- Acquisition steps shown under the running module -->
+    <string name="step_copying_file">Copying %1$s</string>
+    <string name="step_bugreport_generating">Waiting for Android to generate the bugreport, this can take a few minutes</string>
+    <string name="step_bugreport_generating_percent">Android is generating the bugreport: %1$d%%</string>
+    <string name="step_bugreport_copying">Copying the bugreport</string>
+    <string name="step_packages_listing">Listing installed apps</string>
+    <string name="step_packages_paths">Locating app files</string>
+    <string name="step_packages_apk">Checking %1$s (%2$d of %3$d)</string>
+    <string name="step_packages_copying">Copying suspicious app %1$s</string>
+    <string name="step_dumpsys_service">Collecting the state of %1$s</string>
+    <string name="step_logcat_current">Copying the system log</string>
+    <string name="step_logcat_old">Copying the system log from before the last reboot</string>
+    <string name="step_intrusion_logs_download">On the phone being checked, tap Access logs, then Download and decrypt for each device. Go back when done</string>
+    <string name="step_files_listing">Listing files in %1$s</string>
     <string name="scan_acquisition_failed_message">Warning: Acquisition is incomplete.\nYou can find it in the Acquisitions screen.\nFailed modules: %1$s</string>
     <string name="scan_acquisition_failed_rescan">Perform another acquisition</string>
     <string name="scan_acquisition_low_space_message">Skipped, not enough free space: %1$s</string>
@@ -309,6 +323,8 @@
     <string name="notification_acquisition_failed_text">Failed modules: %1$s</string>
     <string name="notification_acquisition_low_space_title">Storage ran low</string>
     <string name="notification_acquisition_low_space_text">Some modules were skipped. Tap to view the results.</string>
+    <string name="notification_intrusion_logs_title">Download your intrusion logs</string>
+    <string name="notification_intrusion_logs_text">Tap Access logs, then Download and decrypt for each device. Tap here when done to continue the scan.</string>
 
     <!-- MVT strings -->
     <string name="mvt_ioc_title">Indicators of Compromise found</string>
@@ -419,6 +435,11 @@
 
     <!-- Acquisition device identity -->
     <string name="acquisitions_completed">Completed: %1$s</string>
+    <string name="acquisition_details_incomplete">This acquisition is incomplete</string>
+    <string name="acquisition_details_cancelled">This acquisition was cancelled before it finished</string>
+    <string name="acquisition_details_module_failed">%1$s failed</string>
+    <string name="acquisition_details_module_failed_error">%1$s failed: %2$s</string>
+    <string name="acquisition_details_modules_skipped">Skipped because storage ran out: %1$s</string>
     <string name="acquisition_details_device">Device: %1$s</string>
     <string name="acquisition_details_transport">Connection: %1$s</string>
     <string name="acquisition_transport_local">this phone (wireless debugging)</string>
