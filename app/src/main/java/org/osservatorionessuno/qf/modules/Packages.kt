@@ -2,6 +2,8 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.util.Log
+import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.qf.AcquisitionLog
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbSync
@@ -115,7 +117,7 @@ class Packages : Module {
     }
 
     /** Hash the APK with a single local read; the app can read other packages' APKs directly. */
-    private fun hashFileLocally(file: File): FileHashes? {
+    private fun hashFileLocally(file: File, log: AcquisitionLog): FileHashes? {
         val digests = HASH_ALGORITHMS.map { MessageDigest.getInstance(it) }
         try {
             FileInputStream(file).use { input ->
@@ -127,7 +129,7 @@ class Packages : Module {
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Local hashing failed for ${file.path}: ${e.message}")
+            log.warning("Local hashing failed for ${file.path}, falling back to the device: ${e.message}")
             return null
         }
         val (md5, sha1, sha256, sha512) = digests.map { digest ->
@@ -172,13 +174,16 @@ class Packages : Module {
         cacheDir: File,
         packageName: String,
         packagePath: String,
+        log: AcquisitionLog,
     ): PackageFile {
         // Acquiring another device: its APKs aren't on this filesystem.
         val local = File(packagePath).takeIf { it.canRead() }
+        // Not over ADB, so not recorded by the transport.
+        if (local != null) log.info("Reading $packagePath from this phone's storage (${local.length()} bytes)")
         val temp = if (local == null) pullToTemp(sync, packagePath, cacheDir) else null
         val apk = local ?: temp
         try {
-            return buildPackageFile(shell, sync, writer, packageName, packagePath, apk, temp)
+            return buildPackageFile(shell, sync, writer, packageName, packagePath, apk, temp, log)
         } finally {
             temp?.delete()
         }
@@ -192,8 +197,9 @@ class Packages : Module {
         packagePath: String,
         apk: File?,
         pulled: File?,
+        log: AcquisitionLog,
     ): PackageFile {
-        val hashes = apk?.let { hashFileLocally(it) } ?: hashFileRemotely(shell, packagePath)
+        val hashes = apk?.let { hashFileLocally(it, log) } ?: hashFileRemotely(shell, packagePath)
         val packageFile = PackageFile(
             path = packagePath,
             localName = "", // not set/used here
@@ -211,21 +217,18 @@ class Packages : Module {
             packageFile.suspicious = apkInfo.suspicious
             packageFile.certificates = apkInfo.certificates
             packageFile.infiles = apkInfo.files
-        }.onFailure { Log.w(TAG, "Failed to parse $packagePath: ${it.message}") }
+        }.onFailure { log.warning("Failed to parse $packagePath: ${it.message}") }
 
         if (packageFile.suspicious) {
             val archivePath = getLocalFileName(writer, packageName, packageFile.path)
             packageFile.localName = archivePath
-            Log.i(TAG, "downloading $packagePath")
+            log.step(R.string.step_packages_copying, packagePath)
             val result = runCatching {
                 writer.useArtifact(archivePath) { output ->
                     if (pulled != null) pulled.inputStream().use { it.copyTo(output) } else sync.pull(packagePath, output)
                 }
             }
-            if (result.isFailure) {
-                // TODO: write this feedback to the acquisition report in some way
-                Log.e(TAG, "Failed to copy $packagePath", result.exceptionOrNull())
-            }
+            result.onFailure { log.error("Failed to copy $packagePath: ${it.message}") }
         }
 
         return packageFile
@@ -235,7 +238,8 @@ class Packages : Module {
         context: Context,
         manager: AdbConnectionManager,
         writer: ArtifactSink,
-        progress: ((Long) -> Unit)?
+        progress: ((Long) -> Unit)?,
+        log: AcquisitionLog,
     ) {
         val shell = AdbShell(manager, progress = progress)
         val sync = AdbSync(manager, progress = progress)
@@ -270,6 +274,7 @@ class Packages : Module {
             seen.clear()
         }
 
+        log.step(R.string.step_packages_listing)
         try {
             shell.execForEachLine("pm list packages -U -u -i") { addPackage(it) }
         } catch (_: Throwable) {
@@ -330,16 +335,21 @@ class Packages : Module {
             }
         }
 
+        log.info("Found ${packages.size} installed packages")
+
         // System packages don't need path resolution or hashing.
+        log.step(R.string.step_packages_paths)
         val pathsByPackage = collectPackagePaths(
             shell,
             packages.filter { !it.system }.map { it.name },
         )
+        var checked = 0
         for (i in packages.indices) {
             val pkg = packages[i]
             val packagePaths = pathsByPackage[pkg.name] ?: continue
+            log.step(R.string.step_packages_apk, pkg.name, ++checked, pathsByPackage.size)
             packages[i] = pkg.copy(
-                files = packagePaths.map { buildPackageFile(shell, sync, writer, context.cacheDir, pkg.name, it) },
+                files = packagePaths.map { buildPackageFile(shell, sync, writer, context.cacheDir, pkg.name, it, log) },
             )
         }
 
