@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import io.github.muntashirakon.adb.AdbStream
 import org.osservatorionessuno.cadb.AdbConnectionManager
+import org.osservatorionessuno.qf.AcquisitionLog
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.qf.storage.ArtifactSink
@@ -19,7 +20,8 @@ class SmsBackup : Module {
         context: Context,
         manager: AdbConnectionManager,
         writer: ArtifactSink,
-        progress: ((Long) -> Unit)?
+        progress: ((Long) -> Unit)?,
+        log: AcquisitionLog,
     ) {
         // Optional preflight: if allowBackup=false, likely no data.
         runCatching {

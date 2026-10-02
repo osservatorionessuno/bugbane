@@ -2,6 +2,8 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.os.Environment
+import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.qf.AcquisitionLog
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
@@ -21,7 +23,8 @@ class Files : Module {
         context: Context,
         manager: AdbConnectionManager,
         writer: ArtifactSink,
-        progress: ((Long) -> Unit)?
+        progress: ((Long) -> Unit)?,
+        log: AcquisitionLog,
     ) {
         val sh = AdbShell(manager, progress = progress)
 
@@ -54,6 +57,7 @@ class Files : Module {
 
         writer.useArtifact("files.json") { output ->
             for (folder in folders) {
+                log.step(R.string.step_files_listing, folder)
                 val cmd = if (supportsPrintf)
                     """find ${shQuote(folder)} -type f -printf '$PRINTF\n' 2>/dev/null"""
                 else
