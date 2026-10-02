@@ -51,7 +51,7 @@ import org.osservatorionessuno.bugbane.utils.ViewModelFactory
 import org.osservatorionessuno.bugbane.utils.Utils
 import java.io.File
 
-private fun formatModuleDisplayName(name: String): String =
+internal fun formatModuleDisplayName(name: String): String =
     name.split('_')
         .joinToString(" ") { word ->
             word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
