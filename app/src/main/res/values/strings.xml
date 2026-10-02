@@ -86,6 +86,7 @@
     <string name="step_dumpsys_service">Collecting the state of %1$s</string>
     <string name="step_logcat_current">Copying the system log</string>
     <string name="step_logcat_old">Copying the system log from before the last reboot</string>
+    <string name="step_intrusion_logs_download">On the phone being checked, tap Access logs, then Download and decrypt for each device. Go back when done</string>
     <string name="step_files_listing">Listing files in %1$s</string>
     <string name="scan_acquisition_failed_message">Warning: Acquisition is incomplete.\nYou can find it in the Acquisitions screen.\nFailed modules: %1$s</string>
     <string name="scan_acquisition_failed_rescan">Perform another acquisition</string>
@@ -322,6 +323,8 @@
     <string name="notification_acquisition_failed_text">Failed modules: %1$s</string>
     <string name="notification_acquisition_low_space_title">Storage ran low</string>
     <string name="notification_acquisition_low_space_text">Some modules were skipped. Tap to view the results.</string>
+    <string name="notification_intrusion_logs_title">Download your intrusion logs</string>
+    <string name="notification_intrusion_logs_text">Tap Access logs, then Download and decrypt for each device. Tap here when done to continue the scan.</string>
 
     <!-- MVT strings -->
     <string name="mvt_ioc_title">Indicators of Compromise found</string>

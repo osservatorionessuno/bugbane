@@ -45,6 +45,7 @@ private const val TAG = "AcquisitionProgressTracker"
 object AcquisitionProgressTracker {
     private const val CHANNEL_ID = "acquisition_complete"
     private const val NOTIFICATION_ID = 2
+    private const val INTRUSION_LOGS_NOTIFICATION_ID = 3
 
     enum class ModuleScanStatus {
         Waiting,
@@ -252,7 +253,7 @@ object AcquisitionProgressTracker {
 
     // Permission check and notify() must stay in the same function for lint's
     // MissingPermission dataflow analysis.
-    private fun postAcquisitionNotification(context: Context, notification: Notification) {
+    private fun postAcquisitionNotification(context: Context, notification: Notification, id: Int = NOTIFICATION_ID) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -271,7 +272,7 @@ object AcquisitionProgressTracker {
                 NotificationManager.IMPORTANCE_HIGH
             )
         )
-        manager.notify(NOTIFICATION_ID, notification)
+        manager.notify(id, notification)
     }
 
     private fun reopenAppIntent(context: Context): PendingIntent {
@@ -281,6 +282,27 @@ object AcquisitionProgressTracker {
             context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+    }
+
+    /** Shown over the intrusion logs download screen; tapping it returns to Bugbane, which ends the wait. */
+    fun postIntrusionLogsNotification(context: Context) {
+        // Remote scans keep Bugbane in front with the step on screen.
+        if (isAppInForeground()) return
+        val text = context.getString(R.string.notification_intrusion_logs_text)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_bugbane_zoom)
+            .setContentTitle(context.getString(R.string.notification_intrusion_logs_title))
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setContentIntent(reopenAppIntent(context))
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+        postAcquisitionNotification(context, notification, INTRUSION_LOGS_NOTIFICATION_ID)
+    }
+
+    fun cancelIntrusionLogsNotification(context: Context) {
+        NotificationManagerCompat.from(context).cancel(INTRUSION_LOGS_NOTIFICATION_ID)
     }
 
     private fun postFinishedNotification(context: Context, analyzed: Boolean) {

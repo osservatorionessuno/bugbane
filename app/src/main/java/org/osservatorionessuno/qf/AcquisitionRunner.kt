@@ -15,6 +15,7 @@ import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.qf.modules.Env
 import org.osservatorionessuno.qf.modules.Dumpsys
 import org.osservatorionessuno.qf.modules.Files
+import org.osservatorionessuno.qf.modules.IntrusionLogs
 import org.osservatorionessuno.qf.modules.Logcat
 import org.osservatorionessuno.qf.modules.GetProp
 import org.osservatorionessuno.qf.modules.Processes
@@ -86,6 +87,8 @@ class AcquisitionRunner(
         // The space-hungry modules run last, so low storage only ever costs
         // them and never the smaller high-value modules.
         val DEFAULT_MODULES: List<Module> = listOf(
+            // Needs taps on the phone, so it runs while the user is still there.
+            IntrusionLogs(),
             Env(),
             Dumpsys(),
             Logs(),
