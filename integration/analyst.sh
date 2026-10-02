@@ -153,11 +153,12 @@ flow "$B" target-wireless-qr.yaml || { adb -s "$B" wait-for-device; flow "$B" ta
 a_waiting() { maestro --device "$A" hierarchy 2>/dev/null | grep -q 'Waiting for the device to scan the code'; }
 paired=""
 for attempt in 1 2 3 4; do
+  # Clear first: the reopened scanner often decodes the poster before the macro plays.
+  adb -s "$B" logcat -c
   if [ "$attempt" -gt 1 ]; then
     adb -s "$B" shell input keyevent KEYCODE_BACK; sleep 2
     flow "$B" target-qr-reopen.yaml || exit 1
   fi
-  adb -s "$B" logcat -c
   adb -s "$B" emu automation play "$MACRO"
   scanned=""
   for _ in $(seq 1 15); do
