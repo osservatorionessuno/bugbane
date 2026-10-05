@@ -2,6 +2,7 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.util.Log
+import org.osservatorionessuno.qf.AcquisitionLog
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
@@ -19,7 +20,8 @@ class Mounts : Module {
         context: Context,
         manager: AdbConnectionManager,
         writer: ArtifactSink,
-        progress: ((Long) -> Unit)?
+        progress: ((Long) -> Unit)?,
+        log: AcquisitionLog,
     ) {
         Log.i(TAG, "Collecting mount information")
 

@@ -1,7 +1,7 @@
 package org.osservatorionessuno.qf.modules
 
 import android.content.Context
-import android.util.Log
+import org.osservatorionessuno.qf.AcquisitionLog
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
@@ -34,7 +34,8 @@ class RootBinaries : Module {
         context: Context,
         manager: AdbConnectionManager,
         writer: ArtifactSink,
-        progress: ((Long) -> Unit)?
+        progress: ((Long) -> Unit)?,
+        log: AcquisitionLog,
     ) {
         // Shell output bytes aren't meaningful progress here; keep null.
         val shell = AdbShell(manager, tag = "ShellQF", progress = null)
@@ -65,7 +66,7 @@ class RootBinaries : Module {
         }
 
         val unique = found.distinct()
-        Log.i(TAG, "Found ${unique.size} root-related binaries")
+        log.info("Found ${unique.size} root-related binaries" + if (unique.isEmpty()) "" else ": ${unique.joinToString()}")
         writer.useArtifact("root_binaries.json") { output ->
             ArtifactJson.Array(output).use { arr ->
                 for (path in unique) {
