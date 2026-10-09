@@ -23,11 +23,13 @@ interface Module {
      * @param writer Writer to write artifacts to.
      * @param progress Optional callback to report bytes processed. It may throw to
      *   abort the module (user cancel); a zero delta only gives it a chance to do so.
+     * @param log Acquisition log; [AcquisitionLog.step] also shows the module's current step.
      */
     fun run(
         context: Context,
         manager: AdbConnectionManager,
         writer: ArtifactSink,
-        progress: ((Long) -> Unit)? = null,
+        progress: ((Long) -> Unit)?,
+        log: AcquisitionLog,
     )
 }

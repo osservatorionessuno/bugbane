@@ -13,6 +13,9 @@ import org.osservatorionessuno.qf.crypto.AgeZipArchiveWriter
 import org.osservatorionessuno.qf.crypto.age.AgeIdentity
 import org.osservatorionessuno.qf.crypto.age.AgeRecipient
 
+/** Timestamped acquisition log (androidqf's name), see AcquisitionLog. */
+const val COMMAND_LOG_FILE: String = "command.log"
+
 /** Single encrypted archive holding every artifact of an acquisition. */
 const val ARCHIVE_FILE: String = "acquisition.age"
 
@@ -30,6 +33,9 @@ class EncryptedAcquisitionWriter(
     recipients: List<AgeRecipient>,
     onFileKey: ((ByteArray) -> Unit)? = null,
     reserveBytes: Long = ACQUISITION_FREE_SPACE_RESERVE_BYTES,
+    // Called as each artifact is opened, and closed; sha256 is null when it was truncated.
+    private val onArtifactOpened: ((path: String) -> Unit)? = null,
+    private val onArtifact: ((path: String, bytes: Long, sha256: String?) -> Unit)? = null,
 ) : ArtifactSink {
     private val writer = AgeZipArchiveWriter(FileOutputStream(File(acquisitionDir, ARCHIVE_FILE)), recipients, onFileKey)
     private val writtenPaths = mutableSetOf<String>()
@@ -50,12 +56,16 @@ class EncryptedAcquisitionWriter(
         if (isReservedArtifact(name) || !writtenPaths.add(name)) {
             throw IOException("Artifact already exists: $path")
         }
-        return DigestingOutputStream(writer.putEntry(name, modifiedTime), guard) { sha256 ->
+        onArtifactOpened?.invoke(name)
+        lateinit var stream: DigestingOutputStream
+        stream = DigestingOutputStream(writer.putEntry(name, modifiedTime), guard) { sha256 ->
             // A truncated artifact's hash would be wrong; skip its manifest entry.
             if (!guard.tripped) {
                 hashManifest.write(ArtifactHashes.formatLine(name, sha256).toByteArray(Charsets.UTF_8))
             }
+            onArtifact?.invoke(name, stream.bytesWritten, sha256.takeUnless { guard.tripped })
         }
+        return stream
     }
 
     override fun artifactExists(path: String): Boolean {
@@ -68,12 +78,30 @@ class EncryptedAcquisitionWriter(
         writer.close()
     }
 
-    /** Write [index] as the final [METADATA_FILE] zip entry (before [close]). */
+    /**
+     * Write [COMMAND_LOG_FILE], listed in the hash manifest like any artifact.
+     * Bypasses the free-space guard: the log matters most when the disk filled up,
+     * and the reserve is kept for finalizing.
+     */
     @Throws(IOException::class)
-    fun writeIndex(index: AcquisitionIndex) {
+    fun writeCommandLog(log: ByteArray) {
+        check(!hashManifestArchived) { "hash manifest already written" }
+        check(writtenPaths.add(COMMAND_LOG_FILE)) { "command log already written" }
+        DigestingOutputStream(writer.putEntry(COMMAND_LOG_FILE)) { sha256 ->
+            hashManifest.write(ArtifactHashes.formatLine(COMMAND_LOG_FILE, sha256).toByteArray(Charsets.UTF_8))
+        }.use { it.write(log) }
+    }
+
+    /**
+     * Write [index] as the final [METADATA_FILE] zip entry (before [close]),
+     * with the [ColanderFeed] of [artifacts]; the plaintext sidecar gets the index only.
+     */
+    @Throws(IOException::class)
+    fun writeIndex(index: AcquisitionIndex, artifacts: List<StoredArtifact> = emptyList()) {
         check(!indexWritten) { "index already written" }
         archiveHashManifestIfNeeded()
-        val json = Utils.toJsonString(index.toJsonObject()).toByteArray(Charsets.UTF_8)
+        val root = index.toJsonObject().also { ColanderFeed.addTo(it, index, artifacts) }
+        val json = Utils.toJsonString(root).toByteArray(Charsets.UTF_8)
         writer.putEntry(METADATA_FILE).use { it.write(json) }
         indexWritten = true
         index.writeSidecar(acquisitionDir)
@@ -156,7 +184,7 @@ private fun normalizeArtifactPath(path: String): String {
 */
 private fun isReservedArtifact(name: String): Boolean {
     if (name == METADATA_FILE) return true
-    if (name == HASHES_FILE) return true
+    if (name == HASHES_FILE || name == COMMAND_LOG_FILE) return true
     if (name.startsWith("${AcquisitionIndex.ANALYSIS_DIR}/")) return true
     return false
 }

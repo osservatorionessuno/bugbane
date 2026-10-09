@@ -196,6 +196,7 @@ python3 "$DIR/verify_export.py" "$ART/$NAME" "$PASSPHRASE" ${FIXTURE:+"$SUSPICIO
 
 cp "$(dirname "$DIR")/app/src/main/assets/bundled-indicators/indicators.json" "$ART/indicators.stix2"
 python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" -i "$ART/indicators.stix2" -e "/data/local/tmp/wd/pred.so" || exit 1
+python3 "$DIR/colander_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" || exit 1
 adb -s "$B" shell 'rm -rf /data/local/tmp/wd' || true
 
 echo "ANALYST WIFI E2E PASS"
