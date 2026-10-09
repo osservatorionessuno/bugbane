@@ -22,5 +22,7 @@ class Dumpsys : Module {
         writer.useArtifact("dumpsys.txt") { output ->
             shell.execToStream("dumpsys", output)
         }
+        // Dropbox bodies: 3 days of app/native crashes and ANRs, outliving logcat's ring buffers.
+        writer.useArtifact("dumpsys_dropbox.txt") { shell.execToStream("dumpsys dropbox --print", it) }
     }
 }
