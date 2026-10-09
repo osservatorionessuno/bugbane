@@ -29,9 +29,12 @@ private const val TAG = "ConfigurationManager"
  */
 object ConfigurationManager {
 
+    private const val KEY_DEV_OPTIONS_CONFIRMED = "dev_options_manually_confirmed"
+
     private lateinit var appContext: Context
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val contentResolver get() = appContext.contentResolver
+    private val prefs by lazy { appContext.getSharedPreferences(Keys.PREFS_NAME, Context.MODE_PRIVATE) }
     private var developerOptsObserver: ContentObserver? = null
     private var wirelessDebugObserver: ContentObserver? = null
     private val _developerOptionsEnabled = MutableStateFlow(false)
@@ -97,12 +100,20 @@ object ConfigurationManager {
 
     private fun developerOptionsCheck() {
         scope.launch {
+            // Android 17+ redacts this setting to 0 for all apps, so it can't be read.
+            // There the user confirms it by hand (see confirmDeveloperOptions).
             val enabled = Settings.Global.getInt(
                 contentResolver,
                 Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0
-            ) == 1
+            ) == 1 || prefs.getBoolean(KEY_DEV_OPTIONS_CONFIRMED, false)
             _developerOptionsEnabled.emit(enabled)
         }
+    }
+
+    /** Record the user's manual confirmation that Developer options are on (Android 17+). */
+    fun confirmDeveloperOptions() {
+        prefs.edit().putBoolean(KEY_DEV_OPTIONS_CONFIRMED, true).apply()
+        developerOptionsCheck()
     }
 
     // A bit dirty:

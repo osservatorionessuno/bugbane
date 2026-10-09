@@ -292,8 +292,10 @@ class ConfigurationViewModel private constructor(
                         appContext.getString(R.string.notification_guide_developer_title),
                         appContext.getString(R.string.notification_guide_developer_text),
                     )
-                    // Turns the card into "done" while the user is still in Settings.
-                    DeveloperOptionsWorker.enqueue(appContext)
+                    // Turns the card into "done" while the user is still in Settings. It
+                    // reads the setting, which Android 17+ redacts to 0, so it can never
+                    // fire there; the manual confirmation on the slide covers that case.
+                    if (Build.VERSION.SDK_INT < 37) DeveloperOptionsWorker.enqueue(appContext)
                 }
                 getIntentForAppState(currentState)?.let { startSettings(it, activity) }
             }
