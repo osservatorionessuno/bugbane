@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.osservatorionessuno.qf.crypto.age.X25519Identity
+import java.io.IOException
 import java.nio.file.Files
 import java.security.MessageDigest
 
@@ -123,6 +124,22 @@ class EncryptedAcquisitionHashesTest {
             }
             assertTrue(writer.outOfSpace)
         }
+    }
+
+    @Test
+    fun `command log is written and hashed even when out of space`() {
+        val dir = tempDir()
+        val id = X25519Identity.generate()
+        val log = "2026-10-02T10:34:56Z [ERROR] out of space\n".toByteArray()
+        // StatFs reports 0 free bytes in tests, so any positive reserve trips.
+        EncryptedAcquisitionWriter(dir, listOf(id.recipient()), reserveBytes = 1).use { writer ->
+            writer.refreshOutOfSpace()
+            assertTrue(writer.outOfSpace)
+            assertThrows<IOException> { writer.openArtifact(COMMAND_LOG_FILE) }
+            writer.writeCommandLog(log)
+        }
+        val hashes = EncryptedAcquisitionReader(dir, listOf(id)).use { it.readHashes() }
+        assertEquals(mapOf(COMMAND_LOG_FILE to sha256Hex(log)), hashes!!.toMap())
     }
 
     @Test
