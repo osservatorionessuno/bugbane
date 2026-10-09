@@ -36,6 +36,7 @@
     \n\n
     The application acquires data using ADB Wireless Debugging, which is available only when Developer Options are enabled.</string>
     <string name="slideshow_button_text_enable">Enable</string>
+    <string name="slideshow_developer_already_enabled">I\'ve already enabled Developer options, continue</string>
 
     <!-- ADB wireless-debugging vulnerability warning (CVE-2026-0073) -->
     <string name="adb_vuln_title">Your device needs an update</string>

@@ -21,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -35,6 +36,8 @@ import kotlinx.coroutines.flow.collectLatest
 import org.osservatorionessuno.bugbane.components.AcquisitionProtectionPage
 import org.osservatorionessuno.bugbane.components.AdbVulnerabilityWarningPage
 import org.osservatorionessuno.bugbane.components.BetaWarningPage
+import org.osservatorionessuno.bugbane.components.SlideshowPageContent
+import org.osservatorionessuno.bugbane.components.getSlideshowScreenContent
 import org.osservatorionessuno.bugbane.components.RolePage
 import org.osservatorionessuno.bugbane.components.SlideshowPage
 import org.osservatorionessuno.bugbane.ui.theme.Theme
@@ -251,6 +254,22 @@ fun SlideshowScreen(
                     AppState.NeedRole -> RolePage(
                         onChoose = { viewModel.appManager.setRole(it) }
                     )
+                    AppState.NeedDeveloperOptions -> SlideshowPageContent(
+                        page = getSlideshowScreenContent(state.value),
+                        onClickContinue = { viewModel.onChangeStateRequest(state.value, context) },
+                    ) {
+                        // Android 17+ redacts the setting, so the real state is unreadable;
+                        // let the user confirm it by hand. On older releases detection works.
+                        if (Build.VERSION.SDK_INT >= 37) TextButton(
+                            onClick = { viewModel.configurationManager.confirmDeveloperOptions() },
+                            modifier = Modifier.padding(top = 16.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.slideshow_developer_already_enabled),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            )
+                        }
+                    }
                     AppState.NeedAcquisitionProtection -> AcquisitionProtectionPage(
                         analyst = progress.value.isAnalyst,
                         // The identity files are the source of truth; re-check so the
