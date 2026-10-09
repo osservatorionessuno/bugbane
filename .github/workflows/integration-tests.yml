@@ -309,27 +309,29 @@ jobs:
           pip install -r integration/requirements.txt
 
       - name: Install /e/OS system image
-        # pinned: fixed dev-channel build (that channel keeps history). To bump, browse
-        # https://ota.ecloud.global/dev/sdk_phone_x86_64/ and update both values; the
-        # sha256 is pinned in-repo on purpose, not taken from the server.
-        # latest: the test channel's single newest build, checked against the server's
-        # .sha256sum in transit. The API level comes from the aNN in the file name
-        # (Android NN = API NN+20, valid since Android 15).
+        # pinned: fixed community-channel build (that channel keeps history). To bump,
+        # pick one from $EOS_API?type=community and update both values; the sha256 is
+        # pinned in-repo on purpose, not taken from the server.
+        # latest: the test channel's newest build on its newest Android, resolved via
+        # the OTA API (the HTML listings are a JS app now) and checked against the
+        # server's sha256 in transit. The API level comes from the aNN in the file
+        # name (Android NN = API NN+20, valid since Android 15).
         env:
+          EOS_API: https://ota.ecloud.global/api/v2/devices/sdk_phone_x86_64/downloads
           EOS_IMAGE: IMG-e-4.2-a16-20260815662914-community-sdk_phone_x86_64.zip
           EOS_SHA256: 90340954d1b26bf5b1b089a89886257aa45c42e4f6b6bf4dcdd860be2e826826
         run: |
           if [ "${{ matrix.flavor }}" = pinned ]; then
             ZIP="$EOS_IMAGE"
-            curl -fL -o eos.zip "https://ota.ecloud.global/dev/sdk_phone_x86_64/$ZIP"
-            echo "$EOS_SHA256  eos.zip" | sha256sum --check
+            SHA="$EOS_SHA256"
+            URL="https://ota.ecloud.global/community/sdk_phone_x86_64/$ZIP"
           else
-            BASE=https://ota.ecloud.global/test/sdk_phone_x86_64
-            ZIP=$(curl -fsSL "$BASE/" | grep -oE 'IMG-e-[0-9.]+-a[0-9]+-[0-9]+-test-sdk_phone_x86_64\.zip' | sort -u | tail -1)
-            if [ -z "$ZIP" ]; then echo "::error::no build resolved from $BASE (naming scheme changed?)"; exit 1; fi
-            curl -fL -o eos.zip "$BASE/$ZIP"
-            curl -fsSL "$BASE/$ZIP.sha256sum" | sed "s|$ZIP|eos.zip|" | sha256sum --check
+            read -r ZIP URL SHA < <(curl -fsSL "$EOS_API?type=test" | jq -r \
+              '[.builds[] | select(.files[0].ftype == "IMG")] | sort_by(.android_version, .datetime) | last | .files[0] | "\(.filename) \(.url) \(.sha256)"')
+            if [ -z "$ZIP" ]; then echo "::error::no build resolved from $EOS_API (schema changed?)"; exit 1; fi
           fi
+          curl -fL -o eos.zip "$URL"
+          echo "$SHA  eos.zip" | sha256sum --check
           echo "Using $ZIP"
           API=$(( $(echo "$ZIP" | sed -E 's/^IMG-e-[0-9.]+-a([0-9]+)-.*/\1/') + 20 ))
           echo "EOS_API=$API" >> "$GITHUB_ENV"
