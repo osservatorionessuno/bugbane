@@ -2,6 +2,8 @@ package org.osservatorionessuno.qf.modules
 
 import android.content.Context
 import android.util.Log
+import org.osservatorionessuno.bugbane.R
+import org.osservatorionessuno.qf.AcquisitionLog
 import org.osservatorionessuno.qf.Module
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.cadb.AdbShell
@@ -34,7 +36,8 @@ class Logs : Module {
         context: Context,
         manager: AdbConnectionManager,
         writer: ArtifactSink,
-        progress: ((Long) -> Unit)?
+        progress: ((Long) -> Unit)?,
+        log: AcquisitionLog,
     ) {
         val sync = AdbSync(manager, progress)
 
@@ -45,29 +48,26 @@ class Logs : Module {
             writer.useArtifact("logs/kmsg.txt") { output ->
                 shell.execToStream("dmesg", output)
             }
-        }.onFailure { Log.w(TAG, "dmesg capture failed", it) }
+        }.onFailure { log.warning("dmesg capture failed: ${it.message}") }
 
         // Several targets are root-only on production devices: skip per target so one
         // denied path cannot cost the readable ones.
         for (target in targets) {
             runCatching {
                 if (target.endsWith("/")) {
-                    sync.pullFolder(target, writer, "logs")
+                    sync.pullFolder(target, writer, "logs") { log.step(R.string.step_copying_file, it) }
                 } else {
                     // Stat first: a failed pull would still commit an empty artifact entry.
                     if (!sync.canStat(target)) {
-                        Log.w(TAG, "Skipping $target: missing or inaccessible")
                         return@runCatching
                     }
+                    log.step(R.string.step_copying_file, target)
                     val name = target.substringAfterLast('/')
                     writer.useArtifact("logs/$name") { output ->
                         sync.pull(target, output)
                     }
                 }
-            }.onFailure {
-                // TODO: write this feedback to the acquisition report in some way
-                Log.e(TAG, "Failed to pull $target", it)
-            }
+            }.onFailure { log.warning("Failed to pull $target: ${it.message}") }
         }
         Log.i(TAG, "Pulled logs")
     }

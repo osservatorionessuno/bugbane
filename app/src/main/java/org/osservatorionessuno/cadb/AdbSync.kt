@@ -9,11 +9,14 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.math.min
+import org.osservatorionessuno.qf.AcquisitionLog
+import org.osservatorionessuno.qf.operation
 import org.osservatorionessuno.qf.storage.ArtifactSink
 
 /** A sync transfer went quiet past the inactivity window (likely a wedged file). */
@@ -97,11 +100,13 @@ class AdbSync(
      */
     @Throws(IOException::class, InterruptedException::class)
     fun pull(remotePath: String, output: OutputStream) {
-        manager.openStream(LocalServices.SYNC).use { stream ->
-            val out = stream.openOutputStream()
-            timeoutInput(stream.openInputStream()).use { input ->
-                sendRecv(out, remotePath)
-                receiveFile(input, output)
+        manager.commandLog.operation("sync pull: $remotePath", { "$it bytes" }) {
+            manager.openStream(LocalServices.SYNC).use { stream ->
+                val out = stream.openOutputStream()
+                timeoutInput(stream.openInputStream()).use { input ->
+                    sendRecv(out, remotePath)
+                    receiveFile(input, output)
+                }
             }
         }
     }
@@ -111,7 +116,12 @@ class AdbSync(
      * mode 0 for missing and unreadable paths alike.
      */
     @Throws(IOException::class)
-    fun canStat(remotePath: String): Boolean {
+    fun canStat(remotePath: String): Boolean =
+        manager.commandLog.operation("sync stat: $remotePath", { if (it) "exists" else "missing or inaccessible" }) {
+            stat(remotePath)
+        }
+
+    private fun stat(remotePath: String): Boolean {
         manager.openStream(LocalServices.SYNC).use { stream ->
             val out = stream.openOutputStream()
             timeoutInput(stream.openInputStream()).use { input ->
@@ -139,7 +149,10 @@ class AdbSync(
      * @return List of file info maps: [ { "path": ..., "mode": ..., "size": ..., "mtime": ... }, ... ]
      */
     @Throws(IOException::class)
-    fun list(remoteDir: String): List<Map<String, Any>> {
+    fun list(remoteDir: String): List<Map<String, Any>> =
+        manager.commandLog.operation("sync list: $remoteDir", { "${it.size} entries" }) { listMaps(remoteDir) }
+
+    private fun listMaps(remoteDir: String): List<Map<String, Any>> {
         manager.openStream(LocalServices.SYNC).use { stream ->
             val out = stream.openOutputStream()
             timeoutInput(stream.openInputStream()).use { input ->
@@ -166,8 +179,24 @@ class AdbSync(
         remoteDir: String,
         writer: ArtifactSink,
         artifactPrefix: String = "",
+        onFile: ((String) -> Unit)? = null,
     ) {
         require(remoteDir.endsWith("/")) { "remoteDir must end with /" }
+        val log = manager.commandLog
+        log.operation("sync pull folder: $remoteDir", { "$it files pulled" }) {
+            pullFolderFiles(remoteDir, writer, artifactPrefix, onFile, log)
+        }
+    }
+
+    /** Returns how many files were pulled. */
+    private fun pullFolderFiles(
+        remoteDir: String,
+        writer: ArtifactSink,
+        artifactPrefix: String,
+        onFile: ((String) -> Unit)?,
+        log: AcquisitionLog?,
+    ): Int {
+        var pulled = 0
         val prefix = artifactPrefix.trimEnd('/').let { normalized ->
             if (normalized.isEmpty()) "" else "$normalized/"
         }
@@ -176,13 +205,23 @@ class AdbSync(
             timeoutInput(stream.openInputStream()).use { input ->
                 val files = mutableListOf<RemoteFileEntry>()
                 collectFiles(input, out, remoteDir, prefix, files)
+                log?.info("Found ${files.size} files in $remoteDir")
                 for (file in files) {
+                    onFile?.invoke(file.remotePath)
                     try {
-                        writer.useArtifact(file.artifactPath, file.mtime.toLong() * 1000) { artifact ->
-                            // this does not call pull() explicitly cause otherwise a new manager->stream would be created
-                            sendRecv(out, file.remotePath)
-                            receiveFile(input, artifact)
+                        log.operation(
+                            "sync pull: ${file.remotePath} -> ${file.artifactPath} (mtime ${Instant.ofEpochSecond(file.mtime.toLong())})",
+                            { "$it bytes" },
+                        ) {
+                            var bytes = 0L
+                            writer.useArtifact(file.artifactPath, file.mtime.toLong() * 1000) { artifact ->
+                                // this does not call pull() explicitly cause otherwise a new manager->stream would be created
+                                sendRecv(out, file.remotePath)
+                                bytes = receiveFile(input, artifact)
+                            }
+                            bytes
                         }
+                        pulled++
                     } catch (e: IOException) {
                         // A denied open leaves the stream synced, so skip just that file.
                         // A read-timeout desyncs the stream, so abort the folder (the
@@ -196,6 +235,7 @@ class AdbSync(
                 }
             }
         }
+        return pulled
     }
 
     private fun collectFiles(
@@ -336,7 +376,9 @@ class AdbSync(
         out.flush()
     }
 
-    private fun receiveFile(input: InputStream, output: OutputStream) {
+    /** Returns the number of bytes received. */
+    private fun receiveFile(input: InputStream, output: OutputStream): Long {
+        var total = 0L
         val header = ByteArray(4)
         val lenBuf = ByteArray(4)
         // Sync DATA frames are at most 64 KiB: drain a whole frame per read.
@@ -353,6 +395,7 @@ class AdbSync(
                         val chunk = min(remaining, buf.size)
                         readFully(input, buf, 0, chunk)
                         output.write(buf, 0, chunk)
+                        total += chunk
                         progress?.invoke(chunk.toLong())
                         remaining -= chunk
                     }
@@ -361,7 +404,7 @@ class AdbSync(
                     // DONE is followed by a 4-byte mtime (uint32). Ignore contents.
                     readFully(input, lenBuf, 0, 4)
                     output.flush()
-                    return
+                    return total
                 }
                 AdbConstants.FAIL -> throw IOException("Sync failed: ${readFailMessage(input)}")
                 else -> throw IOException("Unexpected sync response: ${String(header, StandardCharsets.US_ASCII)}")
