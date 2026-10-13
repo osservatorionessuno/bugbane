@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.osservatorionessuno.qf.AcquisitionScanner
 import org.osservatorionessuno.qf.crypto.AcquisitionIdentityVault
 import org.osservatorionessuno.qf.crypto.SessionKeyCache
 import org.osservatorionessuno.qf.crypto.age.DestroyableAgeIdentity
@@ -146,9 +145,8 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
     var selectedScans by remember { mutableStateOf<Set<ScanSummary>>(emptySet()) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
-    // A fresh acquisition's first analysis starts automatically (see
-    // AcquisitionProgressTracker). Mirror it here as if the analyze button
-    // had been pressed, and load its results once it completes.
+    // Analyses run in AcquisitionProgressTracker's app-wide scope so rotation
+    // can't cancel them. Mirror its state here and load the results once done.
     val autoAnalyzing =
         org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker.analyzing.collectAsState()
     var wasAutoAnalyzing by remember { mutableStateOf(false) }
@@ -254,18 +252,7 @@ fun AcquisitionDetailScreen(acquisitionDir: File) {
 
     fun startAnalysis() {
         withUnlockedIdentity { identity ->
-            scope.launch {
-                processing = ProcessingState.SCANNING
-                try {
-                    withContext(Dispatchers.IO) {
-                        AcquisitionScanner.scan(context, acquisitionDir, identity)
-                    }
-                } finally {
-                    identity.destroy()
-                }
-                scans = loadScans(acquisitionDir)
-                processing = ProcessingState.OFF
-            }
+            org.osservatorionessuno.bugbane.utils.AcquisitionProgressTracker.analyze(context, acquisitionDir, identity)
         }
     }
 
