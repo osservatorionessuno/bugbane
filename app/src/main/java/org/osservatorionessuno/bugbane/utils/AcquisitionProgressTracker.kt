@@ -26,6 +26,7 @@ import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.cadb.AdbManager
 import org.osservatorionessuno.qf.AcquisitionRunner
 import org.osservatorionessuno.qf.AcquisitionScanner
+import org.osservatorionessuno.qf.crypto.age.DestroyableAgeIdentity
 import java.io.File
 
 private const val TAG = "AcquisitionProgressTracker"
@@ -90,7 +91,7 @@ object AcquisitionProgressTracker {
     private val _showDisableReminder = MutableStateFlow(false)
     val showDisableReminder: StateFlow<Boolean> = _showDisableReminder.asStateFlow()
 
-    /** The acquisition directory whose first analysis is currently running. */
+    /** The acquisition directory whose analysis is currently running. */
     private val _analyzing = MutableStateFlow<File?>(null)
     val analyzing: StateFlow<File?> = _analyzing.asStateFlow()
 
@@ -222,6 +223,25 @@ object AcquisitionProgressTracker {
                 }
             } else {
                 Log.d(TAG, "Skipping completion notification; app is in the foreground")
+            }
+        }
+    }
+
+    /**
+     * Analyze [acquisitionDir] with an unlocked [identity]. Runs in the app-wide scope
+     * so a screen rotation does not cancel it (#174); the detail screen follows
+     * [analyzing]. Takes ownership of [identity].
+     */
+    fun analyze(context: Context, acquisitionDir: File, identity: DestroyableAgeIdentity) {
+        _analyzing.value = acquisitionDir
+        analysisScope.launch {
+            try {
+                AcquisitionScanner.scan(context.applicationContext, acquisitionDir, identity)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Analysis failed", t)
+            } finally {
+                identity.destroy()
+                _analyzing.value = null
             }
         }
     }
