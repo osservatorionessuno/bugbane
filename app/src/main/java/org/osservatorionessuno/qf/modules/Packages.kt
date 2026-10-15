@@ -175,6 +175,7 @@ class Packages : Module {
         writer: ArtifactSink,
         packageName: String,
         packagePath: String,
+        uid: Int,
         log: AcquisitionLog,
         remoteSession: RemoteAPKParser.Session,
     ): PackageFile {
@@ -198,19 +199,22 @@ class Packages : Module {
             infiles = emptyList(),
         )
 
+        // RemoteAPKParser soft-fails (empty certs) without throwing; track verified too.
+        var verified = false
         val parseOk = runCatching {
             val apkInfo = if (local != null && !useRemote) {
                 APKParser.parseAPK(local)
             } else {
-                remoteSession.parse(packageName, packagePath)
+                remoteSession.parse(packageName, packagePath, androidUserId(uid))
             }
             packageFile.suspicious = apkInfo.suspicious
             packageFile.certificates = apkInfo.certificates
             packageFile.infiles = apkInfo.files
+            verified = apkInfo.verified
         }.onFailure { log.warning("Failed to parse $packagePath: ${it.message}") }.isSuccess
 
-        // Analyst path: if remote triage threw, pull anyway so we don't under-export.
-        if (!parseOk && useRemote) {
+        // Analyst path: throw or soft-fail (no verified signer), then we pull so we don't under-export.
+        if (useRemote && (!parseOk || !verified)) {
             packageFile.suspicious = true
         }
 
@@ -241,6 +245,9 @@ class Packages : Module {
             override fun execToStream(command: String, output: OutputStream) =
                 shell.execToStream(command, output)
         }
+
+    /** Android multi-user id from app uid (`pm list packages -U`). */
+    private fun androidUserId(uid: Int): Int = if (uid >= 0) uid / 100_000 else 0
 
     override fun run(
         context: Context,
@@ -360,7 +367,7 @@ class Packages : Module {
             log.step(R.string.step_packages_apk, pkg.name, ++checked, pathsByPackage.size)
             packages[i] = pkg.copy(
                 files = packagePaths.map {
-                    buildPackageFile(shell, sync, writer, pkg.name, it, log, remoteSession)
+                    buildPackageFile(shell, sync, writer, pkg.name, it, pkg.uid, log, remoteSession)
                 },
             )
         }
