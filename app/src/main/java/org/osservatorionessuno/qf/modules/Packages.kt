@@ -11,6 +11,7 @@ import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.libmvt.android.parsers.APKParser
 import org.osservatorionessuno.libmvt.android.parsers.CertificateParser
 import org.osservatorionessuno.libmvt.android.parsers.RemoteAPKParser
+import org.osservatorionessuno.libmvt.common.Utils
 import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
@@ -32,6 +33,11 @@ class Packages : Module {
         // Packages per batched `pm path` exec, to bound single-command output and runtime.
         private const val PM_PATH_BATCH = 50
         private val HASH_ALGORITHMS = listOf("MD5", "SHA-1", "SHA-256", "SHA-512")
+        /**
+         * When true, always parse via [RemoteAPKParser] even if the APK is readable locally.
+         * Debug only — leave false in production.
+         */
+        const val FORCE_REMOTE_APK_PARSER = false
     }
 
     // Data class to hold package info
@@ -140,13 +146,13 @@ class Packages : Module {
     }
 
     /** Fallback: all four sums in one exec, matched to fields by digest length. */
-    private fun hashFileRemotely(shell: AdbShell, path: String): FileHashes {
+    private fun hashFileRemotely(shell: AdbShell, path: String, log: AcquisitionLog): FileHashes {
         var md5 = ""
         var sha1 = ""
         var sha256 = ""
         var sha512 = ""
         runCatching {
-            val quoted = "\"$path\""
+            val quoted = Utils.shQuote(path)
             shell.execForEachLine("md5sum $quoted; sha1sum $quoted; sha256sum $quoted; sha512sum $quoted") { line ->
                 val token = line.trim().split(WHITESPACE, 2).firstOrNull().orEmpty()
                 if (token.matches(HEX)) when (token.length) {
@@ -156,6 +162,9 @@ class Packages : Module {
                     128 -> sha512 = token
                 }
             }
+        }.onFailure { log.warning("Remote hashing failed for $path: ${it.message}") }
+        if (md5.isEmpty() && sha1.isEmpty() && sha256.isEmpty() && sha512.isEmpty()) {
+            log.warning("Remote hashing produced no digests for $path")
         }
         return FileHashes(md5, sha1, sha256, sha512)
     }
@@ -167,10 +176,16 @@ class Packages : Module {
         packageName: String,
         packagePath: String,
         log: AcquisitionLog,
+        remoteSession: RemoteAPKParser.Session,
     ): PackageFile {
         // Local (self) scan can read the APK path; Analyst mode cannot — parse remotely.
         val local = File(packagePath).takeIf { it.canRead() }
-        val hashes = local?.let { hashFileLocally(it, log) } ?: hashFileRemotely(shell, packagePath)
+        val useRemote = local == null || FORCE_REMOTE_APK_PARSER
+        val hashes = when {
+            local != null && !useRemote ->
+                hashFileLocally(local, log) ?: hashFileRemotely(shell, packagePath, log)
+            else -> hashFileRemotely(shell, packagePath, log)
+        }
         val packageFile = PackageFile(
             path = packagePath,
             localName = "", // not set/used here
@@ -183,16 +198,21 @@ class Packages : Module {
             infiles = emptyList(),
         )
 
-        runCatching {
-            val apkInfo = if (local != null && !FORCE_REMOTE_APK_PARSER) {
+        val parseOk = runCatching {
+            val apkInfo = if (local != null && !useRemote) {
                 APKParser.parseAPK(local)
             } else {
-                RemoteAPKParser.parse(adbShellAsRemote(shell), packageName, packagePath)
+                remoteSession.parse(packageName, packagePath)
             }
             packageFile.suspicious = apkInfo.suspicious
             packageFile.certificates = apkInfo.certificates
             packageFile.infiles = apkInfo.files
-        }.onFailure { log.warning("Failed to parse $packagePath: ${it.message}") }
+        }.onFailure { log.warning("Failed to parse $packagePath: ${it.message}") }.isSuccess
+
+        // Analyst path: if remote triage threw, pull anyway so we don't under-export.
+        if (!parseOk && useRemote) {
+            packageFile.suspicious = true
+        }
 
         if (packageFile.suspicious) {
             val archivePath = getLocalFileName(writer, packageName, packageFile.path)
@@ -200,7 +220,7 @@ class Packages : Module {
             log.step(R.string.step_packages_copying, packagePath)
             val result = runCatching {
                 writer.useArtifact(archivePath) { output ->
-                    if (local != null) {
+                    if (local != null && !useRemote) {
                         local.inputStream().use { it.copyTo(output) }
                     } else {
                         sync.pull(packagePath, output)
@@ -331,13 +351,17 @@ class Packages : Module {
             shell,
             packages.filter { !it.system }.map { it.name },
         )
+        // One Session per acquisition: caches getPackageInfo ordinal + SDK flag width.
+        val remoteSession = RemoteAPKParser.Session(adbShellAsRemote(shell))
         var checked = 0
         for (i in packages.indices) {
             val pkg = packages[i]
             val packagePaths = pathsByPackage[pkg.name] ?: continue
             log.step(R.string.step_packages_apk, pkg.name, ++checked, pathsByPackage.size)
             packages[i] = pkg.copy(
-                files = packagePaths.map { buildPackageFile(shell, sync, writer, pkg.name, it, log) },
+                files = packagePaths.map {
+                    buildPackageFile(shell, sync, writer, pkg.name, it, log, remoteSession)
+                },
             )
         }
 
