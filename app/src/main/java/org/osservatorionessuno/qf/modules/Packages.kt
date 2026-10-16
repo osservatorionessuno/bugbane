@@ -10,11 +10,14 @@ import org.osservatorionessuno.cadb.AdbSync
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.libmvt.android.parsers.APKParser
 import org.osservatorionessuno.libmvt.android.parsers.CertificateParser
+import org.osservatorionessuno.libmvt.android.parsers.RemoteAPKParser
+import org.osservatorionessuno.libmvt.common.Utils
 import org.osservatorionessuno.qf.ArtifactJson
+import org.osservatorionessuno.qf.rethrowIfCancelled
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.io.OutputStream
 import java.security.MessageDigest
 
 /**
@@ -31,6 +34,11 @@ class Packages : Module {
         // Packages per batched `pm path` exec, to bound single-command output and runtime.
         private const val PM_PATH_BATCH = 50
         private val HASH_ALGORITHMS = listOf("MD5", "SHA-1", "SHA-256", "SHA-512")
+        /**
+         * When true, always parse via [RemoteAPKParser] even if the APK is readable locally.
+         * Debug only — leave false in production.
+         */
+        const val FORCE_REMOTE_APK_PARSER = false
     }
 
     // Data class to hold package info
@@ -111,7 +119,7 @@ class Packages : Module {
                             current?.add(trimmed.removePrefix("package:"))
                     }
                 }
-            }.onFailure { Log.w(TAG, "pm path batch failed: ${it.message}") }
+            }.rethrowIfCancelled().onFailure { Log.w(TAG, "pm path batch failed: ${it.message}") }
         }
         return paths.mapValues { it.value.toList() }
     }
@@ -139,13 +147,13 @@ class Packages : Module {
     }
 
     /** Fallback: all four sums in one exec, matched to fields by digest length. */
-    private fun hashFileRemotely(shell: AdbShell, path: String): FileHashes {
+    private fun hashFileRemotely(shell: AdbShell, path: String, log: AcquisitionLog): FileHashes {
         var md5 = ""
         var sha1 = ""
         var sha256 = ""
         var sha512 = ""
         runCatching {
-            val quoted = "\"$path\""
+            val quoted = Utils.shQuote(path)
             shell.execForEachLine("md5sum $quoted; sha1sum $quoted; sha256sum $quoted; sha512sum $quoted") { line ->
                 val token = line.trim().split(WHITESPACE, 2).firstOrNull().orEmpty()
                 if (token.matches(HEX)) when (token.length) {
@@ -155,51 +163,33 @@ class Packages : Module {
                     128 -> sha512 = token
                 }
             }
+        }.rethrowIfCancelled().onFailure { log.warning("Remote hashing failed for $path: ${it.message}") }
+        if (md5.isEmpty() && sha1.isEmpty() && sha256.isEmpty() && sha512.isEmpty()) {
+            log.warning("Remote hashing produced no digests for $path")
         }
         return FileHashes(md5, sha1, sha256, sha512)
     }
 
-    /** Copy of an APK on another device, so it can be hashed and parsed like a local one. */
-    private fun pullToTemp(sync: AdbSync, packagePath: String, cacheDir: File): File? {
-        val temp = File.createTempFile("apk", ".apk", cacheDir)
-        return runCatching { FileOutputStream(temp).use { sync.pull(packagePath, it) }; temp }
-            .onFailure { Log.w(TAG, "Failed to pull $packagePath: ${it.message}"); temp.delete() }
-            .getOrNull()
-    }
-
     private fun buildPackageFile(
         shell: AdbShell,
         sync: AdbSync,
         writer: ArtifactSink,
-        cacheDir: File,
         packageName: String,
         packagePath: String,
+        uid: Int,
         log: AcquisitionLog,
+        remoteSession: RemoteAPKParser.Session,
+        remoteTarget: Boolean,
     ): PackageFile {
-        // Acquiring another device: its APKs aren't on this filesystem.
-        val local = File(packagePath).takeIf { it.canRead() }
-        // Not over ADB, so not recorded by the transport.
-        if (local != null) log.info("Reading $packagePath from this phone's storage (${local.length()} bytes)")
-        val temp = if (local == null) pullToTemp(sync, packagePath, cacheDir) else null
-        val apk = local ?: temp
-        try {
-            return buildPackageFile(shell, sync, writer, packageName, packagePath, apk, temp, log)
-        } finally {
-            temp?.delete()
+        // Another phone's path may exist and be readable here too (/system, /product, /apex):
+        // only a self scan may ever touch the local filesystem.
+        val useRemote = remoteTarget || FORCE_REMOTE_APK_PARSER
+        val local = if (useRemote) null else File(packagePath).takeIf { it.canRead() }
+        val hashes = when {
+            local != null && !useRemote ->
+                hashFileLocally(local, log) ?: hashFileRemotely(shell, packagePath, log)
+            else -> hashFileRemotely(shell, packagePath, log)
         }
-    }
-
-    private fun buildPackageFile(
-        shell: AdbShell,
-        sync: AdbSync,
-        writer: ArtifactSink,
-        packageName: String,
-        packagePath: String,
-        apk: File?,
-        pulled: File?,
-        log: AcquisitionLog,
-    ): PackageFile {
-        val hashes = apk?.let { hashFileLocally(it, log) } ?: hashFileRemotely(shell, packagePath)
         val packageFile = PackageFile(
             path = packagePath,
             localName = "", // not set/used here
@@ -212,12 +202,25 @@ class Packages : Module {
             infiles = emptyList(),
         )
 
-        if (apk != null) runCatching {
-            val apkInfo = APKParser.parseAPK(apk)
+        // RemoteAPKParser soft-fails (empty certs) without throwing; track verified too.
+        var verified = false
+        val parseOk = runCatching {
+            val apkInfo = if (local != null && !useRemote) {
+                APKParser.parseAPK(local)
+            } else {
+                remoteSession.parse(packageName, packagePath, androidUserId(uid))
+            }
             packageFile.suspicious = apkInfo.suspicious
             packageFile.certificates = apkInfo.certificates
             packageFile.infiles = apkInfo.files
-        }.onFailure { log.warning("Failed to parse $packagePath: ${it.message}") }
+            verified = apkInfo.verified
+        }.rethrowIfCancelled().onFailure { log.warning("Failed to parse $packagePath: ${it.message}") }.isSuccess
+
+        // Analyst path: throw or soft-fail (no verified signer), then we pull so we don't under-export.
+        if (useRemote && (!parseOk || !verified)) {
+            log.warning("Exporting $packagePath: " + if (parseOk) "no signer attested by the device" else "parse failed")
+            packageFile.suspicious = true
+        }
 
         if (packageFile.suspicious) {
             val archivePath = getLocalFileName(writer, packageName, packageFile.path)
@@ -225,14 +228,30 @@ class Packages : Module {
             log.step(R.string.step_packages_copying, packagePath)
             val result = runCatching {
                 writer.useArtifact(archivePath) { output ->
-                    if (pulled != null) pulled.inputStream().use { it.copyTo(output) } else sync.pull(packagePath, output)
+                    if (local != null && !useRemote) {
+                        local.inputStream().use { it.copyTo(output) }
+                    } else {
+                        sync.pull(packagePath, output)
+                    }
                 }
             }
-            result.onFailure { log.error("Failed to copy $packagePath: ${it.message}") }
+            result.rethrowIfCancelled().onFailure { log.error("Failed to copy $packagePath: ${it.message}") }
         }
 
         return packageFile
     }
+
+    private fun adbShellAsRemote(shell: AdbShell): RemoteAPKParser.Shell =
+        object : RemoteAPKParser.Shell {
+            override fun execForEachLine(command: String, onLine: (String) -> Unit) =
+                shell.execForEachLine(command, onLine)
+
+            override fun execToStream(command: String, output: OutputStream) =
+                shell.execToStream(command, output)
+        }
+
+    /** Android multi-user id from app uid (`pm list packages -U`). */
+    private fun androidUserId(uid: Int): Int = if (uid >= 0) uid / 100_000 else 0
 
     override fun run(
         context: Context,
@@ -343,13 +362,17 @@ class Packages : Module {
             shell,
             packages.filter { !it.system }.map { it.name },
         )
+        // One Session per acquisition: caches getPackageInfo ordinal + SDK flag width.
+        val remoteSession = RemoteAPKParser.Session(adbShellAsRemote(shell))
         var checked = 0
         for (i in packages.indices) {
             val pkg = packages[i]
             val packagePaths = pathsByPackage[pkg.name] ?: continue
             log.step(R.string.step_packages_apk, pkg.name, ++checked, pathsByPackage.size)
             packages[i] = pkg.copy(
-                files = packagePaths.map { buildPackageFile(shell, sync, writer, context.cacheDir, pkg.name, it, log) },
+                files = packagePaths.map {
+                    buildPackageFile(shell, sync, writer, pkg.name, it, pkg.uid, log, remoteSession, manager.remoteTarget)
+                },
             )
         }
 
