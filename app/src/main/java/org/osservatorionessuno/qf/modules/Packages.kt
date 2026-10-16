@@ -218,7 +218,7 @@ class Packages : Module {
 
         // Analyst path: throw or soft-fail (no verified signer), then we pull so we don't under-export.
         if (useRemote && (!parseOk || !verified)) {
-            log.warning("No signer attested by the device for $packageName, exporting $packagePath")
+            log.warning("Exporting $packagePath: " + if (parseOk) "no signer attested by the device" else "parse failed")
             packageFile.suspicious = true
         }
 
