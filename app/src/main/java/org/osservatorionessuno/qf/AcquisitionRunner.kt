@@ -170,6 +170,7 @@ class AcquisitionRunner(
         val log = AcquisitionLog(context)
         // Records every shell command and file transfer until the run ends.
         manager.commandLog = log
+        manager.remoteTarget = transport?.type != AcquisitionTransport.LOCAL
         log.info("Bugbane version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}, ${BuildConfig.FLAVOR} ${BuildConfig.BUILD_TYPE})")
         runCatching { log.info("Bugbane build: ${appBuild(context)}") }
             .onFailure { log.warning("Bugbane build details unavailable: ${it.describe()}") }

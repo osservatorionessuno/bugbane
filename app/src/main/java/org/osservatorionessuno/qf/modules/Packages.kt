@@ -178,10 +178,12 @@ class Packages : Module {
         uid: Int,
         log: AcquisitionLog,
         remoteSession: RemoteAPKParser.Session,
+        remoteTarget: Boolean,
     ): PackageFile {
-        // Local (self) scan can read the APK path; Analyst mode cannot — parse remotely.
-        val local = File(packagePath).takeIf { it.canRead() }
-        val useRemote = local == null || FORCE_REMOTE_APK_PARSER
+        // Another phone's path may exist and be readable here too (/system, /product, /apex):
+        // only a self scan may ever touch the local filesystem.
+        val useRemote = remoteTarget || FORCE_REMOTE_APK_PARSER
+        val local = if (useRemote) null else File(packagePath).takeIf { it.canRead() }
         val hashes = when {
             local != null && !useRemote ->
                 hashFileLocally(local, log) ?: hashFileRemotely(shell, packagePath, log)
@@ -367,7 +369,7 @@ class Packages : Module {
             log.step(R.string.step_packages_apk, pkg.name, ++checked, pathsByPackage.size)
             packages[i] = pkg.copy(
                 files = packagePaths.map {
-                    buildPackageFile(shell, sync, writer, pkg.name, it, pkg.uid, log, remoteSession)
+                    buildPackageFile(shell, sync, writer, pkg.name, it, pkg.uid, log, remoteSession, manager.remoteTarget)
                 },
             )
         }
