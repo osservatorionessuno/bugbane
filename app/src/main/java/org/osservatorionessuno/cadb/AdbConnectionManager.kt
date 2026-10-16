@@ -41,6 +41,13 @@ class AdbConnectionManager private constructor(context: Context) : AbsAdbConnect
     /** Set during an acquisition: every shell command and sync operation is recorded here. */
     @Volatile var commandLog: AcquisitionLog? = null
 
+    /**
+     * Set during an acquisition: the device being acquired is another phone. Its paths must
+     * never be opened on this phone's filesystem, where `/system/...` APKs also exist and read.
+     * Defaults to true so an unknown transport can only cost speed, never wrong evidence.
+     */
+    @Volatile var remoteTarget: Boolean = true
+
     init {
         // The library defaults to API 1, which negotiates 4 KiB packets with checksums.
         setApi(Build.VERSION.SDK_INT)
