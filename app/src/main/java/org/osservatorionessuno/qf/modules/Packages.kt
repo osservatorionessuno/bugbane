@@ -13,6 +13,7 @@ import org.osservatorionessuno.libmvt.android.parsers.CertificateParser
 import org.osservatorionessuno.libmvt.android.parsers.RemoteAPKParser
 import org.osservatorionessuno.libmvt.common.Utils
 import org.osservatorionessuno.qf.ArtifactJson
+import org.osservatorionessuno.qf.rethrowIfCancelled
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
 import java.io.FileInputStream
@@ -118,7 +119,7 @@ class Packages : Module {
                             current?.add(trimmed.removePrefix("package:"))
                     }
                 }
-            }.onFailure { Log.w(TAG, "pm path batch failed: ${it.message}") }
+            }.rethrowIfCancelled().onFailure { Log.w(TAG, "pm path batch failed: ${it.message}") }
         }
         return paths.mapValues { it.value.toList() }
     }
@@ -162,7 +163,7 @@ class Packages : Module {
                     128 -> sha512 = token
                 }
             }
-        }.onFailure { log.warning("Remote hashing failed for $path: ${it.message}") }
+        }.rethrowIfCancelled().onFailure { log.warning("Remote hashing failed for $path: ${it.message}") }
         if (md5.isEmpty() && sha1.isEmpty() && sha256.isEmpty() && sha512.isEmpty()) {
             log.warning("Remote hashing produced no digests for $path")
         }
@@ -213,10 +214,11 @@ class Packages : Module {
             packageFile.certificates = apkInfo.certificates
             packageFile.infiles = apkInfo.files
             verified = apkInfo.verified
-        }.onFailure { log.warning("Failed to parse $packagePath: ${it.message}") }.isSuccess
+        }.rethrowIfCancelled().onFailure { log.warning("Failed to parse $packagePath: ${it.message}") }.isSuccess
 
         // Analyst path: throw or soft-fail (no verified signer), then we pull so we don't under-export.
         if (useRemote && (!parseOk || !verified)) {
+            log.warning("No signer attested by the device for $packageName, exporting $packagePath")
             packageFile.suspicious = true
         }
 
@@ -233,7 +235,7 @@ class Packages : Module {
                     }
                 }
             }
-            result.onFailure { log.error("Failed to copy $packagePath: ${it.message}") }
+            result.rethrowIfCancelled().onFailure { log.error("Failed to copy $packagePath: ${it.message}") }
         }
 
         return packageFile
