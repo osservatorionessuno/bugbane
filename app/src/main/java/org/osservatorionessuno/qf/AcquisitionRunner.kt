@@ -412,6 +412,7 @@ class AcquisitionRunner(
             // Report finished even when setup (env probe, recipient, writer) throws,
             // so the UI never hangs in the scanning state.
             manager.commandLog = null
+            manager.remoteTarget = true
             Log.i(TAG, "Acquisition finished in ${acquisitionDir.absolutePath}")
             listener?.onFinished(cancelled, output)
         }
