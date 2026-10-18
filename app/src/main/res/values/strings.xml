@@ -422,6 +422,8 @@
     <string name="remote_wifi_pairing_title">Pair with the device</string>
     <string name="remote_wifi_pairing_description">On the device to scan, enable Developer options (tap “Build number” seven times in About phone), then open Developer options › Wireless debugging, turn it on, tap “Pair device with QR code” and scan this code.</string>
     <string name="remote_wifi_waiting">Waiting for the device to scan the code…</string>
+    <string name="remote_qr_step">QR code %1$d of %2$d</string>
+    <string name="remote_qr_scanned">QR code %1$d of %2$d scanned</string>
     <string name="remote_wifi_pairing_failed">Pairing failed. Turn Wireless debugging off and on again on the other device, then retry.</string>
     <string name="remote_connected_title">Device connected</string>
     <string name="remote_connected_unknown_device">Unknown device</string>

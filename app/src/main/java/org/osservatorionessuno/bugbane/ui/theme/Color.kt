@@ -40,3 +40,6 @@ val AnalystPrimaryDark = Color(0xFF7161AB)
 val AnalystSecondary = Color(0xFF644079)
 val AnalystSecondaryDark = Color(0xFFB9ACE7)
 val AnalystOnSecondaryDark = Color(0xFF1A1040)
+
+/** Full-screen wash after a QR code is accepted. White text and the check sit on it. */
+val QrSuccessGreen = Color(0xFF1B8A3E)

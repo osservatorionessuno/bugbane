@@ -54,6 +54,8 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
         data class Connecting(val usb: Boolean) : Step
         object Hotspot : Step
         data class WifiPairing(val credentials: AdbQrCredentials) : Step
+        /** Full-screen confirmation after one of the two QR codes is accepted. [index] is 1-based. */
+        data class QrSuccess(val index: Int) : Step
         data class Error(val messageRes: Int, val retry: Step) : Step
         object Connected : Step
     }
@@ -166,13 +168,16 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
 
     fun hotspotJoined() {
         val credentials = AdbQrCredentials.generate()
-        _step.value = Step.WifiPairing(credentials)
         restart {
+            // The two codes look alike; hold a beat so the swap is not read as the same code.
+            showQrSuccess(1)
+            _step.value = Step.WifiPairing(credentials)
             val discovery = AdbNetworkDiscovery(appContext).also { discovery = it; it.start() }
             // The target advertises the pairing service under the QR's name.
             val pairing = discovery.services
                 .map { list -> list.firstOrNull { it.kind == ServiceKind.TLS_PAIRING && it.serviceName == credentials.serviceName } }
                 .filter { it != null }.first()!!
+            showQrSuccess(2)
             _step.value = Step.Connecting(usb = false)
             // The link may still be settling: the first packets can fail to route.
             val paired = retrying { adbManager.pairRemote(pairing.host, pairing.port, credentials.password) } == true
@@ -220,6 +225,11 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
         if (_step.value == Step.Hotspot) watchJoin()
     }
 
+    private suspend fun showQrSuccess(index: Int) {
+        _step.value = Step.QrSuccess(index)
+        delay(QR_SUCCESS_HOLD_MS)
+    }
+
     /** Run a blocking transport call on IO up to [ATTEMPTS] times; null when all failed. */
     private suspend fun <T> retrying(block: () -> T): T? {
         repeat(ATTEMPTS) { attempt ->
@@ -263,5 +273,6 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
         private const val CONNECT_DISCOVERY_TIMEOUT_MS = 30_000L
         private const val ATTEMPTS = 5
         private const val RETRY_DELAY_MS = 4_000L
+        private const val QR_SUCCESS_HOLD_MS = 1_500L
     }
 }
