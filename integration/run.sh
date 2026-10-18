@@ -171,3 +171,14 @@ python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" \
 adb shell "rm -rf /data/local/tmp/wd $(dirname "$CUSTOM_MARKER")" || true
 
 echo "INTEGRATION E2E PASS"
+
+# Docs figures only, after the verdict: an acquisition that loses its device halfway.
+# Wireless debugging goes off under a running acquisition, so the remaining modules
+# fail and the acquisition is saved incomplete (scan-screen warning + failed-modules
+# card). Back on afterwards so the emulator is left as found.
+if run_flow docs-fail-start.yaml; then
+  sleep 5
+  adb shell settings put global adb_wifi_enabled 0 || true
+  run_flow docs-fail-end.yaml || true
+  adb shell settings put global adb_wifi_enabled 1 || true
+fi

@@ -19,7 +19,7 @@ It runs the whole user journey and verifies the result off-device:
 | `maestro/check-custom-ioc.yaml` | open the analysis and assert the custom set's planted marker is among the detections |
 | `fixtures/e2e-iocs.stix2` | the custom set: a file-path IOC (`/data/local/tmp/bugbane-e2e/custom-marker.so`, planted by `run.sh`) and the fixture APK's app id |
 | `maestro/set-password.yaml` | set the mandatory acquisition password |
-| `maestro/docs-wifi.yaml`, `maestro/docs-extra.yaml` | docs figures only (Wi-Fi slide with Wi-Fi off; Acquisitions tab, About); failures ignored |
+| `maestro/docs-wifi.yaml`, `maestro/docs-extra.yaml`, `maestro/docs-fail-*.yaml` | docs figures only (Wi-Fi slide with Wi-Fi off; Acquisitions tab, About; an acquisition failed by turning Wireless debugging off under it); failures ignored |
 | `scrape.py` | pull the pairing code / passphrase out of `maestro hierarchy` |
 | `verify_export.py` | `pyrage`-decrypt the archive and assert its contents |
 | `mvt_crosscheck.py` | run upstream `mvt-android check-androidqf` on the decrypted export with the bundled feed and the custom file; every planted IOC must be flagged |

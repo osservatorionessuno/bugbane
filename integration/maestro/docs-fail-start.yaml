@@ -1,0 +1,13 @@
+# Docs figures only (run.sh ignores failures): start a second acquisition and leave it
+# running; run.sh then turns Wireless debugging off under it so modules fail.
+appId: org.osservatorionessuno.bugbane
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Start Acquisition"
+    timeout: 30000
+- tapOn: "Start Acquisition"
+- extendedWaitUntil:
+    visible: "Stop Acquisition"
+    timeout: 30000

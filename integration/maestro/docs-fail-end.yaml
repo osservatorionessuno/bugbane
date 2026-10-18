@@ -1,0 +1,31 @@
+# Docs figures only: the scan screen's incomplete-acquisition warning, then the failed
+# modules card on the acquisition detail (newest row of the Acquisitions tab).
+appId: org.osservatorionessuno.bugbane
+---
+- extendedWaitUntil:
+    visible:
+      text: "(?s)Warning: Acquisition is incomplete.*"
+    timeout: 600000
+- takeScreenshot: screenshots/12-acquisition-incomplete
+- tapOn: "Acquisitions"
+- extendedWaitUntil:
+    visible:
+      text: "Completed: .*"
+    timeout: 15000
+- tapOn:
+    text: "Completed: .*"
+    index: 0
+# A cold start may ask for the acquisition password before showing the detail.
+- runFlow:
+    when:
+      visible: "Enter acquisition password"
+    commands:
+      - runFlow:
+          file: fill-password-field.yaml
+          env:
+            FIELD: "Password"
+      - tapOn: "Unlock"
+- extendedWaitUntil:
+    visible: "This acquisition is incomplete"
+    timeout: 30000
+- takeScreenshot: screenshots/13-failed-modules
