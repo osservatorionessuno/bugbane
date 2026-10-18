@@ -9,11 +9,20 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -21,27 +30,32 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cable
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -53,12 +67,14 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import org.osservatorionessuno.bugbane.components.SlideshowPageContent
 import org.osservatorionessuno.bugbane.components.SlideshowPageData
+import org.osservatorionessuno.bugbane.ui.theme.QrSuccessGreen
 import org.osservatorionessuno.bugbane.ui.theme.Theme
 import org.osservatorionessuno.bugbane.utils.HotspotManager.HotspotState
 import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel
 import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel.Step
 import org.osservatorionessuno.bugbane.utils.RemoteScanViewModel.UsbRole
 import org.osservatorionessuno.cadb.QrCode
+import kotlinx.coroutines.delay
 
 /** Connect another device over USB or Wi-Fi; the home screen then starts its acquisition. */
 class RemoteScanActivity : ComponentActivity() {
@@ -73,22 +89,32 @@ class RemoteScanActivity : ComponentActivity() {
                 val step by viewModel.step.collectAsStateWithLifecycle()
                 // The home screen shows the connected device and starts the acquisition.
                 LaunchedEffect(step) { if (step == Step.Connected) finish() }
-                BackHandler(enabled = step != Step.Transport) { viewModel.back() }
+                // Swallow back during the success beat so it doesn't dismiss the wizard.
+                BackHandler(enabled = step != Step.Transport) {
+                    if (step !is Step.QrSuccess) viewModel.back()
+                }
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-                    // Centred when the step fits, scrollable when it doesn't.
-                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .heightIn(min = maxHeight)
-                                .safeDrawingPadding()
-                                .padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            RemoteScanStep(step, viewModel)
+                    val current = step
+                    // Leave the QR in place so the green covers that screen instead of replacing it.
+                    val held = remember { arrayOf(current) }
+                    if (current !is Step.QrSuccess) held[0] = current
+                    val page = held[0]
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState())
+                                    .heightIn(min = maxHeight)
+                                    .safeDrawingPadding()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                RemoteScanStep(page, viewModel)
+                            }
                         }
+                        if (current is Step.QrSuccess) QrSuccessScreen(current.index)
                     }
                 }
             }
@@ -157,10 +183,12 @@ private fun RemoteScanStep(step: Step, viewModel: RemoteScanViewModel) {
                 icon = Icons.Filled.Wifi,
             ),
             middle = {
-                Qr(step.credentials.qrPayload)
+                Qr(step.credentials.qrPayload, index = 2)
                 Waiting(stringResource(R.string.remote_wifi_waiting))
             },
         )
+
+        is Step.QrSuccess -> Unit
 
         is Step.Error -> SlideshowPageContent(
             page = SlideshowPageData(
@@ -228,12 +256,12 @@ private fun HotspotStep(viewModel: RemoteScanViewModel) {
                 )
             }
             if (active?.ssid != null && active.passphrase != null) {
-                Qr(QrCode.wifiPayload(active.ssid, active.passphrase))
                 Text(
                     text = "${active.ssid}\n${active.passphrase}",
                     style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
                     textAlign = TextAlign.Center,
                 )
+                Qr(QrCode.wifiPayload(active.ssid, active.passphrase), index = 1)
                 if (!active.wifiDirect) {
                     Text(
                         text = stringResource(R.string.remote_hotspot_keep_open),
@@ -266,17 +294,117 @@ private fun TransportButton(label: Int, enabled: Boolean = true, onClick: () -> 
     }
 }
 
+private const val QR_CODE_COUNT = 2
+
 @Composable
-private fun Qr(payload: String) {
+private fun Qr(payload: String, index: Int) {
     val bitmap = remember(payload) { QrCode.bitmap(payload, 512).asImageBitmap() }
-    Image(
-        bitmap = bitmap,
-        contentDescription = null,
-        modifier = Modifier
-            .padding(vertical = 16.dp)
-            .size(240.dp)
-            .background(Color.White),
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 16.dp)) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = stringResource(R.string.remote_qr_scanned, index, QR_CODE_COUNT),
+            modifier = Modifier
+                .size(240.dp)
+                .background(Color.White),
+        )
+        QrProgress(index)
+    }
+}
+
+/** Two numbered marks under the code: the one on screen is filled, earlier ones are checked. */
+@Composable
+private fun QrProgress(index: Int) {
+    Row(
+        modifier = Modifier.padding(top = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        for (number in 1..QR_CODE_COUNT) {
+            val reached = number <= index
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(
+                        if (reached) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (number < index) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                } else {
+                    Text(
+                        text = number.toString(),
+                        color = if (reached) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QrSuccessScreen(index: Int) {
+    var greenOn by remember { mutableStateOf(false) }
+    var checkOn by remember { mutableStateOf(false) }
+    val green by animateColorAsState(
+        targetValue = if (greenOn) QrSuccessGreen else Color.Transparent,
+        animationSpec = tween(durationMillis = 420),
+        label = "qrSuccessGreen",
     )
+    val scale by animateFloatAsState(
+        targetValue = if (checkOn) 1f else 0.2f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "qrSuccessScale",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (checkOn) 1f else 0f,
+        animationSpec = tween(durationMillis = 260),
+        label = "qrSuccessAlpha",
+    )
+    LaunchedEffect(index) {
+        greenOn = true
+        delay(160)
+        checkOn = true
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(green)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Check,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier
+                .size(144.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                },
+        )
+        Text(
+            text = stringResource(R.string.remote_qr_scanned, index, QR_CODE_COUNT),
+            color = Color.White.copy(alpha = alpha),
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp, start = 32.dp, end = 32.dp),
+        )
+    }
 }
 
 @Composable
