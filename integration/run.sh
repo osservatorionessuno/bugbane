@@ -63,6 +63,9 @@ LOGCAT_PID=$!
 adb shell settings put system notification_cooldown_enabled 0 || true
 adb shell settings put system notification_cooldown_all 0 || true
 adb install -r -g "$APK"
+# The wizard's notification slide only shows while the permission is missing (docs
+# figure; pair.yaml grants it through the system dialog, and it is re-granted below).
+adb shell pm revoke $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 # A benign "suspicious" APK (accessibility service): the acquisition's Packages module
 # must flag it and stage it into the archive, asserted host-side in verify_export.py.
 [ -n "$FIXTURE" ] && adb install -r -g "$FIXTURE"
@@ -80,9 +83,17 @@ adb shell content call --uri content://media/external/file --method scan_file \
   --arg /storage/emulated/0/Download/e2e-iocs.stix2 >/dev/null 2>&1 || true
 CUSTOM_SHA="$(shasum -a 256 "$CUSTOM_IOCS" | cut -d' ' -f1)"
 
+# Wi-Fi slide (docs figure): shows only while Wi-Fi is off. Separate throwaway app
+# state; failure ignored. Wi-Fi is back and connected before the real onboarding.
+adb shell svc wifi disable || true
+run_flow docs-wifi.yaml || true
+adb shell svc wifi enable || true
+for _ in $(seq 1 30); do adb shell ip addr show wlan0 2>/dev/null | grep -q 'inet ' && break; sleep 2; done
+
 # Onboard + open the Settings pairing dialog (6-digit code left on screen).
 # Restartable (clears app state): one retry absorbs a transient dialog or a slow start.
 run_flow pair.yaml || run_flow pair.yaml || exit 1
+adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 
 # Scrape the pairing code from the dialog, then open the notification shade via adb
 # (the swipe gesture misses over the pairing dialog on slow CI emulators) and wait for
@@ -103,6 +114,8 @@ for _ in $(seq 1 60); do
   if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then NOTIF_SEEN=1; break; fi
   sleep 3
 done
+# Pairing dialog with bugbane's notification above it (docs figure).
+[ -n "$NOTIF_SEEN" ] && adb exec-out screencap -p > "$ART/screenshots/02b-pair-dialog.png" 2>/dev/null
 if [ -n "$CODE" ] && [ -z "$NOTIF_SEEN" ]; then
   echo "PAIRING NOTIFICATION NOT SEEN AFTER 3 MINUTES (continuing; the flow waits once more)"
   maestro hierarchy > "$ART/pairing-wait-hierarchy.json" 2>/dev/null || true
@@ -129,6 +142,7 @@ if [ -z "$PASSPHRASE" ]; then echo "PASSPHRASE SCRAPE FAILED"; exit 1; fi
 printf '%s' "$PASSPHRASE" > "$ART/passphrase.txt"
 
 run_flow set-password.yaml || exit 1
+run_flow docs-extra.yaml || true
 
 # Pull the exported archive (newest first) and verify it host-side.
 # The archive is moved into place a moment after the passphrase dialog shows. The file

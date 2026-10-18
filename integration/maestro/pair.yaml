@@ -17,17 +17,35 @@ appId: org.osservatorionessuno.bugbane
     visible: "Check this device"
     timeout: 15000
 - tapOn: "Check this device"
+# Notification slide (API 33+, run.sh revokes the permission so it shows): shoot it,
+# then grant through the system dialog. run.sh re-grants afterwards regardless.
+- extendedWaitUntil:
+    visible: "Enable Notification Permissions"
+    timeout: 8000
+    optional: true
+- runFlow:
+    when:
+      visible: "Enable Notification Permissions"
+    commands:
+      - takeScreenshot: screenshots/01a-notifications
+      - tapOn:
+          text: "Enable"
+      - tapOn:
+          text: "Allow"
+          optional: true
 # CVE vulnerability page: API 34-36 only.
 - runFlow:
     when:
       visible: "I understand, continue anyway"
     commands:
+      - takeScreenshot: screenshots/01c-security-warning
       - tapOn: "I understand, continue anyway"
 # Developer options page (only when off): enable the real way via Build number x7.
 - runFlow:
     when:
       visible: "Enable Developer Options"
     commands:
+      - takeScreenshot: screenshots/01b-developer-options
       - tapOn:
           text: "Enable"
       # Settings can take a while to come up on a slow emulator.

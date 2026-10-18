@@ -19,6 +19,7 @@ It runs the whole user journey and verifies the result off-device:
 | `maestro/check-custom-ioc.yaml` | open the analysis and assert the custom set's planted marker is among the detections |
 | `fixtures/e2e-iocs.stix2` | the custom set: a file-path IOC (`/data/local/tmp/bugbane-e2e/custom-marker.so`, planted by `run.sh`) and the fixture APK's app id |
 | `maestro/set-password.yaml` | set the mandatory acquisition password |
+| `maestro/docs-wifi.yaml`, `maestro/docs-extra.yaml` | docs figures only (Wi-Fi slide with Wi-Fi off; Acquisitions tab, About); failures ignored |
 | `scrape.py` | pull the pairing code / passphrase out of `maestro hierarchy` |
 | `verify_export.py` | `pyrage`-decrypt the archive and assert its contents |
 | `mvt_crosscheck.py` | run upstream `mvt-android check-androidqf` on the decrypted export with the bundled feed and the custom file; every planted IOC must be flagged |
@@ -65,6 +66,11 @@ ANDROID_SERIAL=emulator-5554 ./integration/run.sh \
 
 Needs `maestro` and a JDK on `PATH`. Artifacts (screenshots, logcat, the archive) land
 in `integration/artifacts/`.
+
+The flows screenshot each screen the website docs show. On a release tag, CI opens a PR on
+bugbane-website with the API 36 shots of both harnesses in `static/imgs/docs/`, named as
+the figures: `NN-name` → `name.png` (NN may carry a letter suffix), `aNN-name` → `analyst-name.png`, `bNN-name` →
+`target-name.png`. Flows match English labels, so the shots are EN only.
 
 ## CI
 

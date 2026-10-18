@@ -9,6 +9,13 @@ for _ in $(seq 1 90); do
   if adb -s "$serial" shell dumpsys activity users 2>/dev/null | grep -q 'User #0: state=RUNNING_UNLOCKED'; then
     sleep 2  # the broadcast is posted from a handler right after the state flips
     adb -s "$serial" shell am wait-for-broadcast-idle >/dev/null 2>&1
+    # SystemUI demo mode: fixed clock, full battery, Wi-Fi, no status icons, so
+    # screenshots are stable between runs and clean enough for the website docs.
+    adb -s "$serial" shell settings put global sysui_demo_allowed 1
+    for cmd in "enter" "clock -e hhmm 1200" "battery -e level 100 -e plugged false" \
+               "network -e wifi show -e level 4 -e mobile hide" "notifications -e visible false"; do
+      adb -s "$serial" shell am broadcast -a com.android.systemui.demo -e command $cmd >/dev/null 2>&1
+    done
     exit 0
   fi
   sleep 2

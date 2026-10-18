@@ -28,6 +28,7 @@ appId: org.osservatorionessuno.bugbane
 - extendedWaitUntil:
     visible: "Indicators of Compromise (IoCs)"
     timeout: 15000
+- takeScreenshot: screenshots/03a-settings
 # The card sits below the fold of the settings list.
 - scrollUntilVisible:
     element:

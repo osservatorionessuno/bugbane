@@ -1,0 +1,25 @@
+# Docs figure only: the Wi-Fi slide, reachable while Wi-Fi is off (run.sh). Clears the
+# app state; pair.yaml starts from scratch again afterwards.
+appId: org.osservatorionessuno.bugbane
+---
+- launchApp:
+    clearState: true
+- runFlow: dismiss-anr.yaml
+- extendedWaitUntil:
+    visible: "Welcome to Bugbane"
+    timeout: 60000
+- tapOn:
+    text: "^I understand$"
+- extendedWaitUntil:
+    visible: "Check this device"
+    timeout: 15000
+- tapOn: "Check this device"
+- runFlow:
+    when:
+      visible: "I understand, continue anyway"
+    commands:
+      - tapOn: "I understand, continue anyway"
+- extendedWaitUntil:
+    visible: "Connect to a Trusted Wi-Fi Network"
+    timeout: 15000
+- takeScreenshot: screenshots/01d-wifi

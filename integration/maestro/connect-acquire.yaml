@@ -43,7 +43,7 @@ appId: org.osservatorionessuno.bugbane
     visible:
       text: ".*(Ready to Start|Get Started|Acquire Data).*"
     timeout: 90000
-- takeScreenshot: screenshots/03-home-paired
+- takeScreenshot: screenshots/03-ready-to-start
 # Pairing lands on the last onboarding slide; the home screen (with Settings) is behind
 # "Get Started".
 - runFlow:
@@ -61,12 +61,23 @@ appId: org.osservatorionessuno.bugbane
 - extendedWaitUntil:
     visible: "Start Acquisition"
     timeout: 20000
-- takeScreenshot: screenshots/04-ready-to-acquire
+- takeScreenshot: screenshots/04-acquire
 - tapOn: "Start Acquisition"
+- extendedWaitUntil:
+    visible: "Stop Acquisition"
+    timeout: 30000
+    optional: true
+- takeScreenshot: screenshots/04b-acquiring
 - extendedWaitUntil:
     visible: "Export"
     timeout: 1200000
 - takeScreenshot: screenshots/05-acquisition-complete
+# Auto-analysis right after; catch its dialog if it is still up (docs figure).
+- runFlow:
+    when:
+      visible: "Analysis in progress..."
+    commands:
+      - takeScreenshot: screenshots/06-analysis-in-progress
 # Auto-analysis runs after acquisition and disables Export until it finishes (slow on
 # CI). CRITICAL is bugbane's own detection of the planted pred.so IOC (cross-checked
 # against MVT host-side) and doubles as the analysis-done gate.
@@ -74,7 +85,7 @@ appId: org.osservatorionessuno.bugbane
     visible:
       text: ".*CRITICAL.*"
     timeout: 300000
-- takeScreenshot: screenshots/06-scan-results
+- takeScreenshot: screenshots/07-analysis-results
 # The custom set must have matched too (its planted marker, see run.sh).
 - runFlow: check-custom-ioc.yaml
 # Tapping Export right after can race the SAF picker, so retry until SAVE shows.
@@ -95,4 +106,4 @@ appId: org.osservatorionessuno.bugbane
 - extendedWaitUntil:
     visible: "Copy to clipboard"
     timeout: 120000
-- takeScreenshot: screenshots/07-export-passphrase
+- takeScreenshot: screenshots/08-export-passphrase
