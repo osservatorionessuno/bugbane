@@ -17,6 +17,7 @@ It runs the whole user journey and verifies the result off-device:
 | `maestro/connect-acquire.yaml` | enter the code in bugbane's notification → import custom IOCs → acquire → check the custom detection → export (one flow, so the wireless connection can't drop between pairing and acquisition) |
 | `maestro/import-iocs.yaml` | Settings → Custom indicators → import `e2e-iocs.stix2` through the system file picker; asserts the row's name, count and SHA-256 |
 | `maestro/check-custom-ioc.yaml` | open the analysis and assert the custom set's planted marker is among the detections |
+| `fixtures/suspicious-apk/` | benign code-less APK (`com.malicious.fixture`) whose manifest trips libMVT's suspicious heuristic; the acquisition must stage it (Gradle `:suspicious-apk`) |
 | `fixtures/e2e-iocs.stix2` | the custom set: a file-path IOC (`/data/local/tmp/bugbane-e2e/custom-marker.so`, planted by `run.sh`) and the fixture APK's app id |
 | `maestro/set-password.yaml` | set the mandatory acquisition password |
 | `maestro/docs-wifi.yaml`, `maestro/docs-extra.yaml`, `maestro/docs-fail-*.yaml` | docs figures only (Wi-Fi slide with Wi-Fi off; Acquisitions tab, About; an acquisition failed by turning Wireless debugging off under it); failures ignored |

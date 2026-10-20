@@ -42,7 +42,7 @@ jobs:
             platforms;android-36 build-tools;36.0.0
 
       - name: Build release APK + suspicious fixture APK
-        run: ./gradlew --no-daemon assembleProductionRelease :fixtures:suspicious-apk:assembleDebug
+        run: ./gradlew --no-daemon assembleProductionRelease :suspicious-apk:assembleDebug
 
       - name: Sign release APK with a throwaway CI key (unsigned APKs cannot be installed)
         run: |
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: integration-fixture-apk
-          path: fixtures/suspicious-apk/build/outputs/apk/debug/suspicious-apk-debug.apk
+          path: integration/fixtures/suspicious-apk/build/outputs/apk/debug/suspicious-apk-debug.apk
           compression-level: 0
           retention-days: 3
 

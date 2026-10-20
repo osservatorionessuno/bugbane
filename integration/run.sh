@@ -9,7 +9,7 @@ set -uo pipefail
 
 APK="${1:?usage: run.sh <apk> [suspicious-fixture-apk]}"
 FIXTURE="${2:-}"
-SUSPICIOUS_APPID=org.osservatorionessuno.fixture.suspicious
+SUSPICIOUS_APPID=com.malicious.fixture
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FLOWS="$DIR/maestro"
 ART="${INTEGRATION_ARTIFACTS:-$DIR/artifacts}"

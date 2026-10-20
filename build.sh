@@ -30,13 +30,13 @@ if [[ -z "$VERSION" ]]; then
 fi
 
 FILE_TAG_SUFFIX="${TAG_SUFFIX//-/.}"
-FDROID_VERSION=$(sed -n 's/.*versionName: \(.*\)/\1/p' metadata/org.osservatorionessuno.bugbane${FILE_TAG_SUFFIX}.yml)
+FDROID_VERSION=$(sed -n 's/.*versionName: \(.*\)/\1/p' fastlane/fdroid/org.osservatorionessuno.bugbane${FILE_TAG_SUFFIX}.yml)
 if [[ -z "$FDROID_VERSION" ]]; then
-  echo "Error: could not read versionName from metadata/org.osservatorionessuno.bugbane${FILE_TAG_SUFFIX:-}.yml"
+  echo "Error: could not read versionName from fastlane/fdroid/org.osservatorionessuno.bugbane${FILE_TAG_SUFFIX:-}.yml"
   exit 1
 fi
 if [[ "$VERSION" != "$FDROID_VERSION" ]]; then
-  echo "Error: versionName in app/build.gradle.kts ($VERSION) does not match versionName in metadata/org.osservatorionessuno.bugbane.yml ($FDROID_VERSION)"
+  echo "Error: versionName in app/build.gradle.kts ($VERSION) does not match versionName in fastlane/fdroid/org.osservatorionessuno.bugbane.yml ($FDROID_VERSION)"
   exit 1
 fi
 TAG="${VERSION}${TAG_SUFFIX}"
