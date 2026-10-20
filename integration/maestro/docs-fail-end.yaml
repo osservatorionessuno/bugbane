@@ -4,28 +4,28 @@ appId: org.osservatorionessuno.bugbane
 ---
 - extendedWaitUntil:
     visible:
-      text: "(?s)Warning: Acquisition is incomplete.*"
+      text: "(?s)${s_scan_acquisition_failed_message}"
     timeout: 600000
 - takeScreenshot: screenshots/12-acquisition-incomplete
-- tapOn: "Acquisitions"
+- tapOn: "${s_main_nav_acquisitions}"
 - extendedWaitUntil:
     visible:
-      text: "Completed: .*"
+      text: "${s_acquisitions_completed}"
     timeout: 15000
 - tapOn:
-    text: "Completed: .*"
+    text: "${s_acquisitions_completed}"
     index: 0
 # A cold start may ask for the acquisition password before showing the detail.
 - runFlow:
     when:
-      visible: "Enter acquisition password"
+      visible: "${s_acquisition_unlock_password_title}"
     commands:
       - runFlow:
           file: fill-password-field.yaml
           env:
-            FIELD: "Password"
-      - tapOn: "Unlock"
+            FIELD: "${s_set_password_field_label}"
+      - tapOn: "${s_acquisition_unlock_button}"
 - extendedWaitUntil:
-    visible: "This acquisition is incomplete"
+    visible: "${s_acquisition_details_incomplete}"
     timeout: 30000
 - takeScreenshot: screenshots/13-failed-modules

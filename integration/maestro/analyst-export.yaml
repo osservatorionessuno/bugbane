@@ -14,16 +14,16 @@ appId: org.osservatorionessuno.bugbane
       - inputText: "1234"
       - pressKey: Enter
 - extendedWaitUntil:
-    visible: "Device connected"
+    visible: "${s_remote_connected_title}"
     timeout: 180000
 - takeScreenshot: screenshots/a05b-device-connected
-- tapOn: "Start Acquisition"
+- tapOn: "${s_home_scan_button}"
 - extendedWaitUntil:
-    visible: "Stop Acquisition"
+    visible: "${s_scan_cancel_button}"
     timeout: 60000
 - takeScreenshot: screenshots/a06-acquiring
 - extendedWaitUntil:
-    visible: "Export"
+    visible: "${s_acquisition_details_export}"
     timeout: 1200000
 - takeScreenshot: screenshots/a07-acquisition-complete
 # The planted IOC on the target must be detected; also gates on analysis done.
@@ -39,13 +39,13 @@ appId: org.osservatorionessuno.bugbane
           when:
             notVisible: "SAVE"
           commands:
-            - tapOn: "Export"
+            - tapOn: "${s_acquisition_details_export}"
             - extendedWaitUntil:
                 visible: "SAVE"
                 timeout: 20000
 - assertVisible: "SAVE"
 - tapOn: "SAVE"
 - extendedWaitUntil:
-    visible: "Copy to clipboard"
+    visible: "${s_acquisition_passphrase_copy}"
     timeout: 120000
 - takeScreenshot: screenshots/a09-export-passphrase

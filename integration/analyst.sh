@@ -23,7 +23,12 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 FLOWS="$DIR/maestro"
 ART="${INTEGRATION_ARTIFACTS:-$DIR/artifacts}"
 mkdir -p "$ART" "$ART/screenshots"
+python3 "$DIR/strings_env.py" "$LOCALE" > "$ART/strings.tsv" || exit 1
+export BUGBANE_STRINGS="$ART/strings.tsv"
+MAESTRO_ENV=(); while IFS=$'\t' read -r k v; do MAESTRO_ENV+=(-e "$k=$v"); done < "$BUGBANE_STRINGS"
+s() { awk -F'\t' -v k="$1" '$1==k{print $2}' "$BUGBANE_STRINGS"; }
 PKG=org.osservatorionessuno.bugbane
+LOCALE="${BUGBANE_LOCALE:-en}"  # see run.sh
 MACRO="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/emulator/resources/macros/Walk_to_image_room"
 
 echo "sha=${GITHUB_SHA:-unknown} run=${GITHUB_RUN_NUMBER:-?} ref=${GITHUB_REF_NAME:-?} A=$A B=$B" > "$ART/RUN_INFO.txt"
@@ -45,7 +50,7 @@ trap capture EXIT
 flow() {  # <serial> <flow-file> [maestro args...]
   local serial="$1" f="$2"; shift 2
   echo "::group::maestro [$serial] $f"
-  maestro --device "$serial" test "$@" "$FLOWS/$f"
+  maestro --device "$serial" test "${MAESTRO_ENV[@]}" "$@" "$FLOWS/$f"
   local rc=$?
   echo "::endgroup::"
   [ "$rc" -eq 0 ] || echo "FLOW FAILED: $f on $serial (rc=$rc)"
@@ -83,6 +88,7 @@ unlock_a() {
 
 # --- analyst (A): the app, a PIN for the lock gate, the Wi-Fi permission --------------
 adb -s "$A" install -r -g "$APK"
+[ "$LOCALE" = en ] || adb -s "$A" shell cmd locale set-app-locales $PKG --locales "$LOCALE" || true
 unlock_a
 adb -s "$A" shell locksettings set-pin 1234
 unlock_a
@@ -150,7 +156,7 @@ flow "$B" target-wireless-qr.yaml || { adb -s "$B" wait-for-device; flow "$B" ta
 # The emulator camera sometimes fails to start, and the analyst can miss the target's
 # mDNS announcement on the virtual Wi-Fi (run 117: advertised, never seen). Scanning
 # again re-announces the pairing service, so rescan until the analyst leaves the QR step.
-a_waiting() { maestro --device "$A" hierarchy 2>/dev/null | grep -q 'Waiting for the device to scan the code'; }
+a_waiting() { maestro --device "$A" hierarchy 2>/dev/null | grep -q "$(s s_remote_wifi_waiting)"; }
 paired=""
 for attempt in 1 2 3 4; do
   # Clear first: the reopened scanner often decodes the poster before the macro plays.

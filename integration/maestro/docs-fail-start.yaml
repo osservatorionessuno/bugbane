@@ -5,9 +5,9 @@ appId: org.osservatorionessuno.bugbane
 - stopApp
 - launchApp
 - extendedWaitUntil:
-    visible: "Start Acquisition"
+    visible: "${s_home_scan_button}"
     timeout: 30000
-- tapOn: "Start Acquisition"
+- tapOn: "${s_home_scan_button}"
 - extendedWaitUntil:
-    visible: "Stop Acquisition"
+    visible: "${s_scan_cancel_button}"
     timeout: 30000

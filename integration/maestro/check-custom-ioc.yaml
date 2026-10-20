@@ -7,7 +7,7 @@ appId: org.osservatorionessuno.bugbane
     containsChild: "CRITICAL"
 - extendedWaitUntil:
     visible:
-      text: "Analysis date.*"
+      text: "${s_analysis_details_analysis_completed}"
     timeout: 30000
 - takeScreenshot: screenshots/07a-analysis-detail
 # Cards are collapsed; "Expand" flips to "Collapse" once tapped, so tapping the first
@@ -36,7 +36,7 @@ appId: org.osservatorionessuno.bugbane
 - repeat:
     times: 3
     while:
-      notVisible: "Export"
+      notVisible: "${s_acquisition_details_export}"
     commands:
       - swipe:
           start: "50%, 20%"
@@ -44,9 +44,9 @@ appId: org.osservatorionessuno.bugbane
           duration: 600
 - runFlow:
     when:
-      notVisible: "Export"
+      notVisible: "${s_acquisition_details_export}"
     commands:
       - pressKey: Back
 - extendedWaitUntil:
-    visible: "Export"
+    visible: "${s_acquisition_details_export}"
     timeout: 20000

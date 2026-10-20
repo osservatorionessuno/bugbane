@@ -15,9 +15,17 @@ FLOWS="$DIR/maestro"
 ART="${INTEGRATION_ARTIFACTS:-$DIR/artifacts}"
 mkdir -p "$ART" "$ART/screenshots"
 PKG=org.osservatorionessuno.bugbane
+# App language the flows match (BUGBANE_LOCALE, default en): the app's strings for
+# that locale become ${s_<name>} in the flows and $(s s_<name>) here. Android
+# Settings stays English (per-app locale, API 33+), as do the flows' system labels.
+LOCALE="${BUGBANE_LOCALE:-en}"
 
 echo "sha=${GITHUB_SHA:-unknown} run=${GITHUB_RUN_NUMBER:-?} ref=${GITHUB_REF_NAME:-?}" > "$ART/RUN_INFO.txt"
 exec > >(tee -a "$ART/harness.log") 2>&1
+python3 "$DIR/strings_env.py" "$LOCALE" > "$ART/strings.tsv" || exit 1
+export BUGBANE_STRINGS="$ART/strings.tsv"
+MAESTRO_ENV=(); while IFS=$'\t' read -r k v; do MAESTRO_ENV+=(-e "$k=$v"); done < "$BUGBANE_STRINGS"
+s() { awk -F'\t' -v k="$1" '$1==k{print $2}' "$BUGBANE_STRINGS"; }
 
 LOGCAT_PID=""
 capture() {
@@ -36,7 +44,7 @@ trap capture EXIT
 
 run_flow() {  # <flow-file>
   echo "::group::maestro $1"
-  maestro test "$FLOWS/$1"
+  maestro test "${MAESTRO_ENV[@]}" "$FLOWS/$1"
   local rc=$?
   echo "::endgroup::"
   [ "$rc" -eq 0 ] || echo "FLOW FAILED: $1 (rc=$rc)"
@@ -63,6 +71,7 @@ LOGCAT_PID=$!
 adb shell settings put system notification_cooldown_enabled 0 || true
 adb shell settings put system notification_cooldown_all 0 || true
 adb install -r -g "$APK"
+[ "$LOCALE" = en ] || adb shell cmd locale set-app-locales $PKG --locales "$LOCALE" || true
 # The wizard's notification slide only shows while the permission is missing (docs
 # figure; pair.yaml grants it through the system dialog, and it is re-granted below).
 adb shell pm revoke $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null || true
@@ -111,7 +120,7 @@ for _ in $(seq 1 60); do
     CODE=""; break
   fi
   adb shell cmd statusbar expand-notifications || true
-  if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then NOTIF_SEEN=1; break; fi
+  if maestro hierarchy 2>/dev/null | grep -qE "$(s s_notification_adb_pairing_input_code)|$(s s_notification_adb_pairing_service_found_title)|$(s s_notification_adb_pairing_working_title)"; then NOTIF_SEEN=1; break; fi
   sleep 3
 done
 # Pairing dialog with bugbane's notification above it (docs figure).
@@ -124,7 +133,7 @@ fi
 # notifications carry the same "Expand" button, so pick the one next to bugbane's title.
 [ -n "$CODE" ] && for _ in 1 2 3; do
   tree="$(maestro hierarchy 2>/dev/null)"
-  echo "$tree" | grep -q "Enter pairing code" && break
+  echo "$tree" | grep -q "$(s s_notification_adb_pairing_input_code)" && break
   point="$(echo "$tree" | python3 "$DIR/scrape.py" expand)" || break
   adb shell input tap $point; sleep 2
 done
@@ -132,7 +141,7 @@ done
 # gap after pairing, where the wireless connection drops and the app reverts to the
 # pair page).
 echo "::group::maestro connect-acquire.yaml"
-maestro test -e CODE="$CODE" -e IOCS_SHA256="$CUSTOM_SHA" "$FLOWS/connect-acquire.yaml"; rc=$?
+maestro test "${MAESTRO_ENV[@]}" -e CODE="$CODE" -e IOCS_SHA256="$CUSTOM_SHA" "$FLOWS/connect-acquire.yaml"; rc=$?
 echo "::endgroup::"
 if [ "$rc" -ne 0 ]; then echo "FLOW FAILED: connect-acquire.yaml (rc=$rc)"; exit 1; fi
 

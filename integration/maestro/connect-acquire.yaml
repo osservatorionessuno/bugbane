@@ -13,7 +13,7 @@ appId: org.osservatorionessuno.bugbane
     commands:
       - extendedWaitUntil:
           visible:
-            text: ".*(Enter pairing code|ADB pairing service|Pairing with ADB).*"
+            text: ".*(${s_notification_adb_pairing_input_code}|${s_notification_adb_pairing_service_found_title}|${s_notification_adb_pairing_working_title}).*"
           timeout: 60000
       # Expand bugbane's notification if the inline-reply action isn't already showing.
       - repeat:
@@ -21,16 +21,16 @@ appId: org.osservatorionessuno.bugbane
           commands:
             - runFlow:
                 when:
-                  notVisible: "Enter pairing code"
+                  notVisible: "${s_notification_adb_pairing_input_code}"
                 commands:
                   - tapOn:
                       text: "Expand"
                       optional: true
                   - extendedWaitUntil:
-                      visible: "Enter pairing code"
+                      visible: "${s_notification_adb_pairing_input_code}"
                       timeout: 6000
-      - assertVisible: "Enter pairing code"
-      - tapOn: "Enter pairing code"
+      - assertVisible: "${s_notification_adb_pairing_input_code}"
+      - tapOn: "${s_notification_adb_pairing_input_code}"
       - inputText: "${CODE}"
       - pressKey: Enter
 # Close the shade (Home is reliable) and land on the paired home screen. Settings runs
@@ -41,41 +41,41 @@ appId: org.osservatorionessuno.bugbane
 - launchApp
 - extendedWaitUntil:
     visible:
-      text: ".*(Ready to Start|Get Started|Acquire Data).*"
+      text: ".*(${s_slideshow_ready_title}|${s_slideshow_ready_button}|${s_scan_welcome_title}).*"
     timeout: 90000
 - takeScreenshot: screenshots/03-ready-to-start
 # Pairing lands on the last onboarding slide; the home screen (with Settings) is behind
 # "Get Started".
 - runFlow:
     when:
-      visible: "Get Started"
+      visible: "${s_slideshow_ready_button}"
     commands:
-      - tapOn: "Get Started"
+      - tapOn: "${s_slideshow_ready_button}"
 - extendedWaitUntil:
-    visible: "Start Acquisition"
+    visible: "${s_home_scan_button}"
     timeout: 20000
 # Import the custom IOC set now (same process, so the wireless connection stays up),
 # so the auto-analysis below runs against feed + custom indicators.
 - runFlow: import-iocs.yaml
 # --- acquisition + export (same flow, no relaunch gap after pairing) ---
 - extendedWaitUntil:
-    visible: "Start Acquisition"
+    visible: "${s_home_scan_button}"
     timeout: 20000
 - takeScreenshot: screenshots/04-acquire
-- tapOn: "Start Acquisition"
+- tapOn: "${s_home_scan_button}"
 - extendedWaitUntil:
-    visible: "Stop Acquisition"
+    visible: "${s_scan_cancel_button}"
     timeout: 30000
     optional: true
 - takeScreenshot: screenshots/04b-acquiring
 - extendedWaitUntil:
-    visible: "Export"
+    visible: "${s_acquisition_details_export}"
     timeout: 1200000
 - takeScreenshot: screenshots/05-acquisition-complete
 # Auto-analysis right after; catch its dialog if it is still up (docs figure).
 - runFlow:
     when:
-      visible: "Analysis in progress..."
+      visible: "${s_analysis_in_progress}"
     commands:
       - takeScreenshot: screenshots/06-analysis-in-progress
 # Auto-analysis runs after acquisition and disables Export until it finishes (slow on
@@ -96,7 +96,7 @@ appId: org.osservatorionessuno.bugbane
           when:
             notVisible: "SAVE"
           commands:
-            - tapOn: "Export"
+            - tapOn: "${s_acquisition_details_export}"
             - extendedWaitUntil:
                 visible: "SAVE"
                 timeout: 20000
@@ -104,6 +104,6 @@ appId: org.osservatorionessuno.bugbane
 - tapOn: "SAVE"
 # One-time passphrase dialog — left open for the host to scrape the 32-char value.
 - extendedWaitUntil:
-    visible: "Copy to clipboard"
+    visible: "${s_acquisition_passphrase_copy}"
     timeout: 120000
 - takeScreenshot: screenshots/08-export-passphrase

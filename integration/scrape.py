@@ -8,8 +8,12 @@ Maestro flows for things that must cross to the host.
 """
 
 import json
+import os
 import re
 import sys
+
+# The app's strings for the locale under test (strings_env.py output, see run.sh).
+S = dict(l.rstrip("\n").split("\t", 1) for l in open(os.environ["BUGBANE_STRINGS"]))
 
 
 def _code(text):
@@ -18,8 +22,8 @@ def _code(text):
 
 
 def _passphrase(text):
-    # Dialog body ends with "...shown only once:\n\n<32 alphanumerics>".
-    if "shown only once" not in text:
+    # Dialog body is acquisition_export_passphrase with the 32 alphanumerics in its slot.
+    if not re.fullmatch("(?s)" + S["s_acquisition_export_passphrase"], text.strip()):
         return None
     tokens = re.findall(r"[0-9A-Za-z]{32}", text)
     return tokens[-1] if tokens else None
@@ -27,7 +31,8 @@ def _passphrase(text):
 
 MATCHERS = {"code": _code, "passphrase": _passphrase}
 
-PAIRING_TITLE = re.compile(r".*(ADB pairing service|Pairing with ADB).*")
+PAIRING_TITLE = re.compile("(?s).*(%s|%s).*" % (
+    S["s_notification_adb_pairing_service_found_title"], S["s_notification_adb_pairing_working_title"]))
 
 
 def _bounds(node):

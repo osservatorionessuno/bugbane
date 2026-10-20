@@ -5,7 +5,11 @@ on:
     branches: [ main ]
     tags: [ '*' ]
   pull_request:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      locale:
+        description: "App language the flows match and the docs screenshots show (en, it, …)"
+        default: en
 
 permissions:
   contents: read
@@ -133,6 +137,8 @@ jobs:
           emulator-boot-timeout: 900
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -no-snapshot
           script: ./integration/run.sh app-production-release.apk suspicious-apk-debug.apk
+        env:
+          BUGBANE_LOCALE: ${{ inputs.locale || 'en' }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
@@ -239,6 +245,8 @@ jobs:
       - name: Run analyst Wi-Fi E2E (Maestro)
         timeout-minutes: 60
         run: ./integration/analyst.sh emulator-5554 emulator-5556 app-production-release.apk suspicious-apk-debug.apk
+        env:
+          BUGBANE_LOCALE: ${{ inputs.locale || 'en' }}
 
       - name: Emulator logs
         if: failure()
@@ -414,13 +422,16 @@ jobs:
           retention-days: 7
 
   # On a release tag, send the API 36 screenshots of both harnesses to the website as a
-  # PR against static/imgs/docs, named as the docs figures (NN-name → name,
-  # aNN-name → analyst-name, bNN-name → target-name). WEBSITE_TOKEN: fine-grained PAT
-  # with contents + pull-requests write on bugbane-website.
+  # PR against static/imgs/docs (static/imgs/docs/<locale> for a non-English dispatch),
+  # named as the docs figures (NN-name → name, aNN-name → analyst-name, bNN-name →
+  # target-name). WEBSITE_TOKEN: fine-grained PAT with contents + pull-requests write
+  # on bugbane-website.
   publish-docs-screenshots:
     needs: [ test, analyst-wifi ]
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    env:
+      LOCALE: ${{ inputs.locale || 'en' }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -433,19 +444,22 @@ jobs:
           path: website
       - name: Name the shots as the docs figures
         run: |
+          dest="website/static/imgs/docs"; [ "$LOCALE" = en ] || dest="$dest/$LOCALE"
+          mkdir -p "$dest"
           for f in shots/*/screenshots/*.png shots/*/integration/artifacts/screenshots/*.png; do
             [ -e "$f" ] || continue
-            cp "$f" "website/static/imgs/docs/$(basename "$f" | sed 's/^a[0-9]*[a-z]*-/analyst-/; s/^b[0-9]*-/target-/; s/^[0-9][0-9]*[a-z]*-//')"
+            cp "$f" "$dest/$(basename "$f" | sed 's/^a[0-9]*[a-z]*-/analyst-/; s/^b[0-9]*-/target-/; s/^[0-9][0-9]*[a-z]*-//')"
           done
-          ls website/static/imgs/docs
+          ls "$dest"
       - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           token: ${{ secrets.WEBSITE_TOKEN }}
           path: website
           add-paths: static/imgs/docs/**
-          branch: bot/docs-screenshots
-          title: "Docs screenshots from bugbane ${{ github.ref_name }}"
-          commit-message: "Refresh docs screenshots from bugbane ${{ github.ref_name }}"
+          branch: bot/docs-screenshots-${{ inputs.locale || 'en' }}
+          title: "Docs screenshots (${{ inputs.locale || 'en' }}) from bugbane ${{ github.ref_name }}"
+          commit-message: "Refresh docs screenshots (${{ inputs.locale || 'en' }}) from bugbane ${{ github.ref_name }}"
           body: |
             Screenshots taken by the integration run of bugbane `${{ github.ref_name }}`
-            (API 36, user and analyst harnesses). Set `app_version` to the same tag.
+            (API 36, user and analyst harnesses, app language `${{ inputs.locale || 'en' }}`).
+            Set `app_version` to the same tag.

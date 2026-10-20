@@ -15,15 +15,15 @@ appId: org.osservatorionessuno.bugbane
       - pressKey: Enter
 # The title and the button share the text; the button comes second.
 - tapOn:
-    text: "Scan a device"
+    text: "${s_home_scan_device_button}"
     index: 1
 - extendedWaitUntil:
-    visible: "How is the device connected?"
+    visible: "${s_remote_transport_title}"
     timeout: 15000
 - takeScreenshot: screenshots/a03b-transport
-- tapOn: "Via Wi‑Fi.*"
+- tapOn: "(${s_remote_transport_wifi_direct_button}|${s_remote_transport_hotspot_button})"
 - extendedWaitUntil:
-    visible: "Join this phone's network"
+    visible: "${s_remote_hotspot_title}"
     timeout: 15000
 # Group up: the wizard shows the generated SSID.
 - extendedWaitUntil:
@@ -31,8 +31,8 @@ appId: org.osservatorionessuno.bugbane
       text: "DIRECT-bb-bugbane-.*"
     timeout: 60000
 - takeScreenshot: screenshots/a04-network-qr
-- tapOn: "Next"
+- tapOn: "${s_remote_next_button}"
 - extendedWaitUntil:
-    visible: "Waiting for the device to scan the code…"
+    visible: "${s_remote_wifi_waiting}"
     timeout: 15000
 - takeScreenshot: screenshots/a05-pairing-qr

@@ -4,17 +4,17 @@ appId: org.osservatorionessuno.bugbane
 ---
 - launchApp
 - extendedWaitUntil:
-    visible: "Acquisitions"
+    visible: "${s_main_nav_acquisitions}"
     timeout: 20000
-- tapOn: "Acquisitions"
+- tapOn: "${s_main_nav_acquisitions}"
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: screenshots/10-acquisitions
-- tapOn: "Settings"
+- tapOn: "${s_main_nav_settings}"
 - extendedWaitUntil:
-    visible: "About Us & Credits"
+    visible: "${s_settings_about}"
     timeout: 15000
-- tapOn: "About Us & Credits"
+- tapOn: "${s_settings_about}"
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: screenshots/11-about

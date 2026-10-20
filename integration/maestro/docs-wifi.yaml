@@ -6,20 +6,20 @@ appId: org.osservatorionessuno.bugbane
     clearState: true
 - runFlow: dismiss-anr.yaml
 - extendedWaitUntil:
-    visible: "Welcome to Bugbane"
+    visible: "${s_slideshow_welcome_title}"
     timeout: 60000
 - tapOn:
-    text: "^I understand$"
+    text: "^${s_slideshow_welcome_button}$"
 - extendedWaitUntil:
-    visible: "Check this device"
+    visible: "${s_slideshow_role_user_button}"
     timeout: 15000
-- tapOn: "Check this device"
+- tapOn: "${s_slideshow_role_user_button}"
 - runFlow:
     when:
-      visible: "I understand, continue anyway"
+      visible: "${s_adb_vuln_continue_button}"
     commands:
-      - tapOn: "I understand, continue anyway"
+      - tapOn: "${s_adb_vuln_continue_button}"
 - extendedWaitUntil:
-    visible: "Connect to a Trusted Wi-Fi Network"
+    visible: "${s_slideshow_wifi_title}"
     timeout: 15000
 - takeScreenshot: screenshots/01d-wifi
