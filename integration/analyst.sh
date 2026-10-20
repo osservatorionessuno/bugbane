@@ -23,12 +23,12 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 FLOWS="$DIR/maestro"
 ART="${INTEGRATION_ARTIFACTS:-$DIR/artifacts}"
 mkdir -p "$ART" "$ART/screenshots"
+LOCALE="${BUGBANE_LOCALE:-en}"  # see run.sh
 python3 "$DIR/strings_env.py" "$LOCALE" > "$ART/strings.tsv" || exit 1
 export BUGBANE_STRINGS="$ART/strings.tsv"
 MAESTRO_ENV=(); while IFS=$'\t' read -r k v; do MAESTRO_ENV+=(-e "$k=$v"); done < "$BUGBANE_STRINGS"
 s() { awk -F'\t' -v k="$1" '$1==k{print $2}' "$BUGBANE_STRINGS"; }
 PKG=org.osservatorionessuno.bugbane
-LOCALE="${BUGBANE_LOCALE:-en}"  # see run.sh
 MACRO="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/emulator/resources/macros/Walk_to_image_room"
 
 echo "sha=${GITHUB_SHA:-unknown} run=${GITHUB_RUN_NUMBER:-?} ref=${GITHUB_REF_NAME:-?} A=$A B=$B" > "$ART/RUN_INFO.txt"

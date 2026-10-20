@@ -2,7 +2,7 @@
 """Emit the app's UI strings for one locale as Maestro env vars, so the flows match
 whatever language the app shows instead of English literals.
 
-    strings_env.py <lang> [<res dir>]  ->  lines "s_<name>\\t<value>"
+    strings_env.py <lang>  ->  lines "s_<name>\\t<value>"
 
 Only the names referenced in integration/ (as ${s_name}, or s_name in the shell/python
 scripts) are emitted. Values are Maestro text matchers (equality or regex): format
@@ -15,8 +15,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 lang = sys.argv[1]
-res = Path(sys.argv[2] if len(sys.argv) > 2 else Path(__file__).resolve().parents[1] / "app/src/main/res")
 here = Path(__file__).resolve().parent
+res = here.parent / "app/src/main/res"
 
 
 def load(xml):
@@ -25,12 +25,12 @@ def load(xml):
         return out
     for el in ET.parse(xml).getroot():
         if el.tag == "string":
-            text = el.text and "".join(el.itertext())
+            text = "".join(el.itertext())
         elif el.tag == "plurals":
-            text = next(("".join(q.itertext()) for q in el if q.get("quantity") == "other"), None)
+            text = "".join(t for q in el if q.get("quantity") == "other" for t in q.itertext())
         else:
             continue
-        if text is None:
+        if not text:
             continue
         text = text.replace("\\'", "'").replace('\\"', '"').strip()
         text = re.sub(r"%(\d+\$)?[sd]|\\n", ".*", text)
