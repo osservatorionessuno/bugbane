@@ -5,10 +5,10 @@ plugins {
 // Benign code-less APK whose manifest trips libMVT's suspicious heuristic (accessibility
 // service). The CI emulator installs it so the acquisition stages it (integration/run.sh).
 android {
-    namespace = "org.osservatorionessuno.fixture.suspicious"
+    namespace = "com.malicious.fixture"
     compileSdk = 36
     defaultConfig {
-        applicationId = "org.osservatorionessuno.fixture.suspicious"
+        applicationId = "com.malicious.fixture"
         minSdk = 30
         targetSdk = 36
         versionCode = 1

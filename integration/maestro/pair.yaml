@@ -7,29 +7,47 @@ appId: org.osservatorionessuno.bugbane
     clearState: true
 - runFlow: dismiss-anr.yaml
 - extendedWaitUntil:
-    visible: "Welcome to Bugbane"
+    visible: "${s_slideshow_welcome_title}"
     timeout: 60000
 - takeScreenshot: screenshots/01-welcome
 - tapOn:
-    text: "^I understand$"
+    text: "^${s_slideshow_welcome_button}$"
 # Role slide: the default keeps the install in user mode (this device is scanned).
 - extendedWaitUntil:
-    visible: "Check this device"
+    visible: "${s_slideshow_role_user_button}"
     timeout: 15000
-- tapOn: "Check this device"
+- tapOn: "${s_slideshow_role_user_button}"
+# Notification slide (API 33+, run.sh revokes the permission so it shows): shoot it,
+# then grant through the system dialog. run.sh re-grants afterwards regardless.
+- extendedWaitUntil:
+    visible: "${s_slideshow_notification_title}"
+    timeout: 8000
+    optional: true
+- runFlow:
+    when:
+      visible: "${s_slideshow_notification_title}"
+    commands:
+      - takeScreenshot: screenshots/01a-notifications
+      - tapOn:
+          text: "${s_slideshow_button_text_enable}"
+      - tapOn:
+          text: "Allow"
+          optional: true
 # CVE vulnerability page: API 34-36 only.
 - runFlow:
     when:
-      visible: "I understand, continue anyway"
+      visible: "${s_adb_vuln_continue_button}"
     commands:
-      - tapOn: "I understand, continue anyway"
+      - takeScreenshot: screenshots/01c-security-warning
+      - tapOn: "${s_adb_vuln_continue_button}"
 # Developer options page (only when off): enable the real way via Build number x7.
 - runFlow:
     when:
-      visible: "Enable Developer Options"
+      visible: "${s_slideshow_developer_title}"
     commands:
+      - takeScreenshot: screenshots/01b-developer-options
       - tapOn:
-          text: "Enable"
+          text: "${s_slideshow_button_text_enable}"
       # Settings can take a while to come up on a slow emulator.
       - extendedWaitUntil:
           visible:
@@ -47,19 +65,19 @@ appId: org.osservatorionessuno.bugbane
       # Bugbane brings the wizard back on its own once the setting flips. Give it a few
       # seconds; Back is only the fallback, since Back on the wizard itself quits the app.
       - extendedWaitUntil:
-          visible: "Enable Wireless Debugging and Pair"
+          visible: "${s_slideshow_wireless_and_pair_title}"
           timeout: 15000
           optional: true
       - runFlow:
           when:
-            notVisible: "Enable Wireless Debugging and Pair"
+            notVisible: "${s_slideshow_wireless_and_pair_title}"
           commands:
             - pressKey: Back
 - extendedWaitUntil:
-    visible: "Enable Wireless Debugging and Pair"
+    visible: "${s_slideshow_wireless_and_pair_title}"
     timeout: 25000
 - takeScreenshot: screenshots/02-pair-wizard
-- tapOn: "Pair"
+- tapOn: "${s_slideshow_wireless_and_pair_button}"
 # The app deep-links into Developer options, which animates and scrolls to the row.
 # Settings layouts differ per API level, so act on whatever is on screen until the
 # pairing entry appears: the network dialog, the subscreen toggle, the row, or scroll.

@@ -9,15 +9,23 @@ set -uo pipefail
 
 APK="${1:?usage: run.sh <apk> [suspicious-fixture-apk]}"
 FIXTURE="${2:-}"
-SUSPICIOUS_APPID=org.osservatorionessuno.fixture.suspicious
+SUSPICIOUS_APPID=com.malicious.fixture
 DIR="$(cd "$(dirname "$0")" && pwd)"
 FLOWS="$DIR/maestro"
 ART="${INTEGRATION_ARTIFACTS:-$DIR/artifacts}"
 mkdir -p "$ART" "$ART/screenshots"
 PKG=org.osservatorionessuno.bugbane
+# App language the flows match (BUGBANE_LOCALE, default en): the app's strings for
+# that locale become ${s_<name>} in the flows and $(s s_<name>) here. Android
+# Settings stays English (per-app locale, API 33+), as do the flows' system labels.
+LOCALE="${BUGBANE_LOCALE:-en}"
 
 echo "sha=${GITHUB_SHA:-unknown} run=${GITHUB_RUN_NUMBER:-?} ref=${GITHUB_REF_NAME:-?}" > "$ART/RUN_INFO.txt"
 exec > >(tee -a "$ART/harness.log") 2>&1
+python3 "$DIR/strings_env.py" "$LOCALE" > "$ART/strings.tsv" || exit 1
+export BUGBANE_STRINGS="$ART/strings.tsv"
+MAESTRO_ENV=(); while IFS=$'\t' read -r k v; do MAESTRO_ENV+=(-e "$k=$v"); done < "$BUGBANE_STRINGS"
+s() { awk -F'\t' -v k="$1" '$1==k{print $2}' "$BUGBANE_STRINGS"; }
 
 LOGCAT_PID=""
 capture() {
@@ -36,7 +44,7 @@ trap capture EXIT
 
 run_flow() {  # <flow-file>
   echo "::group::maestro $1"
-  maestro test "$FLOWS/$1"
+  maestro test "${MAESTRO_ENV[@]}" "$FLOWS/$1"
   local rc=$?
   echo "::endgroup::"
   [ "$rc" -eq 0 ] || echo "FLOW FAILED: $1 (rc=$rc)"
@@ -63,6 +71,10 @@ LOGCAT_PID=$!
 adb shell settings put system notification_cooldown_enabled 0 || true
 adb shell settings put system notification_cooldown_all 0 || true
 adb install -r -g "$APK"
+[ "$LOCALE" = en ] || adb shell cmd locale set-app-locales $PKG --locales "$LOCALE" || true
+# The wizard's notification slide only shows while the permission is missing (docs
+# figure; pair.yaml grants it through the system dialog, and it is re-granted below).
+adb shell pm revoke $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 # A benign "suspicious" APK (accessibility service): the acquisition's Packages module
 # must flag it and stage it into the archive, asserted host-side in verify_export.py.
 [ -n "$FIXTURE" ] && adb install -r -g "$FIXTURE"
@@ -80,9 +92,17 @@ adb shell content call --uri content://media/external/file --method scan_file \
   --arg /storage/emulated/0/Download/e2e-iocs.stix2 >/dev/null 2>&1 || true
 CUSTOM_SHA="$(shasum -a 256 "$CUSTOM_IOCS" | cut -d' ' -f1)"
 
+# Wi-Fi slide (docs figure): shows only while Wi-Fi is off. Separate throwaway app
+# state; failure ignored. Wi-Fi is back and connected before the real onboarding.
+adb shell svc wifi disable || true
+run_flow docs-wifi.yaml || true
+adb shell svc wifi enable || true
+for _ in $(seq 1 30); do adb shell ip addr show wlan0 2>/dev/null | grep -q 'inet ' && break; sleep 2; done
+
 # Onboard + open the Settings pairing dialog (6-digit code left on screen).
 # Restartable (clears app state): one retry absorbs a transient dialog or a slow start.
 run_flow pair.yaml || run_flow pair.yaml || exit 1
+adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null || true
 
 # Scrape the pairing code from the dialog, then open the notification shade via adb
 # (the swipe gesture misses over the pairing dialog on slow CI emulators) and wait for
@@ -100,9 +120,11 @@ for _ in $(seq 1 60); do
     CODE=""; break
   fi
   adb shell cmd statusbar expand-notifications || true
-  if maestro hierarchy 2>/dev/null | grep -qE "Enter pairing code|ADB pairing service|Pairing with ADB"; then NOTIF_SEEN=1; break; fi
+  if maestro hierarchy 2>/dev/null | grep -qE "$(s s_notification_adb_pairing_input_code)|$(s s_notification_adb_pairing_service_found_title)|$(s s_notification_adb_pairing_working_title)"; then NOTIF_SEEN=1; break; fi
   sleep 3
 done
+# Pairing dialog with bugbane's notification above it (docs figure).
+[ -n "$NOTIF_SEEN" ] && adb exec-out screencap -p > "$ART/screenshots/02b-pair-dialog.png" 2>/dev/null
 if [ -n "$CODE" ] && [ -z "$NOTIF_SEEN" ]; then
   echo "PAIRING NOTIFICATION NOT SEEN AFTER 3 MINUTES (continuing; the flow waits once more)"
   maestro hierarchy > "$ART/pairing-wait-hierarchy.json" 2>/dev/null || true
@@ -111,7 +133,7 @@ fi
 # notifications carry the same "Expand" button, so pick the one next to bugbane's title.
 [ -n "$CODE" ] && for _ in 1 2 3; do
   tree="$(maestro hierarchy 2>/dev/null)"
-  echo "$tree" | grep -q "Enter pairing code" && break
+  echo "$tree" | grep -q "$(s s_notification_adb_pairing_input_code)" && break
   point="$(echo "$tree" | python3 "$DIR/scrape.py" expand)" || break
   adb shell input tap $point; sleep 2
 done
@@ -119,7 +141,7 @@ done
 # gap after pairing, where the wireless connection drops and the app reverts to the
 # pair page).
 echo "::group::maestro connect-acquire.yaml"
-maestro test -e CODE="$CODE" -e IOCS_SHA256="$CUSTOM_SHA" "$FLOWS/connect-acquire.yaml"; rc=$?
+maestro test "${MAESTRO_ENV[@]}" -e CODE="$CODE" -e IOCS_SHA256="$CUSTOM_SHA" "$FLOWS/connect-acquire.yaml"; rc=$?
 echo "::endgroup::"
 if [ "$rc" -ne 0 ]; then echo "FLOW FAILED: connect-acquire.yaml (rc=$rc)"; exit 1; fi
 
@@ -129,6 +151,7 @@ if [ -z "$PASSPHRASE" ]; then echo "PASSPHRASE SCRAPE FAILED"; exit 1; fi
 printf '%s' "$PASSPHRASE" > "$ART/passphrase.txt"
 
 run_flow set-password.yaml || exit 1
+run_flow docs-extra.yaml || true
 
 # Pull the exported archive (newest first) and verify it host-side.
 # The archive is moved into place a moment after the passphrase dialog shows. The file
@@ -157,3 +180,14 @@ python3 "$DIR/mvt_crosscheck.py" "$ART/$NAME" "$PASSPHRASE" \
 adb shell "rm -rf /data/local/tmp/wd $(dirname "$CUSTOM_MARKER")" || true
 
 echo "INTEGRATION E2E PASS"
+
+# Docs figures only, after the verdict: an acquisition that loses its device halfway.
+# Wireless debugging goes off under a running acquisition, so the remaining modules
+# fail and the acquisition is saved incomplete (scan-screen warning + failed-modules
+# card). Back on afterwards so the emulator is left as found.
+if run_flow docs-fail-start.yaml; then
+  sleep 5
+  adb shell settings put global adb_wifi_enabled 0 || true
+  run_flow docs-fail-end.yaml || true
+  adb shell settings put global adb_wifi_enabled 1 || true
+fi

@@ -1,0 +1,20 @@
+# Screens the test itself never needs, shot for the website docs. Runs last, failure
+# ignored (run.sh), so it cannot affect the test result.
+appId: org.osservatorionessuno.bugbane
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "${s_main_nav_acquisitions}"
+    timeout: 20000
+- tapOn: "${s_main_nav_acquisitions}"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/10-acquisitions
+- tapOn: "${s_main_nav_settings}"
+- extendedWaitUntil:
+    visible: "${s_settings_about}"
+    timeout: 15000
+- tapOn: "${s_settings_about}"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: screenshots/11-about

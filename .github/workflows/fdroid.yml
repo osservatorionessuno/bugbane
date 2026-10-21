@@ -95,7 +95,7 @@ jobs:
       - name: Determine APPID
         run: |
           if [ "${APPID}" = "org.example.app" ]; then
-            APPID=$(ls metadata/*.yml | head -n1 | sed -E 's|metadata/(.*)\.yml|\1|')
+            APPID=$(ls fastlane/fdroid/*.yml | head -n1 | sed -E 's|fastlane/fdroid/(.*)\.yml|\1|')
           fi
           echo "APPID=$APPID" >> $GITHUB_ENV
           echo "Using APPID=$APPID"
@@ -112,13 +112,13 @@ jobs:
 
           git clone --depth 1 https://gitlab.com/fdroid/fdroiddata.git "$TMP_META_DIR"
 
-          test -f "metadata/${APPID}.yml" || { echo "::error::metadata/${APPID}.yml not found"; exit 1; }
-          cp metadata/${APPID}*.yml "$TMP_META_DIR/metadata/"
+          test -f "fastlane/fdroid/${APPID}.yml" || { echo "::error::fastlane/fdroid/${APPID}.yml not found"; exit 1; }
+          cp fastlane/fdroid/${APPID}*.yml "$TMP_META_DIR/metadata/"
 
           # fdroidserver parses every app's metadata (publish validates all of
           # it), so other apps' files can break this lane — e.g. the pinned
           # 2.4.5 rejects Taproot bitcoin addresses newer metadata uses. Keep
-          # only our apps (stable + beta): metadata/ holds <appid>.yml files
+          # only our apps (stable + beta): fastlane/fdroid/ holds <appid>.yml files
           # plus <appid>/ localization dirs, and fdroidserver requires them to
           # correspond, so both must go.
           find "$TMP_META_DIR/metadata" -maxdepth 1 -name '*.yml' ! -name "${APPID}*.yml" -delete
@@ -194,7 +194,7 @@ jobs:
           pip install check-jsonschema
           # The pristine repo files, against the schema fdroiddata's own MR
           # pipeline enforces (the pinned fdroidserver can lag its rules).
-          check-jsonschema --schemafile "$TMP_META_DIR/schemas/metadata.json" metadata/${APPID}*.yml
+          check-jsonschema --schemafile "$TMP_META_DIR/schemas/metadata.json" fastlane/fdroid/${APPID}*.yml
 
       - name: Build
         env:
@@ -254,7 +254,7 @@ jobs:
           /tmp/fdsm/bin/pip -q install "fdroidserver @ https://gitlab.com/fdroid/fdroidserver/-/archive/master/fdroidserver-master.tar.gz"
           # fdroiddata's MR pipeline requires master rewritemeta to be a
           # no-op on the submitted files; warn early when upstream drifts.
-          cp metadata/${APPID}*.yml "$TMP_META_DIR/metadata/"
+          cp fastlane/fdroid/${APPID}*.yml "$TMP_META_DIR/metadata/"
           cd "$TMP_META_DIR"
           git add -A && git -c user.email=ci@example.invalid -c user.name=CI commit -qm "canary baseline"
           /tmp/fdsm/bin/fdroid rewritemeta "$APPID" "$APPID.beta"

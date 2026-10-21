@@ -82,3 +82,4 @@ appId: com.android.settings
     visible:
       text: ".*(Scan QR code|Pairing device|Paired devices).*"
     timeout: 20000
+- takeScreenshot: screenshots/b02-qr-pairing

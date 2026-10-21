@@ -32,7 +32,7 @@
       "created": "2026-01-01T00:00:00.000Z",
       "modified": "2026-01-01T00:00:00.000Z",
       "indicator_types": ["malicious-activity"],
-      "pattern": "[app:id = 'org.osservatorionessuno.fixture.suspicious']",
+      "pattern": "[app:id = 'com.malicious.fixture']",
       "pattern_type": "stix",
       "pattern_version": "2.1",
       "valid_from": "2026-01-01T00:00:00.000Z"

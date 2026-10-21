@@ -7,7 +7,7 @@ appId: org.osservatorionessuno.bugbane
 - runFlow: dismiss-anr.yaml
 - extendedWaitUntil:
     visible:
-      text: ".*(Welcome to Bugbane|Unlock for all features and data|Enter your PIN).*"
+      text: ".*(${s_slideshow_welcome_title}|Unlock for all features and data|Enter your PIN).*"
     timeout: 60000
 # Android 16 emulators can lock while a flow runs; the harness PIN is 1234.
 - runFlow:
@@ -21,30 +21,30 @@ appId: org.osservatorionessuno.bugbane
       - inputText: "1234"
       - pressKey: Enter
 - extendedWaitUntil:
-    visible: "Welcome to Bugbane"
+    visible: "${s_slideshow_welcome_title}"
     timeout: 60000
 - tapOn:
-    text: "^I understand$"
+    text: "^${s_slideshow_welcome_button}$"
 - extendedWaitUntil:
-    visible: "Check this device"
+    visible: "${s_slideshow_role_user_button}"
     timeout: 15000
 - takeScreenshot: screenshots/a01-role
-- tapOn: "I'm an analyst: scan other devices instead"
+- tapOn: "${s_slideshow_role_analyst_button}"
 # Choosing analyst swaps the launcher alias and restarts the app in a new task.
 - extendedWaitUntil:
-    visible: "Protect your acquisitions"
+    visible: "${s_slideshow_protection_title}"
     timeout: 60000
 - takeScreenshot: screenshots/a02-protection
-- tapOn: "Set a password"
+- tapOn: "${s_protection_set_password}"
 - extendedWaitUntil:
-    visible: "Set an acquisition password"
+    visible: "${s_set_password_title}"
     timeout: 15000
 - runFlow: type-password.yaml
 - extendedWaitUntil:
-    visible: "Get Started"
+    visible: "${s_slideshow_ready_button}"
     timeout: 30000
-- tapOn: "Get Started"
+- tapOn: "${s_slideshow_ready_button}"
 - extendedWaitUntil:
-    visible: "Scan a device"
+    visible: "${s_home_scan_device_button}"
     timeout: 20000
 - takeScreenshot: screenshots/a03-home

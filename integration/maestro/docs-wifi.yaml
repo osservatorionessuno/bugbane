@@ -1,0 +1,25 @@
+# Docs figure only: the Wi-Fi slide, reachable while Wi-Fi is off (run.sh). Clears the
+# app state; pair.yaml starts from scratch again afterwards.
+appId: org.osservatorionessuno.bugbane
+---
+- launchApp:
+    clearState: true
+- runFlow: dismiss-anr.yaml
+- extendedWaitUntil:
+    visible: "${s_slideshow_welcome_title}"
+    timeout: 60000
+- tapOn:
+    text: "^${s_slideshow_welcome_button}$"
+- extendedWaitUntil:
+    visible: "${s_slideshow_role_user_button}"
+    timeout: 15000
+- tapOn: "${s_slideshow_role_user_button}"
+- runFlow:
+    when:
+      visible: "${s_adb_vuln_continue_button}"
+    commands:
+      - tapOn: "${s_adb_vuln_continue_button}"
+- extendedWaitUntil:
+    visible: "${s_slideshow_wifi_title}"
+    timeout: 15000
+- takeScreenshot: screenshots/01d-wifi

@@ -3,11 +3,19 @@ name: Integration Tests
 on:
   push:
     branches: [ main ]
+    tags: [ '*' ]
   pull_request:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      locale:
+        description: "App language the flows match and the docs screenshots show (en, it, …)"
+        default: en
 
 permissions:
   contents: read
+
+env:
+  BUGBANE_LOCALE: ${{ inputs.locale || 'en' }}
 
 concurrency:
   group: integration-${{ github.head_ref || github.run_id }}
@@ -37,7 +45,7 @@ jobs:
             platforms;android-36 build-tools;36.0.0
 
       - name: Build release APK + suspicious fixture APK
-        run: ./gradlew --no-daemon assembleProductionRelease :fixtures:suspicious-apk:assembleDebug
+        run: ./gradlew --no-daemon assembleProductionRelease :suspicious-apk:assembleDebug
 
       - name: Sign release APK with a throwaway CI key (unsigned APKs cannot be installed)
         run: |
@@ -58,7 +66,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: integration-fixture-apk
-          path: fixtures/suspicious-apk/build/outputs/apk/debug/suspicious-apk-debug.apk
+          path: integration/fixtures/suspicious-apk/build/outputs/apk/debug/suspicious-apk-debug.apk
           compression-level: 0
           retention-days: 3
 
@@ -411,3 +419,49 @@ jobs:
             integration/artifacts/
             eos-emu.log
           retention-days: 7
+
+  # On a release tag, send the screenshots of both harnesses to the website as a PR:
+  # the API 36 shots as the default figures in static/imgs/docs (static/imgs/docs/<locale>
+  # for a non-English dispatch), every lane's under android-<version>/ for the site's
+  # version picker; named as the docs figures (NN-name → name, aNN-name → analyst-name,
+  # bNN-name → target-name). WEBSITE_TOKEN: fine-grained PAT with contents +
+  # pull-requests write on bugbane-website.
+  publish-docs-screenshots:
+    needs: [ test, analyst-wifi ]
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: '*-artifacts-api*-run*'
+          path: shots
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: osservatorionessuno/bugbane-website
+          token: ${{ secrets.WEBSITE_TOKEN }}
+          path: website
+      - name: Name the shots as the docs figures
+        run: |
+          dest="website/static/imgs/docs"; [ "$BUGBANE_LOCALE" = en ] || dest="$dest/$BUGBANE_LOCALE"
+          android() { case "$1" in 30) echo 11;; 31) echo 12;; 32) echo 12L;; 33) echo 13;; 34) echo 14;; 35) echo 15;; *) echo $(($1 - 20));; esac; }
+          for f in shots/*/screenshots/*.png shots/*/integration/artifacts/screenshots/*.png; do
+            [ -e "$f" ] || continue
+            api="$(echo "$f" | sed -n 's|^shots/[^/]*-api\([0-9]*\)-run.*|\1|p')"
+            name="$(basename "$f" | sed 's/^a[0-9]*[a-z]*-/analyst-/; s/^b[0-9]*-/target-/; s/^[0-9][0-9]*[a-z]*-//')"
+            mkdir -p "$dest/android-$(android "$api")"
+            cp "$f" "$dest/android-$(android "$api")/$name"
+            [ "$api" = 36 ] && cp "$f" "$dest/$name"
+          done
+          find "$dest" -name '*.png' | sort
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          token: ${{ secrets.WEBSITE_TOKEN }}
+          path: website
+          add-paths: static/imgs/docs/**
+          branch: bot/docs-screenshots-${{ env.BUGBANE_LOCALE }}
+          title: "Docs screenshots (${{ env.BUGBANE_LOCALE }}) from bugbane ${{ github.ref_name }}"
+          commit-message: "Refresh docs screenshots (${{ env.BUGBANE_LOCALE }}) from bugbane ${{ github.ref_name }}"
+          body: |
+            Screenshots taken by the integration run of bugbane `${{ github.ref_name }}`
+            (API 36, user and analyst harnesses, app language `${{ env.BUGBANE_LOCALE }}`).
+            Set `app_version` to the same tag.

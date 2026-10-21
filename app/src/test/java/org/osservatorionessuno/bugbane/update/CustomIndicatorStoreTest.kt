@@ -173,7 +173,7 @@ class CustomIndicatorStoreTest {
             listOf("Bugbane E2E test set", "FILE_PATH", marker),
             indicators.matchString(marker, Indicators.IndicatorType.FILE_PATH).single().value,
         )
-        assertEquals(1, indicators.matchString("org.osservatorionessuno.fixture.suspicious", Indicators.IndicatorType.APP_ID).size)
+        assertEquals(1, indicators.matchString("com.malicious.fixture", Indicators.IndicatorType.APP_ID).size)
     }
 
     @Test

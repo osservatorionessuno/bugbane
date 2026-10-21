@@ -17,9 +17,12 @@ It runs the whole user journey and verifies the result off-device:
 | `maestro/connect-acquire.yaml` | enter the code in bugbane's notification → import custom IOCs → acquire → check the custom detection → export (one flow, so the wireless connection can't drop between pairing and acquisition) |
 | `maestro/import-iocs.yaml` | Settings → Custom indicators → import `e2e-iocs.stix2` through the system file picker; asserts the row's name, count and SHA-256 |
 | `maestro/check-custom-ioc.yaml` | open the analysis and assert the custom set's planted marker is among the detections |
+| `fixtures/suspicious-apk/` | benign code-less APK (`com.malicious.fixture`) whose manifest trips libMVT's suspicious heuristic; the acquisition must stage it (Gradle `:suspicious-apk`) |
 | `fixtures/e2e-iocs.stix2` | the custom set: a file-path IOC (`/data/local/tmp/bugbane-e2e/custom-marker.so`, planted by `run.sh`) and the fixture APK's app id |
 | `maestro/set-password.yaml` | set the mandatory acquisition password |
+| `maestro/docs-wifi.yaml`, `maestro/docs-extra.yaml`, `maestro/docs-fail-*.yaml` | docs figures only (Wi-Fi slide with Wi-Fi off; Acquisitions tab, About; an acquisition failed by turning Wireless debugging off under it); failures ignored |
 | `scrape.py` | pull the pairing code / passphrase out of `maestro hierarchy` |
+| `strings_env.py` | the app's strings for one locale as Maestro env (`${s_<name>}` in the flows); flows match the app in whatever language `BUGBANE_LOCALE` names |
 | `verify_export.py` | `pyrage`-decrypt the archive and assert its contents |
 | `mvt_crosscheck.py` | run upstream `mvt-android check-androidqf` on the decrypted export with the bundled feed and the custom file; every planted IOC must be flagged |
 
@@ -63,8 +66,17 @@ ANDROID_SERIAL=emulator-5554 ./integration/run.sh \
   app/build/outputs/apk/production/release/app-production-release.apk
 ```
 
-Needs `maestro` and a JDK on `PATH`. Artifacts (screenshots, logcat, the archive) land
+Needs `maestro` and a JDK on `PATH`. `BUGBANE_LOCALE=it` (or any `values-<lang>` the app
+has) runs the whole thing against the app in that language: the flows take every app
+label from `strings.xml` via `${s_<name>}` (see `strings_env.py`), and the app is switched
+with a per-app locale (API 33+). Android Settings and other system UI stay English. Artifacts (screenshots, logcat, the archive) land
 in `integration/artifacts/`.
+
+The flows screenshot each screen the website docs show. On a release tag, CI opens a PR on
+bugbane-website with the API 36 shots of both harnesses in `static/imgs/docs/`, named as
+the figures: `NN-name` → `name.png` (NN may carry a letter suffix), `aNN-name` → `analyst-name.png`, `bNN-name` →
+`target-name.png`. A manual dispatch with the `locale` input does the same for another
+app language, into `static/imgs/docs/<locale>/`.
 
 ## CI
 
