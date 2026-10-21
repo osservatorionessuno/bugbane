@@ -45,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -262,6 +263,11 @@ private fun HotspotStep(viewModel: RemoteScanViewModel) {
                     textAlign = TextAlign.Center,
                 )
                 Qr(QrCode.wifiPayload(active.ssid, active.passphrase), index = 1)
+                if (active.wifiDirect && active.frequencyMhz >= 5000) {
+                    TextButton(onClick = { viewModel.hotspotOn2GHz() }) {
+                        Text(stringResource(R.string.remote_hotspot_switch_band), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 if (!active.wifiDirect) {
                     Text(
                         text = stringResource(R.string.remote_hotspot_keep_open),

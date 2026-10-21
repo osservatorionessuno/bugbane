@@ -418,6 +418,7 @@
     <string name="remote_hotspot_permission_button">Allow</string>
     <string name="remote_hotspot_location_hint">On this Android version, Location must be on for the network to start.</string>
     <string name="remote_hotspot_error">Couldn\'t share the network. Make sure Wi‑Fi is on and no other Wi‑Fi Direct connection, hotspot or tethering is active, then try again.</string>
+    <string name="remote_hotspot_switch_band">Can\'t see the network? Switch to 2.4 GHz Wi‑Fi Direct</string>
     <string name="remote_hotspot_keep_open">Keep Bugbane open: on this phone the shared network stops if you leave the app.</string>
     <string name="remote_wifi_pairing_title">Pair with the device</string>
     <string name="remote_wifi_pairing_description">On the device to scan, enable Developer options (tap “Build number” seven times in About phone), then open Developer options › Wireless debugging, turn it on, tap “Pair device with QR code” and scan this code.</string>
