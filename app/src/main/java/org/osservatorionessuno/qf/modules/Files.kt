@@ -66,10 +66,9 @@ class Files : Module {
                 else
                     """find ${shQuote(folder)} -type f -print 2>/dev/null"""
 
-                if (supportsPrintf) {
-                    runCatching { sh.execForEachLine(cmd) { line ->
-                        val parts = line.trim().split(WHITESPACE, limit = 9)
-                        if (parts.size < 9) return@execForEachLine
+                val onLine: (String) -> Unit = if (supportsPrintf) { line ->
+                    val parts = line.trim().split(WHITESPACE, limit = 9)
+                    if (parts.size >= 9) {
                         val path = parts[8]
                         if (seen.add(path)) {
                             ArtifactJson.file(
@@ -78,16 +77,22 @@ class Files : Module {
                                 parts[3], parts[4].toLongOrNull(), parts[5], parts[6], parts[7],
                             )
                         }
-                    } }.rethrowIfCancelled().onFailure { failed += folder; log.error("Listing $folder failed: ${it.message}") }
-                } else {
-                    runCatching { sh.execForEachLine(cmd) { line ->
-                        val path = line.trim()
-                        if (path.isEmpty()) return@execForEachLine
-                        if (seen.add(path)) {
-                            ArtifactJson.file(output, path, null, null, null, null, null, null, null, null)
-                        }
-                    } }.rethrowIfCancelled().onFailure { failed += folder; log.error("Listing $folder failed: ${it.message}") }
+                    }
+                } else { line ->
+                    val path = line.trim()
+                    if (path.isNotEmpty() && seen.add(path)) {
+                        ArtifactJson.file(output, path, null, null, null, null, null, null, null, null)
+                    }
                 }
+                // A stalled link kills a listing part-way; run it again once (`seen` drops the
+                // repeats) and only then count the root as lost.
+                var listed = false
+                for (attempt in 1..2) {
+                    listed = runCatching { sh.execForEachLine(cmd, onLine) }.rethrowIfCancelled()
+                        .onFailure { log.warning("Listing $folder failed (attempt $attempt): ${it.message}") }.isSuccess
+                    if (listed) break
+                }
+                if (!listed) { failed += folder; log.error("Listing $folder failed twice") }
                 output.flush()
             }
         }
