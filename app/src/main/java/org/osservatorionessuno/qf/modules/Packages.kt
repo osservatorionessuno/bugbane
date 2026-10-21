@@ -16,6 +16,7 @@ import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.rethrowIfCancelled
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
+import java.io.IOException
 import java.io.FileInputStream
 import java.io.OutputStream
 import java.security.MessageDigest
@@ -120,6 +121,17 @@ class Packages : Module {
                     }
                 }
             }.rethrowIfCancelled().onFailure { Log.w(TAG, "pm path batch failed: ${it.message}") }
+            // A batch that died (the target busy after bugreportz, a stalled link) must not
+            // silently drop its packages: resolve the missing ones one by one.
+            for (name in batch) {
+                if (name in paths) continue
+                runCatching {
+                    shell.execForEachLine("pm path ${Utils.shQuote(name)}") { line ->
+                        val trimmed = line.trim()
+                        if (trimmed.startsWith("package:")) paths.getOrPut(name) { LinkedHashSet() }.add(trimmed.removePrefix("package:"))
+                    }
+                }.rethrowIfCancelled().onFailure { Log.w(TAG, "pm path failed for $name: ${it.message}") }
+            }
         }
         return paths.mapValues { it.value.toList() }
     }
@@ -169,6 +181,9 @@ class Packages : Module {
         }
         return FileHashes(md5, sha1, sha256, sha512)
     }
+
+    // APKs whose copy into the archive broke off; the partial file stays, the module reports it.
+    private val copyFailures = mutableListOf<String>()
 
     private fun buildPackageFile(
         shell: AdbShell,
@@ -235,7 +250,7 @@ class Packages : Module {
                     }
                 }
             }
-            result.rethrowIfCancelled().onFailure { log.error("Failed to copy $packagePath: ${it.message}") }
+            result.rethrowIfCancelled().onFailure { copyFailures += packagePath; log.error("Failed to copy $packagePath: ${it.message}") }
         }
 
         return packageFile
@@ -260,6 +275,7 @@ class Packages : Module {
         progress: ((Long) -> Unit)?,
         log: AcquisitionLog,
     ) {
+        copyFailures.clear()
         val shell = AdbShell(manager, progress = progress)
         val sync = AdbSync(manager, progress = progress)
 
@@ -383,5 +399,6 @@ class Packages : Module {
                 }
             }
         }
+        if (copyFailures.isNotEmpty()) throw IOException("incomplete copy of ${copyFailures.joinToString()}")
     }
 }
