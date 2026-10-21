@@ -73,24 +73,36 @@ object HotspotManager {
             clear()
         }.also { channel = it }
         registerReceiver()
+        // A leftover group makes createGroup fail with BUSY.
+        p2p.removeGroup(channel, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() = createGroup(p2p, channel, WifiP2pConfig.GROUP_OWNER_BAND_5GHZ)
+            override fun onFailure(reason: Int) = createGroup(p2p, channel, WifiP2pConfig.GROUP_OWNER_BAND_5GHZ)
+        })
+    }
+
+    /**
+     * 5 GHz first: a 2.4 GHz group moves about 1 MB/s, which makes a remote acquisition
+     * take ten times longer. Phones that cannot own a 5 GHz group fall back to 2.4 GHz.
+     */
+    @SuppressLint("MissingPermission")
+    private fun createGroup(p2p: WifiP2pManager, channel: WifiP2pManager.Channel, band: Int) {
         val config = WifiP2pConfig.Builder()
             // "DIRECT-xy" prefix is mandated by the standard.
             .setNetworkName("DIRECT-bb-bugbane-" + AdbQrCredentials.randomString(6))
             .setPassphrase(AdbQrCredentials.randomString(16))
-            .setGroupOperatingBand(WifiP2pConfig.GROUP_OWNER_BAND_2GHZ)
+            .setGroupOperatingBand(band)
             .enablePersistentMode(false)
             .build()
-        val create = object : WifiP2pManager.ActionListener {
-            override fun onSuccess() { Log.d(TAG, "group requested") }
+        p2p.createGroup(channel, config, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() { Log.d(TAG, "group requested, band $band") }
             override fun onFailure(reason: Int) {
-                Log.w(TAG, "createGroup failed, reason $reason")
-                _state.value = HotspotState.Error(reason)
+                Log.w(TAG, "createGroup failed on band $band, reason $reason")
+                if (band == WifiP2pConfig.GROUP_OWNER_BAND_5GHZ) {
+                    createGroup(p2p, channel, WifiP2pConfig.GROUP_OWNER_BAND_2GHZ)
+                } else {
+                    _state.value = HotspotState.Error(reason)
+                }
             }
-        }
-        // A leftover group makes createGroup fail with BUSY.
-        p2p.removeGroup(channel, object : WifiP2pManager.ActionListener {
-            override fun onSuccess() = p2p.createGroup(channel, config, create)
-            override fun onFailure(reason: Int) = p2p.createGroup(channel, config, create)
         })
     }
 
@@ -104,7 +116,10 @@ object HotspotManager {
                 // The owner is told about every station that joins, legacy Wi-Fi clients included.
                 val clients = group.clientList.size
                 if (current is HotspotState.Starting) {
-                    Log.d(TAG, "group ${group.networkName} up on ${group.`interface`}")
+                    Log.i(TAG, "group ${group.networkName} up on ${group.`interface`} at ${group.frequency} MHz")
+                    // Keep the radio out of power save while the target streams to us.
+                    wifiLock = (appContext.getSystemService(Context.WIFI_SERVICE) as WifiManager)
+                        .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, TAG).apply { acquire() }
                     _state.value = HotspotState.Active(group.networkName, group.passphrase, wifiDirect = true, clients = clients)
                 } else if (current is HotspotState.Active && current.wifiDirect && current.clients != clients) {
                     Log.d(TAG, "group has $clients client(s)")
@@ -179,7 +194,11 @@ object HotspotManager {
         clear()
     }
 
+    private var wifiLock: WifiManager.WifiLock? = null
+
     private fun clear() {
+        wifiLock?.let { if (it.isHeld) it.release() }
+        wifiLock = null
         _state.value = HotspotState.Inactive
     }
 
