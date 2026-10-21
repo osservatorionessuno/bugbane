@@ -5,6 +5,8 @@ import android.os.Environment
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.qf.AcquisitionLog
 import org.osservatorionessuno.qf.Module
+import org.osservatorionessuno.qf.rethrowIfCancelled
+import java.io.IOException
 import org.osservatorionessuno.cadb.AdbShell
 import org.osservatorionessuno.cadb.AdbConnectionManager
 import org.osservatorionessuno.qf.ArtifactJson
@@ -54,6 +56,7 @@ class Files : Module {
         val folders = roots.distinct()
 
         val seen = HashSet<String>()
+        val failed = mutableListOf<String>()
 
         writer.useArtifact("files.json") { output ->
             for (folder in folders) {
@@ -75,7 +78,7 @@ class Files : Module {
                                 parts[3], parts[4].toLongOrNull(), parts[5], parts[6], parts[7],
                             )
                         }
-                    } }
+                    } }.rethrowIfCancelled().onFailure { failed += folder; log.error("Listing $folder failed: ${it.message}") }
                 } else {
                     runCatching { sh.execForEachLine(cmd) { line ->
                         val path = line.trim()
@@ -83,11 +86,13 @@ class Files : Module {
                         if (seen.add(path)) {
                             ArtifactJson.file(output, path, null, null, null, null, null, null, null, null)
                         }
-                    } }
+                    } }.rethrowIfCancelled().onFailure { failed += folder; log.error("Listing $folder failed: ${it.message}") }
                 }
                 output.flush()
             }
         }
+        // What was listed is kept; the module is incomplete, not successful.
+        if (failed.isNotEmpty()) throw IOException("listing failed for ${failed.joinToString()}")
     }
 
     /* helpers */
