@@ -35,7 +35,7 @@ object HotspotManager {
         object Inactive : HotspotState()
         object Starting : HotspotState()
         /** [clients] counts stations on the Wi-Fi Direct group; a local-only hotspot reports none. */
-        data class Active(val ssid: String?, val passphrase: String?, val wifiDirect: Boolean, val clients: Int = 0) : HotspotState()
+        data class Active(val ssid: String?, val passphrase: String?, val wifiDirect: Boolean, val clients: Int = 0, val frequencyMhz: Int = 0) : HotspotState()
         data class Error(val reason: Int?) : HotspotState()
     }
 
@@ -59,7 +59,7 @@ object HotspotManager {
 
     // Needs NEARBY_WIFI_DEVICES (33+) or ACCESS_FINE_LOCATION, and Wi-Fi on.
     @SuppressLint("MissingPermission")
-    fun start() {
+    fun start(band: Int = WifiP2pConfig.GROUP_OWNER_BAND_5GHZ) {
         if (_state.value is HotspotState.Starting || _state.value is HotspotState.Active) return
         _state.value = HotspotState.Starting
         if (!wifiDirectSupported()) {
@@ -75,9 +75,15 @@ object HotspotManager {
         registerReceiver()
         // A leftover group makes createGroup fail with BUSY.
         p2p.removeGroup(channel, object : WifiP2pManager.ActionListener {
-            override fun onSuccess() = createGroup(p2p, channel, WifiP2pConfig.GROUP_OWNER_BAND_5GHZ)
-            override fun onFailure(reason: Int) = createGroup(p2p, channel, WifiP2pConfig.GROUP_OWNER_BAND_5GHZ)
+            override fun onSuccess() = createGroup(p2p, channel, band)
+            override fun onFailure(reason: Int) = createGroup(p2p, channel, band)
         })
+    }
+
+    /** Recreate the group on 2.4 GHz, for a target that cannot see a 5 GHz network. */
+    fun switchTo2GHz() {
+        stop()
+        start(WifiP2pConfig.GROUP_OWNER_BAND_2GHZ)
     }
 
     /**
@@ -120,7 +126,7 @@ object HotspotManager {
                     // Keep the radio out of power save while the target streams to us.
                     wifiLock = (appContext.getSystemService(Context.WIFI_SERVICE) as WifiManager)
                         .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, TAG).apply { acquire() }
-                    _state.value = HotspotState.Active(group.networkName, group.passphrase, wifiDirect = true, clients = clients)
+                    _state.value = HotspotState.Active(group.networkName, group.passphrase, wifiDirect = true, clients = clients, frequencyMhz = group.frequency)
                 } else if (current is HotspotState.Active && current.wifiDirect && current.clients != clients) {
                     Log.d(TAG, "group has $clients client(s)")
                     _state.value = current.copy(clients = clients)

@@ -165,6 +165,7 @@ class RemoteScanViewModel(app: Application) : AndroidViewModel(app) {
     val hotspot: StateFlow<HotspotManager.HotspotState> get() = HotspotManager.state
 
     fun startHotspot() = HotspotManager.start()
+    fun hotspotOn2GHz() = HotspotManager.switchTo2GHz()
 
     fun hotspotJoined() {
         val credentials = AdbQrCredentials.generate()
