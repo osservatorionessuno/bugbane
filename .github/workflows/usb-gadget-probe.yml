@@ -1,0 +1,35 @@
+# Probe only: can a GitHub runner host a virtual USB gadget (dummy_hcd + FunctionFS)
+# and can the Linux emulator's QEMU pass a host USB device into the guest? Both are
+# needed to acquire an emulated target over USB in analyst mode (any Android version).
+name: USB gadget probe
+
+on:
+  push:
+    branches: [ usb-gadget-probe ]
+  pull_request:
+    paths: [ .github/workflows/usb-gadget-probe.yml ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kernel gadget modules
+        run: |
+          uname -r; dpkg -l | grep -E 'linux-modules(-extra)?-' | awk '{print $2, $3}'
+          sudo modprobe dummy_hcd && echo "dummy_hcd: ok" || echo "dummy_hcd: MISSING"
+          sudo modprobe libcomposite && echo "libcomposite: ok" || echo "libcomposite: MISSING"
+          sudo modprobe usb_f_fs && echo "usb_f_fs: ok" || echo "usb_f_fs: MISSING"
+          echo "udc:"; ls /sys/class/udc || true
+          # Stock test gadget bound to the dummy controller must show up as a USB device.
+          sudo modprobe g_zero && sleep 2 && lsusb && (lsusb | grep -qi "gadget zero" && echo "g_zero: VISIBLE" || echo "g_zero: not visible") || echo "g_zero: MISSING"
+      - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: emulator
+      - name: QEMU USB devices in the emulator build
+        run: |
+          q="$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"
+          "$q" -device help 2>/dev/null | grep -iE 'usb-host|qemu-xhci|usb-redir' || echo "no usb-host/xhci in emulator QEMU"
