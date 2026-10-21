@@ -171,6 +171,13 @@ class AcquisitionRunner(
         // Records every shell command and file transfer until the run ends.
         manager.commandLog = log
         manager.remoteTarget = transport?.type != AcquisitionTransport.LOCAL
+        // Parsing an APK on the device costs five shell round trips and four reads of the file;
+        // pulling it is one transfer. Pull up to this size, parse the rest remotely.
+        manager.pullApkBelowBytes = when (transport?.type) {
+            AcquisitionTransport.USB -> 64L shl 20
+            AcquisitionTransport.LOCAL, null -> 0L
+            else -> 10L shl 20
+        }
         log.info("Bugbane version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}, ${BuildConfig.FLAVOR} ${BuildConfig.BUILD_TYPE})")
         runCatching { log.info("Bugbane build: ${appBuild(context)}") }
             .onFailure { log.warning("Bugbane build details unavailable: ${it.describe()}") }
