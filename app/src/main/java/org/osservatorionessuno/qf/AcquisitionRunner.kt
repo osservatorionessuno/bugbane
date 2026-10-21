@@ -294,7 +294,7 @@ class AcquisitionRunner(
                     }
                 }
 
-                for (module in modules) {
+                for ((index, module) in modules.withIndex()) {
                     if (listener?.isCancelled() == true) {
                         log.warning("Acquisition cancelled by the user before module ${module.name}")
                         Log.i(TAG, "Acquisition cancelled before module ${module.name}")
@@ -373,10 +373,27 @@ class AcquisitionRunner(
                         listener?.onModuleSkipped(module.name)
                         continue
                     }
+                    // Modules swallow shell errors to keep what they collected, so a connection
+                    // that died under a module leaves it "successful" with partial output. The
+                    // connection state, not the module's outcome, is authoritative: mark it and
+                    // every remaining module failed instead of running them against nothing.
+                    if (!manager.isConnected) {
+                        val why = "device disconnected"
+                        success = false
+                        moduleErrors[module.name] = why
+                        log.error("Module ${module.name} incomplete after ${AcquisitionLog.elapsed(moduleStarted)}: $why")
+                        Log.w(TAG, "Device disconnected during module ${module.name}")
+                        for (rest in modules.drop(index + 1)) {
+                            failedModules += rest.name
+                            moduleErrors[rest.name] = why
+                            log.error("Skipping module ${rest.name}: $why")
+                        }
+                    }
                     if (!success) failedModules += module.name
                     else log.info("Module ${module.name} completed in ${AcquisitionLog.elapsed(moduleStarted)}, $moduleBytes bytes received from the device")
                     completedCount++
                     listener?.onModuleComplete(module.name, completedCount, total, success)
+                    if (!manager.isConnected) break
                 }
 
                 currentModule = "acquisition metadata"
