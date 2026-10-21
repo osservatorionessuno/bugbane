@@ -32,4 +32,28 @@ jobs:
       - name: QEMU USB devices in the emulator build
         run: |
           q="$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"
-          "$q" -device help 2>/dev/null | grep -iE 'usb-host|qemu-xhci|usb-redir' || echo "no usb-host/xhci in emulator QEMU"
+          ls -la "$q"; "$ANDROID_HOME/emulator/emulator" -version | head -2
+          export LD_LIBRARY_PATH="$ANDROID_HOME/emulator/lib64:$ANDROID_HOME/emulator/lib64/qt/lib"
+          echo "--- -device help (first lines / errors):"; "$q" -device help 2>&1 | head -5 || true
+          echo "--- USB device types:"; "$q" -device help 2>&1 | grep -i usb || true
+          echo "--- names in the binary:"; strings "$q" | grep -xE 'usb-host|qemu-xhci|usb-ehci|usb-redir|usb-tablet|usb-storage' | sort -u
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # The decisive check: does a guest booted with an xHCI controller see a USB bus?
+      - name: Boot an AVD with an xHCI controller and a USB tablet
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -qemu -device qemu-xhci,id=xhci -device usb-tablet,bus=xhci.0
+          script: |
+            adb shell 'ls /sys/bus/usb/devices; for d in /sys/bus/usb/devices/*/product; do echo "$d: $(cat $d)"; done' || echo "NO USB BUS IN GUEST"
+            adb shell dmesg 2>/dev/null | grep -iE 'xhci|usb' | head -20 || true
