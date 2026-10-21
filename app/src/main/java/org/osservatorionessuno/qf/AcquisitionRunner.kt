@@ -184,6 +184,13 @@ class AcquisitionRunner(
         // The dir once the index is written; null on setup failure so the UI never
         // navigates into an unreadable acquisition.
         var output: File? = null
+        // Another person's device must not doze mid-run: a sleeping target can power-save
+        // its radio or USB port. One shell stream wakes it every 10 s for the whole run; no
+        // setting is changed, and the loop dies with the connection, so nothing lingers.
+        val keepAwake = if (transport?.type != AcquisitionTransport.LOCAL) runCatching {
+            manager.openStream("shell:while :; do input keyevent KEYCODE_WAKEUP; sleep 10; done")
+                .also { log.info("Keeping the target awake with KEYCODE_WAKEUP every 10 s for the whole run") }
+        }.onFailure { log.warning("Could not start keeping the target awake: ${it.describe()}") }.getOrNull() else null
         try {
             val shell = AdbShell(manager)
             val cpu = shell.execFirstLine("getprop ro.product.cpu.abi")
@@ -426,6 +433,7 @@ class AcquisitionRunner(
             // until the automatic first analysis.
             fileKey?.let { SessionKeyCache.put(context, acquisitionDir, it) }
         } finally {
+            runCatching { keepAwake?.close() }
             // Report finished even when setup (env probe, recipient, writer) throws,
             // so the UI never hangs in the scanning state.
             manager.commandLog = null
