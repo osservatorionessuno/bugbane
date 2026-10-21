@@ -19,8 +19,6 @@
     <!-- Analyst mode, Wi-Fi transport (group the scanned device joins + mDNS) -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    <!-- Wi-Fi performance lock while a Wi-Fi Direct group is up (HotspotManager). -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
