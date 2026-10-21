@@ -1,6 +1,7 @@
 package org.osservatorionessuno.cadb
 
 import android.content.Context
+import org.osservatorionessuno.bugbane.AcquisitionService
 import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.os.Build
@@ -354,6 +355,9 @@ class AdbManager(applicationContext: Context) {
         }
         qfCancelled.set(false)
         _adbState.value = AdbState.ConnectedAcquiring
+        // Foreground + CPU wake lock for the whole run: a locked phone would otherwise
+        // freeze the process and suspend the USB port.
+        AcquisitionService.start(appContext!!)
         qfFuture = executor.submit(Runnable {
             try {
                 val out = AcquisitionRunner()
@@ -381,6 +385,8 @@ class AdbManager(applicationContext: Context) {
                 commandOutput.postValue("Error running QuickForensics: " + e.message)
                 _adbState.value = AdbState.ErrorAcquisition
                 qfCancelled.set(true);
+            } finally {
+                AcquisitionService.stop(appContext!!)
             }
         })
     }

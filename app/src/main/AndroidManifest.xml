@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Permission for foreground service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- AcquisitionService: keeps the process and CPU up while a device is being acquired. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Permission to check network state -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Currently used only to fetch IOCs -->
@@ -103,6 +106,10 @@
             android:name="org.osservatorionessuno.cadb.AdbPairingService"
             android:exported="false"
             android:foregroundServiceType="shortService" />
+        <service
+            android:name=".AcquisitionService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- Sent by the system to this app only, when its notifications are unblocked. -->
         <receiver
