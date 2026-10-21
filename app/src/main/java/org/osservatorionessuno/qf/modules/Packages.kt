@@ -185,6 +185,25 @@ class Packages : Module {
     // APKs whose copy into the archive broke off; the partial file stays, the module reports it.
     private val copyFailures = mutableListOf<String>()
 
+    /**
+     * Pull [path] into [output]. The archive streams, so a pull that stalls part-way cannot be
+     * rewound; the bytes already written are intact, so the rest is fetched through the shell.
+     */
+    private fun pullResumable(shell: AdbShell, sync: AdbSync, path: String, output: OutputStream, log: AcquisitionLog) {
+        var received = 0L
+        val counted = object : OutputStream() {
+            override fun write(b: Int) { output.write(b); received++ }
+            override fun write(b: ByteArray, off: Int, len: Int) { output.write(b, off, len); received += len }
+            override fun flush() = output.flush()
+        }
+        try {
+            sync.pull(path, counted)
+        } catch (e: IOException) {
+            log.warning("Pull of $path stalled after $received bytes (${e.message}); fetching the rest through the shell")
+            shell.execToStream("tail -c +${received + 1} ${Utils.shQuote(path)}", output)
+        }
+    }
+
     private fun buildPackageFile(
         shell: AdbShell,
         sync: AdbSync,
@@ -246,7 +265,7 @@ class Packages : Module {
                     if (local != null && !useRemote) {
                         local.inputStream().use { it.copyTo(output) }
                     } else {
-                        sync.pull(packagePath, output)
+                        pullResumable(shell, sync, packagePath, output, log)
                     }
                 }
             }
