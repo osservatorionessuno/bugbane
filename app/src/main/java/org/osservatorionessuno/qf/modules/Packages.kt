@@ -16,6 +16,7 @@ import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.rethrowIfCancelled
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
+import java.io.IOException
 import java.io.FileInputStream
 import java.io.OutputStream
 import java.security.MessageDigest
@@ -109,7 +110,8 @@ class Packages : Module {
             val names = batch.joinToString(" ") { "'$it'" }
             var current: LinkedHashSet<String>? = null
             runCatching {
-                shell.execForEachLine("for p in $names; do echo \"PKG:\$p\"; pm path \"\$p\"; done") { line ->
+                // Sizes ride along (SIZE:<bytes> <path>), to decide pull versus remote parse.
+                shell.execForEachLine("for p in $names; do echo \"PKG:\$p\"; pm path \"\$p\" | while read l; do echo \"\$l\"; stat -c 'SIZE:%s %n' \"\${l#package:}\" 2>/dev/null; done; done") { line ->
                     val trimmed = line.trim()
                     when {
                         // exec retries re-stream the same lines: the per-package set dedups paths
@@ -117,9 +119,24 @@ class Packages : Module {
                             current = paths.getOrPut(trimmed.removePrefix("PKG:")) { LinkedHashSet() }
                         trimmed.startsWith("package:") ->
                             current?.add(trimmed.removePrefix("package:"))
+                        trimmed.startsWith("SIZE:") -> {
+                            val (size, path) = trimmed.removePrefix("SIZE:").split(" ", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+                            size.toLongOrNull()?.let { apkSizes[path] = it }
+                        }
                     }
                 }
             }.rethrowIfCancelled().onFailure { Log.w(TAG, "pm path batch failed: ${it.message}") }
+            // A batch that died (the target busy after bugreportz, a stalled link) must not
+            // silently drop its packages: resolve the missing ones one by one.
+            for (name in batch) {
+                if (name in paths) continue
+                runCatching {
+                    shell.execForEachLine("pm path ${Utils.shQuote(name)}") { line ->
+                        val trimmed = line.trim()
+                        if (trimmed.startsWith("package:")) paths.getOrPut(name) { LinkedHashSet() }.add(trimmed.removePrefix("package:"))
+                    }
+                }.rethrowIfCancelled().onFailure { Log.w(TAG, "pm path failed for $name: ${it.message}") }
+            }
         }
         return paths.mapValues { it.value.toList() }
     }
@@ -170,6 +187,31 @@ class Packages : Module {
         return FileHashes(md5, sha1, sha256, sha512)
     }
 
+    // APKs whose copy into the archive broke off; the partial file stays, the module reports it.
+    private val copyFailures = mutableListOf<String>()
+    private val apkSizes = HashMap<String, Long>()
+    private var cacheDir: File? = null
+    private var pullApkBelowBytes = 0L
+
+    /**
+     * Pull [path] into [output]. The archive streams, so a pull that stalls part-way cannot be
+     * rewound; the bytes already written are intact, so the rest is fetched through the shell.
+     */
+    private fun pullResumable(shell: AdbShell, sync: AdbSync, path: String, output: OutputStream, log: AcquisitionLog) {
+        var received = 0L
+        val counted = object : OutputStream() {
+            override fun write(b: Int) { output.write(b); received++ }
+            override fun write(b: ByteArray, off: Int, len: Int) { output.write(b, off, len); received += len }
+            override fun flush() = output.flush()
+        }
+        try {
+            sync.pull(path, counted)
+        } catch (e: IOException) {
+            log.warning("Pull of $path stalled after $received bytes (${e.message}); fetching the rest through the shell")
+            shell.execToStream("tail -c +${received + 1} ${Utils.shQuote(path)}", output)
+        }
+    }
+
     private fun buildPackageFile(
         shell: AdbShell,
         sync: AdbSync,
@@ -183,8 +225,19 @@ class Packages : Module {
     ): PackageFile {
         // Another phone's path may exist and be readable here too (/system, /product, /apex):
         // only a self scan may ever touch the local filesystem.
-        val useRemote = remoteTarget || FORCE_REMOTE_APK_PARSER
-        val local = if (useRemote) null else File(packagePath).takeIf { it.canRead() }
+        var useRemote = remoteTarget || FORCE_REMOTE_APK_PARSER
+        var local = if (useRemote) null else File(packagePath).takeIf { it.canRead() }
+        // Another phone's small APK: one pull, then hashed and parsed here like a local one.
+        // Larger ones stay on the device and are parsed through the shell.
+        var pulled: File? = null
+        val size = apkSizes[packagePath]
+        if (useRemote && !FORCE_REMOTE_APK_PARSER && size != null && size <= pullApkBelowBytes) {
+            val tmp = File(cacheDir, "apk-" + packageName + ".apk")
+            val ok = runCatching { tmp.outputStream().use { pullResumable(shell, sync, packagePath, it, log) } }
+                .rethrowIfCancelled().onFailure { log.warning("Pulling $packagePath failed (${it.message}); parsing it on the device instead"); tmp.delete() }.isSuccess
+            if (ok) { pulled = tmp; local = tmp; useRemote = false }
+        }
+        try {
         val hashes = when {
             local != null && !useRemote ->
                 hashFileLocally(local, log) ?: hashFileRemotely(shell, packagePath, log)
@@ -231,14 +284,17 @@ class Packages : Module {
                     if (local != null && !useRemote) {
                         local.inputStream().use { it.copyTo(output) }
                     } else {
-                        sync.pull(packagePath, output)
+                        pullResumable(shell, sync, packagePath, output, log)
                     }
                 }
             }
-            result.rethrowIfCancelled().onFailure { log.error("Failed to copy $packagePath: ${it.message}") }
+            result.rethrowIfCancelled().onFailure { copyFailures += packagePath; log.error("Failed to copy $packagePath: ${it.message}") }
         }
 
         return packageFile
+        } finally {
+            pulled?.delete()
+        }
     }
 
     private fun adbShellAsRemote(shell: AdbShell): RemoteAPKParser.Shell =
@@ -260,6 +316,10 @@ class Packages : Module {
         progress: ((Long) -> Unit)?,
         log: AcquisitionLog,
     ) {
+        copyFailures.clear()
+        apkSizes.clear()
+        cacheDir = context.cacheDir
+        pullApkBelowBytes = manager.pullApkBelowBytes
         val shell = AdbShell(manager, progress = progress)
         val sync = AdbSync(manager, progress = progress)
 
@@ -383,5 +443,6 @@ class Packages : Module {
                 }
             }
         }
+        if (copyFailures.isNotEmpty()) throw IOException("incomplete copy of ${copyFailures.joinToString()}")
     }
 }

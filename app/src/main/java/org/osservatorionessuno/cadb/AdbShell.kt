@@ -19,9 +19,10 @@ class AdbShell(
     // Called with the bytes of each output chunk, and with 0 while the command is
     // silent; it may throw to abort the command (user cancel).
     private val progress: ((Long) -> Unit)? = null,
-    // Generous defaults: full dumpsys/logcat dumps run for minutes and can stay quiet ~10s.
+    // Generous defaults: full dumpsys/logcat dumps run for minutes, and a busy target can
+    // stay quiet for a while (find over /proc, pm dump: 30-45 s seen over Wi-Fi).
     private val timeoutMs: Long = 5 * 60_000L,
-    private val inactivityMs: Long = 30_000L
+    private val inactivityMs: Long = 90_000L
 ) {
     companion object {
         private const val RETRIES = 1

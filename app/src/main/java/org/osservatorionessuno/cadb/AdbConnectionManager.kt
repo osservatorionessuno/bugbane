@@ -47,6 +47,8 @@ class AdbConnectionManager private constructor(context: Context) : AbsAdbConnect
      * Defaults to true so an unknown transport can only cost speed, never wrong evidence.
      */
     @Volatile var remoteTarget: Boolean = true
+    /** Remote APKs up to this size are pulled and parsed here; larger ones are parsed on the device. */
+    @Volatile var pullApkBelowBytes: Long = 0
 
     init {
         // The library defaults to API 1, which negotiates 4 KiB packets with checksums.
