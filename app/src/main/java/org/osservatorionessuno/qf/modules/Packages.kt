@@ -16,6 +16,8 @@ import org.osservatorionessuno.qf.ArtifactJson
 import org.osservatorionessuno.qf.rethrowIfCancelled
 import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.File
+import java.io.ByteArrayOutputStream
+import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.FileInputStream
 import java.io.OutputStream
@@ -142,6 +144,11 @@ class Packages : Module {
     }
 
     /** Hash the APK with a single local read; the app can read other packages' APKs directly. */
+    private fun hashBytes(bytes: ByteArray): FileHashes {
+        val (md5, sha1, sha256, sha512) = HASH_ALGORITHMS.map { MessageDigest.getInstance(it).digest(bytes).joinToString("") { b -> "%02x".format(b) } }
+        return FileHashes(md5, sha1, sha256, sha512)
+    }
+
     private fun hashFileLocally(file: File, log: AcquisitionLog): FileHashes? {
         val digests = HASH_ALGORITHMS.map { MessageDigest.getInstance(it) }
         try {
@@ -190,7 +197,6 @@ class Packages : Module {
     // APKs whose copy into the archive broke off; the partial file stays, the module reports it.
     private val copyFailures = mutableListOf<String>()
     private val apkSizes = HashMap<String, Long>()
-    private var cacheDir: File? = null
     private var pullApkBelowBytes = 0L
 
     /**
@@ -226,19 +232,19 @@ class Packages : Module {
         // Another phone's path may exist and be readable here too (/system, /product, /apex):
         // only a self scan may ever touch the local filesystem.
         var useRemote = remoteTarget || FORCE_REMOTE_APK_PARSER
-        var local = if (useRemote) null else File(packagePath).takeIf { it.canRead() }
-        // Another phone's small APK: one pull, then hashed and parsed here like a local one.
+        val local = if (useRemote) null else File(packagePath).takeIf { it.canRead() }
+        // Another phone's small APK: one pull into memory, then hashed and parsed here. Never
+        // written to this phone's disk: only the encrypted archive holds the target's data.
         // Larger ones stay on the device and are parsed through the shell.
-        var pulled: File? = null
+        var pulled: ByteArray? = null
         val size = apkSizes[packagePath]
         if (useRemote && !FORCE_REMOTE_APK_PARSER && size != null && size <= pullApkBelowBytes) {
-            val tmp = File(cacheDir, "apk-" + packageName + ".apk")
-            val ok = runCatching { tmp.outputStream().use { pullResumable(shell, sync, packagePath, it, log) } }
-                .rethrowIfCancelled().onFailure { log.warning("Pulling $packagePath failed (${it.message}); parsing it on the device instead"); tmp.delete() }.isSuccess
-            if (ok) { pulled = tmp; local = tmp; useRemote = false }
+            pulled = runCatching { ByteArrayOutputStream(size.toInt()).also { pullResumable(shell, sync, packagePath, it, log) }.toByteArray() }
+                .rethrowIfCancelled().onFailure { log.warning("Pulling $packagePath failed (${it.message}); parsing it on the device instead") }.getOrNull()
+            if (pulled != null) useRemote = false
         }
-        try {
         val hashes = when {
+            pulled != null -> hashBytes(pulled)
             local != null && !useRemote ->
                 hashFileLocally(local, log) ?: hashFileRemotely(shell, packagePath, log)
             else -> hashFileRemotely(shell, packagePath, log)
@@ -258,7 +264,9 @@ class Packages : Module {
         // RemoteAPKParser soft-fails (empty certs) without throwing; track verified too.
         var verified = false
         val parseOk = runCatching {
-            val apkInfo = if (local != null && !useRemote) {
+            val apkInfo = if (pulled != null) {
+                APKParser.parseAPK(ByteArrayInputStream(pulled))
+            } else if (local != null && !useRemote) {
                 APKParser.parseAPK(local)
             } else {
                 remoteSession.parse(packageName, packagePath, androidUserId(uid))
@@ -281,10 +289,10 @@ class Packages : Module {
             log.step(R.string.step_packages_copying, packagePath)
             val result = runCatching {
                 writer.useArtifact(archivePath) { output ->
-                    if (local != null && !useRemote) {
-                        local.inputStream().use { it.copyTo(output) }
-                    } else {
-                        pullResumable(shell, sync, packagePath, output, log)
+                    when {
+                        pulled != null -> output.write(pulled)
+                        local != null && !useRemote -> local.inputStream().use { it.copyTo(output) }
+                        else -> pullResumable(shell, sync, packagePath, output, log)
                     }
                 }
             }
@@ -292,9 +300,6 @@ class Packages : Module {
         }
 
         return packageFile
-        } finally {
-            pulled?.delete()
-        }
     }
 
     private fun adbShellAsRemote(shell: AdbShell): RemoteAPKParser.Shell =
@@ -318,7 +323,6 @@ class Packages : Module {
     ) {
         copyFailures.clear()
         apkSizes.clear()
-        cacheDir = context.cacheDir
         pullApkBelowBytes = manager.pullApkBelowBytes
         val shell = AdbShell(manager, progress = progress)
         val sync = AdbSync(manager, progress = progress)

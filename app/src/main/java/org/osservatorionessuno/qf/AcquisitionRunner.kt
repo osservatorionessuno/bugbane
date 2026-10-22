@@ -173,9 +173,9 @@ class AcquisitionRunner(
         manager.remoteTarget = transport?.type != AcquisitionTransport.LOCAL
         // Parsing an APK on the device costs five shell round trips and four reads of the file,
         // ~2 s over USB and ~4.5 s over Wi-Fi measured; pulling it is one transfer at ~12 MB/s
-        // (USB) or ~5 MB/s (5 GHz Wi-Fi). Both break even near 20 MB: pull below, parse the
-        // rest remotely.
-        manager.pullApkBelowBytes = if (transport?.type == null || transport.type == AcquisitionTransport.LOCAL) 0L else 24L shl 20
+        // (USB) or ~5 MB/s (5 GHz Wi-Fi). Both break even near 20 MB. The pull is held in
+        // memory (never on this phone's disk), which also bounds the size.
+        manager.pullApkBelowBytes = if (transport?.type == null || transport.type == AcquisitionTransport.LOCAL) 0L else 16L shl 20
         log.info("Bugbane version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}, ${BuildConfig.FLAVOR} ${BuildConfig.BUILD_TYPE})")
         runCatching { log.info("Bugbane build: ${appBuild(context)}") }
             .onFailure { log.warning("Bugbane build details unavailable: ${it.describe()}") }

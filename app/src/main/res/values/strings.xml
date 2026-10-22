@@ -89,7 +89,6 @@
     <string name="step_logcat_old">Copying the system log from before the last reboot</string>
     <string name="step_files_listing">Listing files in %1$s</string>
     <string name="step_files_collecting">Listing all files on the device</string>
-    <string name="step_files_pulling">Copying the file list</string>
     <string name="scan_acquisition_failed_message">Warning: Acquisition is incomplete.\nYou can find it in the Acquisitions screen.\nFailed modules: %1$s</string>
     <string name="scan_acquisition_failed_rescan">Perform another acquisition</string>
     <string name="scan_acquisition_low_space_message">Skipped, not enough free space: %1$s</string>
