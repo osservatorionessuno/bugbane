@@ -10,10 +10,32 @@ import org.osservatorionessuno.qf.storage.ArtifactSink
 import java.io.OutputStream
 
 /**
- * Sample module that runs `dumpsys` and stores the output.
+ * Runs full `dumpsys`, then fetches any [REQUIRED_SERVICES] that never appeared
+ * as a dedicated `dumpsys <service>` artifact.
  */
 class Dumpsys : Module {
     override val name: String = "dumpsys"
+
+    /**
+     * @param name service name as it appears in `DUMP OF SERVICE <name>:`
+     * @param args arguments after `dumpsys` for the dedicated fetch
+     */
+    data class RequiredService(val name: String, val extraArgs: String = "")
+
+    companion object {
+        val REQUIRED_SERVICES = listOf(
+            RequiredService("adb"),
+            RequiredService("package"),
+            RequiredService("appops"),
+            RequiredService("accessibility"),
+            RequiredService("batterystats"),
+            RequiredService("platform_compat"),
+            RequiredService("dbinfo"),
+            RequiredService("device_policy"),
+            RequiredService("dropbox", "--print"),
+            RequiredService("settings"),
+        )
+    }
 
     override fun run(
         context: Context,
@@ -23,11 +45,27 @@ class Dumpsys : Module {
         log: AcquisitionLog,
     ) {
         val shell = AdbShell(manager, progress = progress)
+        val seen = LinkedHashSet<String>()
         writer.useArtifact("dumpsys.txt") { output ->
-            shell.execToStream("dumpsys", DumpsysServiceSniffer(output) { log.show(R.string.step_dumpsys_service, it) })
+            shell.execToStream("dumpsys", DumpsysServiceSniffer(output) { service ->
+                seen += service
+                log.show(R.string.step_dumpsys_service, service)
+            })
         }
-        // Dropbox bodies: 3 days of app/native crashes and ANRs, outliving logcat's ring buffers.
-        writer.useArtifact("dumpsys_dropbox.txt") { shell.execToStream("dumpsys dropbox --print", it) }
+
+        for (svc in REQUIRED_SERVICES) {
+            if (svc.name in seen && svc.extraArgs == "") continue
+            
+            // The service was not dumped or we need to dump it with extra args.
+            log.step(R.string.step_dumpsys_service, svc.name)
+            runCatching {
+                writer.useArtifact("dumpsys_${svc.name}.txt") { output ->
+                    // Frame like the full dump so libmvt extractDumpsysSection matches.
+                    output.write("DUMP OF SERVICE ${svc.name}:\n".toByteArray(Charsets.UTF_8))
+                    shell.execToStream("dumpsys ${svc.name} ${svc.extraArgs}", output)
+                }
+            }.onFailure { log.warning("Failed to collect dumpsys ${svc.name}: ${it.message}") }
+        }
     }
 }
 

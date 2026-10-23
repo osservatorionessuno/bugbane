@@ -2,6 +2,7 @@ package org.osservatorionessuno.qf.modules
 
 import java.io.ByteArrayOutputStream
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class DumpsysServiceSnifferTest {
@@ -20,5 +21,20 @@ class DumpsysServiceSnifferTest {
         }
         assertEquals(listOf("activity", "SurfaceFlinger"), services)
         assertEquals(text, out.toString(Charsets.UTF_8.name()))
+    }
+
+    @Test
+    fun requiredServicesDetectsMissingNames() {
+        val seen = setOf("adb", "package", "appops")
+        val missing = Dumpsys.REQUIRED_SERVICES.filter { it.name !in seen }.map { it.name }
+        assertTrue("accessibility" in missing)
+        assertTrue("adb" !in missing)
+        assertTrue(missing.isNotEmpty())
+    }
+
+    @Test
+    fun dropboxUsesPrintArgs() {
+        val dropbox = Dumpsys.REQUIRED_SERVICES.single { it.name == "dropbox" }
+        assertEquals("dropbox --print", dropbox.extraArgs)
     }
 }

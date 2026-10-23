@@ -5,6 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.osservatorionessuno.bugbane.utils.Utils
 import org.osservatorionessuno.bugbane.utils.initLibmvtLogging
+import org.osservatorionessuno.libmvt.android.AcquisitionMetadata
 import org.osservatorionessuno.libmvt.android.ForensicRunner
 import org.osservatorionessuno.libmvt.common.GroupedDetection
 import org.osservatorionessuno.libmvt.common.Indicators
@@ -70,6 +71,8 @@ object AcquisitionScanner {
         val resolver = AndroidStringResolver(context)
         val runner = ForensicRunner(resolver)
         runner.setIndicators(indicators)
+        // Sidecar may carry androidqf collector.ExePath/SHA256 (imported dumps).
+        runner.applyAcquisitionMetadata(AcquisitionMetadata.load(acquisitionDir))
 
         val artifacts = LinkedHashMap<String, Artifact>()
         if (File(acquisitionDir, ARCHIVE_FILE).exists()) {

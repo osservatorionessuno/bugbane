@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import android.app.ActivityManager
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.osservatorionessuno.bugbane.MainActivity
 import org.osservatorionessuno.bugbane.R
 import org.osservatorionessuno.cadb.AdbManager
@@ -239,6 +241,13 @@ object AcquisitionProgressTracker {
                 AcquisitionScanner.scan(context.applicationContext, acquisitionDir, identity)
             } catch (t: Throwable) {
                 Log.e(TAG, "Analysis failed", t)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context.applicationContext,
+                        context.getString(R.string.analysis_failed),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
             } finally {
                 identity.destroy()
                 _analyzing.value = null

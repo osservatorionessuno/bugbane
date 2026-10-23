@@ -197,6 +197,7 @@
     <string name="acquisition_details_share">Share</string>
     <string name="acquisition_details_rescan">Run Analysis</string>
     <string name="analysis_in_progress">Analysis in progress...</string>
+    <string name="analysis_failed">Analysis failed</string>
     <string name="export_in_progress">Export in progress...</string>
 
     <!-- Messages for export/share passphrases -->
