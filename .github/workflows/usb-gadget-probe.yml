@@ -1,0 +1,59 @@
+# Probe only: can a GitHub runner host a virtual USB gadget (dummy_hcd + FunctionFS)
+# and can the Linux emulator's QEMU pass a host USB device into the guest? Both are
+# needed to acquire an emulated target over USB in analyst mode (any Android version).
+name: USB gadget probe
+
+on:
+  push:
+    branches: [ usb-gadget-probe ]
+  pull_request:
+    paths: [ .github/workflows/usb-gadget-probe.yml ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kernel gadget modules
+        run: |
+          uname -r; dpkg -l | grep -E 'linux-modules(-extra)?-' | awk '{print $2, $3}'
+          sudo modprobe dummy_hcd && echo "dummy_hcd: ok" || echo "dummy_hcd: MISSING"
+          sudo modprobe libcomposite && echo "libcomposite: ok" || echo "libcomposite: MISSING"
+          sudo modprobe usb_f_fs && echo "usb_f_fs: ok" || echo "usb_f_fs: MISSING"
+          echo "udc:"; ls /sys/class/udc || true
+          # Stock test gadget bound to the dummy controller must show up as a USB device.
+          sudo modprobe g_zero && sleep 2 && lsusb && (lsusb | grep -qi "gadget zero" && echo "g_zero: VISIBLE" || echo "g_zero: not visible") || echo "g_zero: MISSING"
+      - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: emulator
+      - name: QEMU USB devices in the emulator build
+        run: |
+          q="$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"
+          ls -la "$q"; "$ANDROID_HOME/emulator/emulator" -version | head -2
+          export LD_LIBRARY_PATH="$ANDROID_HOME/emulator/lib64:$ANDROID_HOME/emulator/lib64/qt/lib"
+          echo "--- -device help (first lines / errors):"; "$q" -device help 2>&1 | head -5 || true
+          echo "--- USB device types:"; "$q" -device help 2>&1 | grep -i usb || true
+          echo "--- names in the binary:"; strings "$q" | grep -xE 'usb-host|qemu-xhci|usb-ehci|usb-redir|usb-tablet|usb-storage' | sort -u
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # The decisive check: does a guest booted with an xHCI controller see a USB bus?
+      - name: Boot an AVD with an xHCI controller and a USB tablet
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -qemu -device qemu-xhci,id=xhci -device usb-tablet,bus=xhci.0
+          script: |
+            adb shell 'ls /sys/bus/usb/devices; for d in /sys/bus/usb/devices/*/product; do echo "$d: $(cat $d)"; done' || echo "NO USB BUS IN GUEST"
+            adb shell dmesg 2>/dev/null | grep -iE 'xhci|usb' | head -20 || true
