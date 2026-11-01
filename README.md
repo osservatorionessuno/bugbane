@@ -19,7 +19,7 @@
 
 Documentation lives on the official website, [bugbane.org](https://bugbane.org/). In particular, see the [security architecture](https://bugbane.org/docs/security/) and the [risks and warnings](https://bugbane.org/docs/risks/).
 
-Bugbane is currently in **beta**. The store listings below are the beta channel; a stable release will follow.
+Bugbane is currently in **beta**. The store listings below are for the beta channel; a stable release will follow.
 
 <div align="center">
 
@@ -43,7 +43,7 @@ Bugbane is an open-source Android application designed to help potential spyware
 <img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" /> <img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" /> <img width="260" alt="image" src="https://raw.githubusercontent.com/osservatorionessuno/bugbane/refs/heads/main/fastlane/metadata/android/en-US/images/phoneScreenshots/6.png" />
 
 
-Unlike existing tools such as [MVT](https://mvt.re), Bugbane does not require a separate computer, command-line usage, or debugging skills. It uses ADB Wireless Debugging to issue commands directly to the same device on which it is installed, through a guided, user-friendly interface.
+Unlike existing tools such as [MVT](https://mvt.re), Bugbane does not require a separate computer, command-line experience, or debugging skills. It uses ADB Wireless Debugging to issue commands directly to the same device on which it is installed, through a guided, user-friendly interface.
 
 Exports are intended to be [AndroidQF](https://github.com/mvt-project/androidqf)-compliant, making them portable and analyzable off-device using existing tools, and can be easily shared via Signal or other communication tools. Each export is automatically encrypted with a random password using [age](https://github.com/FiloSottile/age). Since exported data can contain sensitive personal information, the initial scan is performed on-device using a re-implementation of MVT that reuses the same IOCs as the original.
 
@@ -54,11 +54,11 @@ Portions of the code in Shizuku are distributed under the Apache 2.0 License, wh
 
 ## Project Structure
 
-Bugbane is divided in 4 main coponents:
+Bugbane is divided in 4 main components:
 - the Bugbane UI components and activities (`org.osservatorionessuno.bugbane.*`)
 - **cabd**, a Kotlin implementation of a minimal ADB client (`org.osservatorionessuno.cadb.*`)
-- **QF**, a Kotlin implementation of [AndroidQF](https://github.com/mvt-project/androidqf/) acquisition modules (`org.osservatorionessuno.qf.*`). Its main entrypoint is the `AcquisitionRunner` class.
-- **LibMVT**, a Java implementation of [MVT](https://github.com/mvt-project/mvt/) IOC analysis engine (`org.osservatorionessuno.libmvt.*`). Its main entrypoint is the `ForeniscRunner` class.
+- **QF**, a Kotlin implementation of the [AndroidQF](https://github.com/mvt-project/androidqf/) acquisition modules (`org.osservatorionessuno.qf.*`). Its main entrypoint is the `AcquisitionRunner` class.
+- **LibMVT**, a Java implementation of the [MVT](https://github.com/mvt-project/mvt/) IOC analysis engine (`org.osservatorionessuno.libmvt.*`). Its main entrypoint is the `ForeniscRunner` class.
 
 ## Translations
 
