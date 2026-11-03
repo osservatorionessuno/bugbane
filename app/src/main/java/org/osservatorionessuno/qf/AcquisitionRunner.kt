@@ -171,6 +171,11 @@ class AcquisitionRunner(
         // Records every shell command and file transfer until the run ends.
         manager.commandLog = log
         manager.remoteTarget = transport?.type != AcquisitionTransport.LOCAL
+        // Parsing an APK on the device costs five shell round trips and four reads of the file,
+        // ~2 s over USB and ~4.5 s over Wi-Fi measured; pulling it is one transfer at ~12 MB/s
+        // (USB) or ~5 MB/s (5 GHz Wi-Fi). Both break even near 20 MB: pull below, parse the
+        // rest remotely.
+        manager.pullApkBelowBytes = if (transport?.type == null || transport.type == AcquisitionTransport.LOCAL) 0L else 24L shl 20
         log.info("Bugbane version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}, ${BuildConfig.FLAVOR} ${BuildConfig.BUILD_TYPE})")
         runCatching { log.info("Bugbane build: ${appBuild(context)}") }
             .onFailure { log.warning("Bugbane build details unavailable: ${it.describe()}") }
@@ -184,6 +189,13 @@ class AcquisitionRunner(
         // The dir once the index is written; null on setup failure so the UI never
         // navigates into an unreadable acquisition.
         var output: File? = null
+        // Another person's device must not doze mid-run: a sleeping target can power-save
+        // its radio or USB port. One shell stream wakes it every 10 s for the whole run; no
+        // setting is changed, and the loop dies with the connection, so nothing lingers.
+        val keepAwake = if (transport?.type != AcquisitionTransport.LOCAL) runCatching {
+            manager.openStream("shell:while :; do input keyevent KEYCODE_WAKEUP; sleep 10; done")
+                .also { log.info("Keeping the target awake with KEYCODE_WAKEUP every 10 s for the whole run") }
+        }.onFailure { log.warning("Could not start keeping the target awake: ${it.describe()}") }.getOrNull() else null
         try {
             val shell = AdbShell(manager)
             val cpu = shell.execFirstLine("getprop ro.product.cpu.abi")
@@ -426,6 +438,7 @@ class AcquisitionRunner(
             // until the automatic first analysis.
             fileKey?.let { SessionKeyCache.put(context, acquisitionDir, it) }
         } finally {
+            runCatching { keepAwake?.close() }
             // Report finished even when setup (env probe, recipient, writer) throws,
             // so the UI never hangs in the scanning state.
             manager.commandLog = null
